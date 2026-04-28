@@ -1,34 +1,34 @@
-.App-logo {
-    height: 40vmin;
-    pointer-events: none;
+/* App-specific overrides - main styles are in index.css */
+
+/* Ensure dropdowns have correct z-index */
+[data-radix-popper-content-wrapper] {
+  z-index: 100 !important;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-    .App-logo {
-        animation: App-logo-spin infinite 20s linear;
-    }
+/* Leaflet map fixes */
+.leaflet-container {
+  font-family: inherit;
+  z-index: 0;
+}
+.leaflet-control-attribution {
+  font-size: 10px !important;
 }
 
-.App-header {
-    background-color: #0f0f10;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    font-size: calc(10px + 2vmin);
-    color: white;
+/* Better focus rings */
+:focus-visible {
+  outline: 2px solid hsl(var(--primary));
+  outline-offset: 2px;
 }
 
-.App-link {
-    color: #61dafb;
+/* Smooth transitions for theme */
+*, *::before, *::after {
+  transition-property: background-color, border-color, color, fill, stroke;
+  transition-duration: 150ms;
+  transition-timing-function: ease;
 }
 
-@keyframes App-logo-spin {
-    from {
-        transform: rotate(0deg);
-    }
-    to {
-        transform: rotate(360deg);
-    }
+/* Override transition for animations */
+.animate-slide-up, .animate-fade-in-up, .animate-scale-in,
+.animate-float, .animate-marquee, .spinner {
+  transition: none !important;
 }
