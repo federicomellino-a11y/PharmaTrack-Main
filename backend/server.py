@@ -1509,6 +1509,8 @@ async def confirm_delivery_payment(delivery_id: str, request: Request, user: dic
         raise HTTPException(status_code=404, detail="Consegna non trovata")
     if delivery.get("status") not in ["delivered_pending_confirmation", "delivered"]:
         raise HTTPException(status_code=400, detail="La consegna non è in attesa di conferma incasso")
+    if delivery.get("payment_collected") is True and delivery.get("status") == "delivered":
+        raise HTTPException(status_code=400, detail="Incasso già confermato")
 
     body = {}
     try:
