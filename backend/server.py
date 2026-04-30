@@ -1988,7 +1988,12 @@ async def winfarm_import(request: Request, user: dict = Depends(get_current_user
     if not customer and customer_phone:
         digits = "".join(c for c in customer_phone if c.isdigit())
         if digits:
-            customer = await db.customers.find_one({"pharmacy_id": user["user_id"], "phone": {"$regex": digits + "$"}}, {"_id": 0})
+            # match per ultime 9 cifre (gestisce prefissi internazionali e formattazioni varie)
+            tail = digits[-9:] if len(digits) >= 9 else digits
+            customer = await db.customers.find_one(
+                {"pharmacy_id": user["user_id"], "phone": {"$regex": tail + "$"}},
+                {"_id": 0},
+            )
     if not customer and customer_name:
         customer = await db.customers.find_one({"pharmacy_id": user["user_id"], "name": {"$regex": f"^{customer_name}$", "$options": "i"}}, {"_id": 0})
 

@@ -62,8 +62,21 @@ Esempio di feature richiesta: doppia conferma consegna+incasso (la farmacia deve
   - **Scorciatoie tastiera per velocità al banco**: `N`=nuova consegna, `C`=clienti, `D`=dashboard, `S`=turni, `/`=focus search
 - Test backend: 14/14 pytest passati (`test_pharmatrack.py`)
 
-### Test Credentials
-Vedi `/app/memory/test_credentials.md`
+### 2026-04-30 — Landing rinnovata + Demo + Bridge Winfarm ✓
+**Landing**:
+- Riscritta copy senza ripetizioni: hero "Le consegne della tua farmacia, finalmente sotto controllo"
+- Tolto cliché "100% Gratuito", "consegnare smart", "tutto in un unico posto"
+- Box demo evidenziato (giallo) con due pulsanti **Demo Farmacia** e **Demo Fattorino** che fanno auto-login con credenziali test e navigano direttamente al dashboard
+
+**Bridge Winfarm** (Pharmaservice, gestionale farmacia senza API):
+- `POST /api/integrations/winfarm/import` — endpoint REST che accetta JSON (con alias italiani: cliente/telefono/indirizzo/importo/pagamento/note/ricevuta) e crea delivery in stato `da_preparare`. Cerca cliente esistente per id/phone/name (case-insensitive); crea nuovo cliente se solo name fornito; aggiunge `imported_from='winfarm'` e `external_ref`.
+- Phone matching su ultime 9 cifre per gestire prefissi internazionali (+39 etc.)
+- Notifica push/in-app automatica alla farmacia
+- `pages/pharmacy/Deliveries.jsx`: dialog Nuova Consegna ora legge querystring `?new=1&customer_name=…&customer_phone=…&amount=…&payment_method=…&notes=…` e pre-compila il form. Match cliente automatico per telefono normalizzato; se non trovato, popola la barra di ricerca.
+- `pages/pharmacy/Integrations.jsx` (NEW): pagina `/integrations` con istruzioni step-by-step (download AutoHotkey → configura URL → usa Ctrl+F10), deep-link di prova con preview, parametri URL documentati, esempio body JSON dell'API REST.
+- `public/pharmatrack_winfarm.ahk` — script AutoHotkey v1.1 scaricabile dalla pagina /integrations: hotkey Ctrl+F10 → copia clipboard → estrae cliente/telefono/totale via regex configurabili → apre PharmaTrack pre-compilato.
+
+**Test backend**: 23/23 pytest passed (14 Phase-1 regression + 9 nuovi Winfarm). Bug ObjectId in winfarm_import scoperto e corretto durante i test.
 
 ## Backlog prioritizzato
 
