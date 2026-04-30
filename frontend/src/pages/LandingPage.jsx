@@ -19,18 +19,18 @@ const PHOTOS = [
 ];
 
 const FEATURES = [
-  { icon: <Package className="w-5 h-5" />, title: 'Consegne in tempo reale', description: 'Crea, assegna e traccia ogni ordine. Il fattorino riceve tutto sul telefono — zero telefonate, zero confusione.', color: 'from-teal-500/20 to-teal-500/5', accent: 'text-teal-600', border: 'hover:border-teal-500/40' },
-  { icon: <MapPin className="w-5 h-5" />, title: 'Indirizzi sempre precisi', description: 'Geocodifica ogni cliente con Google Maps. Il fattorino apre la navigazione con un tap.', color: 'from-blue-500/20 to-blue-500/5', accent: 'text-blue-600', border: 'hover:border-blue-500/40' },
-  { icon: <MessageSquare className="w-5 h-5" />, title: 'Chat operativa integrata', description: 'Messaggi istantanei tra farmacia e fattorini. Niente WhatsApp personali, tutto in un unico posto.', color: 'from-violet-500/20 to-violet-500/5', accent: 'text-violet-600', border: 'hover:border-violet-500/40' },
-  { icon: <BarChart3 className="w-5 h-5" />, title: 'Report e analisi', description: 'Monitora incassi, performance per fattorino e clienti più attivi. Tutto esportabile.', color: 'from-orange-500/20 to-orange-500/5', accent: 'text-orange-600', border: 'hover:border-orange-500/40' },
-  { icon: <Users className="w-5 h-5" />, title: 'Anagrafica clienti completa', description: 'Storico consegne, note personali, numeri aggiuntivi e metodo di pagamento — sempre disponibili.', color: 'from-rose-500/20 to-rose-500/5', accent: 'text-rose-600', border: 'hover:border-rose-500/40' },
-  { icon: <Bell className="w-5 h-5" />, title: 'Notifiche push', description: 'Avvisi istantanei anche col browser chiuso. Nessun ordine dimenticato, mai.', color: 'from-green-500/20 to-green-500/5', accent: 'text-green-600', border: 'hover:border-green-500/40' },
+  { icon: <Package className="w-5 h-5" />, title: 'Consegne tracciate dal banco al portone', description: 'Crea l\'ordine, assegna il fattorino, stampa la bolla. Lui riceve tutto sul telefono e tu sai dove si trova in ogni momento.', color: 'from-teal-500/20 to-teal-500/5', accent: 'text-teal-600', border: 'hover:border-teal-500/40' },
+  { icon: <MapPin className="w-5 h-5" />, title: 'Indirizzi geolocalizzati', description: 'Ogni cliente ha la sua posizione esatta su Google Maps. Il fattorino apre la navigazione con un tap e parte.', color: 'from-blue-500/20 to-blue-500/5', accent: 'text-blue-600', border: 'hover:border-blue-500/40' },
+  { icon: <MessageSquare className="w-5 h-5" />, title: 'Comunicazione in un solo posto', description: 'Chat dedicata farmacia–fattorini. Niente più WhatsApp privati né telefonate ripetute mentre sei al banco.', color: 'from-violet-500/20 to-violet-500/5', accent: 'text-violet-600', border: 'hover:border-violet-500/40' },
+  { icon: <BarChart3 className="w-5 h-5" />, title: 'Report di cassa e turni', description: 'Incassi del giorno, contanti vs POS, performance per fattorino e clienti più assidui — tutto già pronto a fine giornata.', color: 'from-orange-500/20 to-orange-500/5', accent: 'text-orange-600', border: 'hover:border-orange-500/40' },
+  { icon: <Users className="w-5 h-5" />, title: 'Anagrafica clienti su misura', description: 'Storico consegne, codice fiscale, recapiti aggiuntivi e note rapide. Il farmacista trova tutto al primo colpo.', color: 'from-rose-500/20 to-rose-500/5', accent: 'text-rose-600', border: 'hover:border-rose-500/40' },
+  { icon: <Bell className="w-5 h-5" />, title: 'Doppia conferma incasso', description: 'Il fattorino segna la consegna; tu confermi l\'avvenuto incasso. Zero contestazioni, cassa sempre quadrata.', color: 'from-green-500/20 to-green-500/5', accent: 'text-green-600', border: 'hover:border-green-500/40' },
 ];
 
 const STEPS = [
-  { n: '01', title: 'Registra la farmacia', desc: 'Account gratuito in 2 minuti. Nessuna carta di credito richiesta.' },
-  { n: '02', title: 'Aggiungi fattorini e clienti', desc: 'Crea l\'anagrafica clienti e le credenziali per ogni fattorino dal pannello admin.' },
-  { n: '03', title: 'Consegna con controllo totale', desc: 'Assegna, traccia e chiudi ogni consegna in tempo reale dalla dashboard.' },
+  { n: '01', title: 'Registra la farmacia', desc: 'Account pronto in due minuti, senza inserire dati di pagamento.' },
+  { n: '02', title: 'Carica fattorini e clienti', desc: 'Crea le credenziali per ogni fattorino e l\'anagrafica clienti dal pannello.' },
+  { n: '03', title: 'Inizia a consegnare', desc: 'Apri il primo ordine: il fattorino lo vede subito, tu segui tutto in tempo reale.' },
 ];
 
 function useIntersection(threshold = 0.15) {
@@ -123,7 +123,7 @@ export default function LandingPage() {
             </h1>
 
             <p className="text-lg text-muted-foreground mb-9 max-w-lg leading-relaxed">
-              PharmaTrack è il gestionale pensato per le farmacie italiane. Coordina i fattorini, traccia ogni ordine e analizza le performance — tutto da un'unica schermata, su qualsiasi dispositivo.
+              Il gestionale che porta dietro al banco i tuoi fattorini, i clienti e la cassa. Apri l'ordine, lo assegni, lo segui — tutto in pochi tap, senza alzare la cornetta.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-3 mb-9">
@@ -138,7 +138,7 @@ export default function LandingPage() {
             </div>
 
             <div className="flex flex-wrap gap-5 text-sm text-muted-foreground">
-              {['Nessuna carta richiesta', 'Setup in 2 minuti', 'Supporto incluso'].map((t) => (
+              {['Senza carta di credito', 'Pronto in due minuti', 'Supporto incluso'].map((t) => (
                 <span key={t} className="flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />{t}
                 </span>
@@ -189,10 +189,10 @@ export default function LandingPage() {
       <section className="py-12 border-y border-border bg-secondary/20 px-4">
         <div className="max-w-5xl mx-auto grid grid-cols-2 sm:grid-cols-4 gap-8 text-center">
           {[
-            { icon: <TrendingUp className="w-5 h-5" />, v: '100%', label: 'Gratuito per sempre' },
-            { icon: <Package className="w-5 h-5" />, v: 'Live', label: 'Tracciamento consegne' },
-            { icon: <Smartphone className="w-5 h-5" />, v: 'PWA', label: 'Funziona su tutti i dispositivi' },
-            { icon: <Shield className="w-5 h-5" />, v: 'HTTPS', label: 'Dati sicuri e crittografati' },
+            { icon: <TrendingUp className="w-5 h-5" />, v: 'Free', label: 'Per le farmacie italiane' },
+            { icon: <Package className="w-5 h-5" />, v: 'Live', label: 'Tracciamento delle consegne' },
+            { icon: <Smartphone className="w-5 h-5" />, v: 'PWA', label: 'Web, smartphone e tablet' },
+            { icon: <Shield className="w-5 h-5" />, v: 'HTTPS', label: 'Connessione cifrata' },
           ].map((s) => (
             <div key={s.label} className="group">
               <div className="flex justify-center mb-2 text-primary group-hover:scale-110 transition-transform">{s.icon}</div>
@@ -212,10 +212,10 @@ export default function LandingPage() {
               className="text-3xl sm:text-4xl font-bold mb-4"
               style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
             >
-              Tutto quello che ti serve,<br className="hidden sm:block" /> niente di quello che non ti serve.
+              Solo le funzioni che usi davvero,<br className="hidden sm:block" /> giorno dopo giorno.
             </h2>
             <p className="text-muted-foreground max-w-lg mx-auto text-lg">
-              Progettato da zero per il flusso di lavoro reale di una farmacia italiana.
+              Niente menù infiniti né schermate che rallentano. Ogni schermata è pensata per un farmacista che ha venti secondi tra un cliente e l'altro.
             </p>
           </RevealSection>
 
@@ -267,14 +267,14 @@ export default function LandingPage() {
       <section className="py-28 px-4 sm:px-6 lg:px-8">
         <div className="max-w-6xl mx-auto">
           <RevealSection className="text-center mb-14">
-            <p className="text-sm font-semibold text-primary uppercase tracking-wider mb-3">Due portali dedicati</p>
+            <p className="text-sm font-semibold text-primary uppercase tracking-wider mb-3">Due portali, un'unica logica</p>
             <h2
               className="text-3xl sm:text-4xl font-bold mb-4"
               style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
             >
-              Un'interfaccia per ogni ruolo.
+              Ognuno vede ciò che gli serve.
             </h2>
-            <p className="text-muted-foreground max-w-md mx-auto">La farmacia ha il suo pannello. Il fattorino ha la sua app. Entrambi funzionano su qualsiasi dispositivo.</p>
+            <p className="text-muted-foreground max-w-md mx-auto">In farmacia hai il quadro completo. Il fattorino ha l'app sul telefono con la singola consegna che gli interessa.</p>
           </RevealSection>
 
           <div className="grid sm:grid-cols-2 gap-6 max-w-3xl mx-auto">
@@ -282,20 +282,20 @@ export default function LandingPage() {
               {
                 icon: <HeartPulse className="w-6 h-6" />,
                 title: 'Portale Farmacia',
-                subtitle: 'Controllo completo dalla scrivania o dal telefono',
+                subtitle: 'Tutto sotto controllo, dalla scrivania o dal cellulare',
                 color: 'border-teal-500/30 bg-teal-500/5',
                 iconColor: 'text-teal-600',
                 iconBg: 'bg-teal-500/10',
-                points: ['Dashboard con mappa live e consegne attive', 'Gestione clienti con anagrafica completa', 'Chat con tutti i fattorini in tempo reale', 'Report, statistiche e archivio consegne'],
+                points: ['Mappa live e consegne in corso', 'Anagrafica clienti con storico completo', 'Chat con i fattorini in tempo reale', 'Cassa, turni e archivio già impaginati'],
               },
               {
                 icon: <Truck className="w-6 h-6" />,
                 title: 'App Fattorino',
-                subtitle: 'Ottimizzata per chi è sempre in movimento',
+                subtitle: 'Pensata per chi è in scooter o in auto',
                 color: 'border-blue-500/30 bg-blue-500/5',
                 iconColor: 'text-blue-600',
                 iconBg: 'bg-blue-500/10',
-                points: ['Lista consegne assegnate con priorità', 'Navigazione Google Maps con un tap', 'Chat diretta con la farmacia', 'Conferma consegna e metodo di pagamento'],
+                points: ['Consegne ordinate per priorità', 'Navigazione Maps con un tap', 'Inizio e chiusura turno integrati', 'Conferma consegna e pagamento al volo'],
               },
             ].map((p, i) => (
               <RevealSection key={p.title} delay={i * 100}>
@@ -331,11 +331,11 @@ export default function LandingPage() {
                 className="text-3xl sm:text-5xl font-extrabold mb-4 text-foreground"
                 style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
               >
-                Pronto a consegnare<br />in modo più smart?
+                Pronto a portare ordine<br />nel giro consegne?
               </h2>
 
               <p className="text-muted-foreground mb-9 text-lg max-w-md mx-auto leading-relaxed">
-                Crea il tuo account in meno di due minuti. Zero costi, zero vincoli, supporto incluso.
+                Apri il tuo account in due minuti. La tua farmacia inizia a consegnare in modo organizzato già dal primo turno.
               </p>
 
               <Button size="lg" className="btn-primary px-14 h-14 text-base font-semibold shadow-xl shadow-primary/25 hover-lift" asChild>
@@ -343,7 +343,7 @@ export default function LandingPage() {
               </Button>
 
               <p className="text-sm text-muted-foreground mt-6">
-                Già attivo in farmacie italiane · Nessuna carta richiesta
+                Già usato da farmacie italiane · Senza dati di pagamento
               </p>
             </div>
           </div>
