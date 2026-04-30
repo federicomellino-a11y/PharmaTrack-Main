@@ -15,7 +15,7 @@ import { ensureArray } from '@/lib/collections';
 import {
   LayoutDashboard, Users, Package, Truck, MessageSquare, Archive, Settings,
   Bell, LogOut, Menu, X, ChevronRight, BarChart3, Stethoscope,
-  Phone, StickyNote, Sun, Moon, Plus, Home, Check, Trash2, RefreshCw, Map, Wallet
+  Phone, StickyNote, Sun, Moon, Plus, Home, Check, Trash2, RefreshCw, Map, Wallet, Plug
 } from 'lucide-react';
 
 const navItems = [
@@ -32,6 +32,7 @@ const navItems = [
   { path: '/useful-numbers',icon: Phone,           label: 'Numeri Utili' },
   { path: '/notes',         icon: StickyNote,      label: 'Block Notes' },
   { divider: true },
+  { path: '/integrations',  icon: Plug,            label: 'Integrazioni' },
   { path: '/archive',       icon: Archive,         label: 'Archivio' },
   { path: '/settings',      icon: Settings,        label: 'Impostazioni' },
 ];

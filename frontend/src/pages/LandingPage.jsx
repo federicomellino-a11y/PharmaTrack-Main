@@ -1,13 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import axios from 'axios';
+import { API } from '@/lib/config';
 import { Button } from '../components/ui/button';
 import {
   MapPin, MessageSquare, BarChart3, Users, Package, Shield,
   Zap, ArrowRight, CheckCircle2, Truck, Clock, Download,
   ChevronRight, Globe, Lock, HeartPulse, Route, Star,
-  TrendingUp, Bell, Smartphone,
+  TrendingUp, Bell, Smartphone, Sparkles,
 } from 'lucide-react';
 import { usePWAInstall } from '@/hooks/usePWAInstall';
+import { toast } from 'sonner';
 
 const PHOTOS = [
   'https://images.unsplash.com/photo-1631549916768-4119b2e5f926?w=900&auto=format&fit=crop&q=80',
@@ -68,11 +71,36 @@ function RevealSection({ children, className = '', delay = 0 }) {
 export default function LandingPage() {
   const { isInstallable, install } = usePWAInstall();
   const [photo, setPhoto] = useState(0);
+  const [demoLoading, setDemoLoading] = useState(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const t = setInterval(() => setPhoto((p) => (p + 1) % PHOTOS.length), 3500);
     return () => clearInterval(t);
   }, []);
+
+  const handleDemoLogin = async (kind) => {
+    setDemoLoading(kind);
+    try {
+      if (kind === 'pharmacy') {
+        await axios.post(`${API}/auth/login`, {
+          email: 'test@farmaciaprova.it', password: 'Test1234!',
+        }, { withCredentials: true });
+        toast.success('Demo farmacia attiva — buona esplorazione!');
+        navigate('/dashboard');
+      } else if (kind === 'driver') {
+        await axios.post(`${API}/driver/login`, {
+          email: 'luca@fattorino.it', password: 'Driver123!',
+        }, { withCredentials: true });
+        toast.success('Demo fattorino attiva');
+        navigate('/driver');
+      }
+    } catch (err) {
+      toast.error('Demo temporaneamente non disponibile, riprova tra un minuto');
+    } finally {
+      setDemoLoading(null);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background overflow-x-hidden">
@@ -126,7 +154,7 @@ export default function LandingPage() {
               Il gestionale che porta dietro al banco i tuoi fattorini, i clienti e la cassa. Apri l'ordine, lo assegni, lo segui — tutto in pochi tap, senza alzare la cornetta.
             </p>
 
-            <div className="flex flex-col sm:flex-row gap-3 mb-9">
+            <div className="flex flex-col sm:flex-row gap-3 mb-5">
               <Button size="lg" className="btn-primary h-13 px-8 text-base font-semibold shadow-lg shadow-primary/25 hover-lift" asChild>
                 <Link to="/register">Inizia Gratis <ArrowRight className="w-4 h-4 ml-2" /></Link>
               </Button>
@@ -135,6 +163,30 @@ export default function LandingPage() {
                   <Truck className="w-4 h-4" />Area Fattorini
                 </Link>
               </Button>
+            </div>
+
+            {/* Demo buttons */}
+            <div className="mb-9 p-3.5 rounded-xl border border-amber-500/25 bg-amber-500/5">
+              <div className="flex items-center gap-2 mb-2">
+                <Sparkles className="w-4 h-4 text-amber-600" />
+                <span className="text-sm font-semibold text-amber-700 dark:text-amber-300">Provala ora con un account demo</span>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Button size="sm" variant="outline" className="border-amber-500/40 hover:bg-amber-500/10 text-foreground gap-2"
+                  onClick={() => handleDemoLogin('pharmacy')}
+                  disabled={demoLoading === 'pharmacy'}
+                  data-testid="demo-pharmacy-btn">
+                  <HeartPulse className="w-4 h-4 text-teal-600" />
+                  {demoLoading === 'pharmacy' ? 'Apro la demo…' : 'Demo Farmacia'}
+                </Button>
+                <Button size="sm" variant="outline" className="border-amber-500/40 hover:bg-amber-500/10 text-foreground gap-2"
+                  onClick={() => handleDemoLogin('driver')}
+                  disabled={demoLoading === 'driver'}
+                  data-testid="demo-driver-btn">
+                  <Truck className="w-4 h-4 text-blue-600" />
+                  {demoLoading === 'driver' ? 'Apro la demo…' : 'Demo Fattorino'}
+                </Button>
+              </div>
             </div>
 
             <div className="flex flex-wrap gap-5 text-sm text-muted-foreground">

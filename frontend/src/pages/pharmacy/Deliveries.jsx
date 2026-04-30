@@ -115,11 +115,25 @@ export default function DeliveriesPage() {
     amount: '', amount_given: '', scheduled_date: '', scheduled_time: '', priority: 'normal'
   });
 
-  // Open new delivery if ?new=true or ?new=1
+  // Stato per import Winfarm: dati pre-compilati dalla querystring
+  const [winfarmPrefill, setWinfarmPrefill] = useState(null);
+
+  // Open new delivery if ?new=true or ?new=1, supporta deep-link da Winfarm
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const newParam = params.get('new');
     if (newParam === 'true' || newParam === '1') {
+      // Estrai eventuali parametri di pre-compilazione (Winfarm bridge)
+      const prefill = {
+        customer_name: params.get('customer_name') || params.get('cliente') || '',
+        customer_phone: params.get('customer_phone') || params.get('telefono') || '',
+        customer_address: params.get('customer_address') || params.get('indirizzo') || '',
+        amount: params.get('amount') || params.get('importo') || '',
+        payment_method: params.get('payment_method') || params.get('pagamento') || 'cash',
+        notes: params.get('notes') || params.get('note') || '',
+      };
+      const hasPrefill = !!(prefill.customer_name || prefill.customer_phone || prefill.amount);
+      if (hasPrefill) setWinfarmPrefill(prefill);
       setDialogOpen(true);
       window.history.replaceState({}, '', '/deliveries');
     }
@@ -139,6 +153,38 @@ export default function DeliveriesPage() {
     } catch { toast.error('Errore nel caricamento'); }
     finally { setLoading(false); setRefreshing(false); }
   }, []);
+
+  // Applica i dati pre-compilati di Winfarm quando i clienti sono pronti
+  useEffect(() => {
+    if (!winfarmPrefill || !customers.length) return;
+    const safeCustomers = ensureArray(customers);
+    const phoneNorm = (s) => (s || '').replace(/\D/g, '');
+    let matched = null;
+    if (winfarmPrefill.customer_phone) {
+      const target = phoneNorm(winfarmPrefill.customer_phone);
+      matched = safeCustomers.find(c => phoneNorm(c.phone) === target);
+    }
+    if (!matched && winfarmPrefill.customer_name) {
+      const target = winfarmPrefill.customer_name.trim().toLowerCase();
+      matched = safeCustomers.find(c => (c.name || '').trim().toLowerCase() === target);
+    }
+    setForm((prev) => ({
+      ...prev,
+      customer_id: matched ? matched.customer_id : prev.customer_id,
+      amount: winfarmPrefill.amount || prev.amount,
+      payment_method: winfarmPrefill.payment_method || prev.payment_method,
+      notes: winfarmPrefill.notes || prev.notes,
+    }));
+    if (!matched && winfarmPrefill.customer_name) {
+      // mostra termine di ricerca così il farmacista vede la lista filtrata
+      setCustomerSearchTerm(winfarmPrefill.customer_name);
+      setCustomerDropdownOpen(true);
+      toast.info(`Cliente "${winfarmPrefill.customer_name}" non trovato — selezionalo o crealo`);
+    } else if (matched) {
+      toast.success(`Pre-compilato da Winfarm: ${matched.name}`);
+    }
+    setWinfarmPrefill(null);
+  }, [winfarmPrefill, customers]);
 
   const resetForm = () => {
     setForm({ customer_id: 'none', notes: '', payment_method: 'cash', amount: '', amount_given: '', scheduled_date: '', scheduled_time: '', priority: 'normal' });
