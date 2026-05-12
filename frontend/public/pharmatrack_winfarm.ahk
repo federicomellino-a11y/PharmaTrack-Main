@@ -1,7 +1,7 @@
 ; ╔════════════════════════════════════════════════════════════════════════════╗
 ; ║  PHARMATRACK · BRIDGE WINFARM (AutoHotkey v1.1)                            ║
 ; ║  -----------------------------------------------------------------------   ║
-; ║  Hotkey: CTRL + F10  (configurabile sotto)                                 ║
+; ║  Hotkey: ALT + C  (configurabile sotto)                                    ║
 ; ║                                                                            ║
 ; ║  Cosa fa:                                                                  ║
 ; ║  1) Copia il testo selezionato in Winfarm (Ctrl+C)                         ║
@@ -18,7 +18,8 @@
 ; ║                                                                            ║
 ; ║  Personalizza:                                                             ║
 ; ║   • PharmaTrackURL  → URL della tua farmacia                               ║
-; ║   • Hotkey          → cambia "^F10" in altra combinazione                  ║
+; ║   • Hotkey          → cambia "!c" in altra combinazione                    ║
+; ║                       (! = Alt, ^ = Ctrl, + = Shift, # = Win)              ║
 ; ║   • Le regex sotto  → adatta ai pattern reali della tua schermata Winfarm  ║
 ; ╚════════════════════════════════════════════════════════════════════════════╝
 
@@ -26,8 +27,8 @@
 PharmaTrackURL := "https://pharmatrack.replit.app"
 ; ↑ se hai un dominio personalizzato, scrivilo qui (es. https://farmacia-mia.it)
 
-; === HOTKEY: Ctrl+F10 ===
-^F10::
+; === HOTKEY: Alt+C ===
+!c::
     ; 1. Copia il testo selezionato in Winfarm
     ClipSaved := ClipboardAll
     Clipboard := ""

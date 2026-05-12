@@ -116,11 +116,11 @@ export default function IntegrationsPage() {
                 <div className="w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-sm shrink-0">3</div>
                 <div className="flex-1">
                   <h3 className="font-semibold text-sm mb-1 flex items-center gap-2">
-                    <Keyboard className="w-4 h-4 text-primary" />Usa l'hotkey <kbd className="px-2 py-0.5 bg-secondary rounded text-xs font-mono">Ctrl + F10</kbd>
+                    <Keyboard className="w-4 h-4 text-primary" />Usa l'hotkey <kbd className="px-2 py-0.5 bg-secondary rounded text-xs font-mono">Alt + C</kbd>
                   </h3>
                   <ol className="text-xs text-muted-foreground space-y-1.5 list-decimal list-inside">
                     <li>Su Winfarm, dopo aver chiuso la vendita, <strong>seleziona col mouse</strong> la riga/blocco con cliente e importo</li>
-                    <li>Premi <kbd className="px-1.5 py-0.5 bg-secondary rounded text-[10px] font-mono">Ctrl + F10</kbd></li>
+                    <li>Premi <kbd className="px-1.5 py-0.5 bg-secondary rounded text-[10px] font-mono">Alt + C</kbd></li>
                     <li>Si apre PharmaTrack con il modulo "Nuova Consegna" già compilato</li>
                     <li>Completa metodo di pagamento, eventuale resto, e clic su Crea</li>
                   </ol>

@@ -78,6 +78,12 @@ Esempio di feature richiesta: doppia conferma consegna+incasso (la farmacia deve
 
 **Test backend**: 23/23 pytest passed (14 Phase-1 regression + 9 nuovi Winfarm). Bug ObjectId in winfarm_import scoperto e corretto durante i test.
 
+### 2026-05-12 — Crea Cliente in-dialog + Display "Importo da incassare" + Hotkey Alt+C ✓
+- **Card lista consegne**: ora mostra `amount_given` (€ che il fattorino incassa fisicamente) quando il cliente paga in contanti con un importo superiore alla vendita. Sotto in piccolo "Vendita 8,00 € · Resto 2,00 €". Le statistiche di fatturato continuano a usare `amount` (vendita reale).
+- **Crea Cliente al volo**: pulsante "Nuovo cliente" e fallback "Aggiungi cliente" nel dialog Nuova Consegna ora aprono un nested dialog locale invece di redirigere. Cliente creato → aggiunto immediatamente alla lista e auto-selezionato. Form: nome (obbligatorio), telefono, indirizzo, note.
+- **AutoHotkey bridge**: hotkey cambiata da `Ctrl+F10` a `Alt+C` (più comoda da premere al banco). Pagina /integrations aggiornata.
+- **POD rimosso dal backlog** su richiesta utente.
+
 ## Backlog prioritizzato
 
 ### P0 (prossimo sprint, valore operativo immediato)

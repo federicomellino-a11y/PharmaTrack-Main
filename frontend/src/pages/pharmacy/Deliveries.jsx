@@ -126,6 +126,44 @@ export default function DeliveriesPage() {
   // Stato per import Winfarm: dati pre-compilati dalla querystring
   const [winfarmPrefill, setWinfarmPrefill] = useState(null);
 
+  // Dialog "Crea cliente al volo" dentro Nuova Consegna
+  const [createCustomerOpen, setCreateCustomerOpen] = useState(false);
+  const [newCustomer, setNewCustomer] = useState({ name: '', phone: '', address: '', notes: '' });
+  const [creatingCustomer, setCreatingCustomer] = useState(false);
+
+  const openCreateCustomer = (prefilledName) => {
+    setNewCustomer({ name: prefilledName || '', phone: '', address: '', notes: '' });
+    setCreateCustomerOpen(true);
+  };
+
+  const handleCreateCustomer = async (e) => {
+    e.preventDefault();
+    if (!newCustomer.name.trim()) { toast.error('Il nome è obbligatorio'); return; }
+    setCreatingCustomer(true);
+    try {
+      const res = await axios.post(`${API}/customers`, {
+        name: newCustomer.name.trim(),
+        phone: newCustomer.phone.trim() || null,
+        address: newCustomer.address.trim() || null,
+        notes: newCustomer.notes.trim() || null,
+      }, { withCredentials: true });
+      const created = res.data;
+      toast.success(`Cliente "${created.name}" creato`);
+      // Aggiorna lista clienti localmente per evitare un fetch + auto-seleziona
+      setCustomers((prev) => [created, ...ensureArray(prev)]);
+      setForm((prev) => ({ ...prev, customer_id: created.customer_id }));
+      setCustomerSearchTerm('');
+      setCustomerDropdownOpen(false);
+      setCreateCustomerOpen(false);
+      setNewCustomer({ name: '', phone: '', address: '', notes: '' });
+    } catch (err) {
+      console.error('Errore creazione cliente:', err);
+      toast.error(err.response?.data?.detail || 'Errore creazione cliente');
+    } finally {
+      setCreatingCustomer(false);
+    }
+  };
+
   const fetchData = useCallback(async () => {
     try {
       const [dRes, cRes, drRes] = await Promise.all([
@@ -533,12 +571,29 @@ export default function DeliveriesPage() {
                       <div className="flex sm:flex-col items-center sm:items-end gap-2 sm:gap-1 shrink-0">
                         {d.amount && (
                           <div className="text-right">
-                            <p className="font-bold text-base text-primary">{formatCurrency(d.amount)}</p>
-                            <p className="text-xs text-muted-foreground flex items-center gap-1">
-                              {d.payment_method === 'cash'
-                                ? <><Banknote className="w-3 h-3" />Contanti</>
-                                : <><CreditCard className="w-3 h-3" />POS</>}
-                            </p>
+                            {/* Importo da incassare dal cliente:
+                                - cash con amount_given valorizzato → mostro amount_given (es. cliente paga con 10 su vendita di 8)
+                                - altrimenti → mostro amount (POS o cash perfetto) */}
+                            {(() => {
+                              const showsGiven = d.payment_method === 'cash' && d.amount_given && d.amount_given > d.amount;
+                              const principal = showsGiven ? d.amount_given : d.amount;
+                              const change = showsGiven ? (d.amount_given - d.amount) : 0;
+                              return (
+                                <>
+                                  <p className="font-bold text-base text-primary">{formatCurrency(principal)}</p>
+                                  <p className="text-xs text-muted-foreground flex items-center gap-1 justify-end">
+                                    {d.payment_method === 'cash'
+                                      ? <><Banknote className="w-3 h-3" />Contanti</>
+                                      : <><CreditCard className="w-3 h-3" />POS</>}
+                                  </p>
+                                  {showsGiven && (
+                                    <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight">
+                                      Vendita {formatCurrency(d.amount)} · Resto {formatCurrency(change)}
+                                    </p>
+                                  )}
+                                </>
+                              );
+                            })()}
                           </div>
                         )}
                         {['da_preparare', 'pronta', 'pending', 'assigned', 'picked_up', 'in_transit', 'delivered_pending_confirmation'].includes(d.status) && (
@@ -634,7 +689,8 @@ export default function DeliveriesPage() {
               <div className="flex items-center justify-between">
                 <Label>Cliente *</Label>
                 <Button type="button" variant="ghost" size="sm" className="h-6 text-xs text-muted-foreground hover:text-primary px-2"
-                  onClick={() => window.location.href = '/customers?new=true'}>
+                  onClick={() => openCreateCustomer(customerSearchTerm)}
+                  data-testid="open-create-customer-btn">
                   <Plus className="w-3 h-3 mr-1" />Nuovo cliente
                 </Button>
               </div>
@@ -674,7 +730,7 @@ export default function DeliveriesPage() {
                         {dialogCustomers.length === 0 ? (
                           <div className="p-4 text-center">
                             <p className="text-sm text-muted-foreground mb-2">Nessun cliente trovato</p>
-                            <Button type="button" variant="outline" size="sm" onMouseDown={() => window.location.href = '/customers?new=true'}>
+                            <Button type="button" variant="outline" size="sm" onMouseDown={() => openCreateCustomer(customerSearchTerm)}>
                               <Plus className="w-3.5 h-3.5 mr-1" />Aggiungi cliente
                             </Button>
                           </div>
@@ -896,6 +952,74 @@ export default function DeliveriesPage() {
               </Button>
             ))}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Crea Cliente al volo (nested dialog) */}
+      <Dialog open={createCustomerOpen} onOpenChange={setCreateCustomerOpen}>
+        <DialogContent className="max-w-md" data-testid="create-customer-dialog">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <User className="w-5 h-5 text-primary" />Nuovo Cliente
+            </DialogTitle>
+            <DialogDescription>
+              Aggiungi un cliente al volo. Sarà selezionato automaticamente nella consegna.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCreateCustomer} className="space-y-3 py-2">
+            <div>
+              <Label htmlFor="qc-name">Nome e cognome *</Label>
+              <Input id="qc-name"
+                placeholder="ROSSI MARIO"
+                value={newCustomer.name}
+                onChange={(e) => setNewCustomer((p) => ({ ...p, name: e.target.value }))}
+                className="h-11"
+                autoFocus
+                data-testid="qc-name-input"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label htmlFor="qc-phone">Telefono</Label>
+                <Input id="qc-phone"
+                  placeholder="333 1234567"
+                  inputMode="tel"
+                  value={newCustomer.phone}
+                  onChange={(e) => setNewCustomer((p) => ({ ...p, phone: e.target.value }))}
+                  className="h-11"
+                />
+              </div>
+              <div>
+                <Label htmlFor="qc-address">Indirizzo</Label>
+                <Input id="qc-address"
+                  placeholder="Via Roma 5"
+                  value={newCustomer.address}
+                  onChange={(e) => setNewCustomer((p) => ({ ...p, address: e.target.value }))}
+                  className="h-11"
+                />
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="qc-notes">Note (opzionale)</Label>
+              <Input id="qc-notes"
+                placeholder="Es: anziano, citofonare al cancello"
+                value={newCustomer.notes}
+                onChange={(e) => setNewCustomer((p) => ({ ...p, notes: e.target.value }))}
+                className="h-11"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground bg-secondary/40 rounded-lg px-3 py-2">
+              💡 L'indirizzo potrai geolocalizzarlo dopo dalla scheda cliente per la navigazione del fattorino.
+            </p>
+            <DialogFooter className="gap-2">
+              <Button type="button" variant="outline" onClick={() => setCreateCustomerOpen(false)}>
+                Annulla
+              </Button>
+              <Button type="submit" className="btn-primary" disabled={creatingCustomer} data-testid="qc-submit-btn">
+                {creatingCustomer ? 'Creazione…' : (<><Plus className="w-4 h-4 mr-1" />Crea e seleziona</>)}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </Layout>
