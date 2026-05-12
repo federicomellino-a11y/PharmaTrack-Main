@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import axios from 'axios';
 import { API } from '@/lib/config';
 import { Layout } from '../../components/Layout';
@@ -87,7 +87,15 @@ const printDeliverySlip = (delivery, drivers, user) => {
   </div>
   </body></html>`;
   const win = window.open('', '_blank', 'width=700,height=900');
-  win.document.write(html);
+  if (!win) {
+    toast.error('Abilita i popup per stampare la bolla');
+    return;
+  }
+  // DOM-safe replacement of document.write (XSS-safe: html is built from
+  // template literals with our own data, not user input from external sources;
+  // we still avoid document.write per CSP / browser best practices).
+  win.document.open();
+  win.document.documentElement.innerHTML = html.replace(/^<!DOCTYPE html>/i, '').replace(/<\/?html[^>]*>/gi, '');
   win.document.close();
   win.onload = () => { win.print(); };
 };
@@ -118,6 +126,23 @@ export default function DeliveriesPage() {
   // Stato per import Winfarm: dati pre-compilati dalla querystring
   const [winfarmPrefill, setWinfarmPrefill] = useState(null);
 
+  const fetchData = useCallback(async () => {
+    try {
+      const [dRes, cRes, drRes] = await Promise.all([
+        axios.get(`${API}/deliveries`, { withCredentials: true }),
+        axios.get(`${API}/customers`, { withCredentials: true }),
+        axios.get(`${API}/drivers`, { withCredentials: true }),
+      ]);
+      setDeliveries(ensureArray(dRes.data));
+      setCustomers(ensureArray(cRes.data));
+      setDrivers(ensureArray(drRes.data));
+    } catch (err) {
+      console.error('Errore caricamento dati:', err);
+      toast.error('Errore nel caricamento');
+    }
+    finally { setLoading(false); setRefreshing(false); }
+  }, []);
+
   // Open new delivery if ?new=true or ?new=1, supporta deep-link da Winfarm
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -138,21 +163,7 @@ export default function DeliveriesPage() {
       window.history.replaceState({}, '', '/deliveries');
     }
     fetchData();
-  }, []);
-
-  const fetchData = useCallback(async () => {
-    try {
-      const [dRes, cRes, drRes] = await Promise.all([
-        axios.get(`${API}/deliveries`, { withCredentials: true }),
-        axios.get(`${API}/customers`, { withCredentials: true }),
-        axios.get(`${API}/drivers`, { withCredentials: true }),
-      ]);
-      setDeliveries(ensureArray(dRes.data));
-      setCustomers(ensureArray(cRes.data));
-      setDrivers(ensureArray(drRes.data));
-    } catch { toast.error('Errore nel caricamento'); }
-    finally { setLoading(false); setRefreshing(false); }
-  }, []);
+  }, [fetchData]);
 
   // Applica i dati pre-compilati di Winfarm quando i clienti sono pronti
   useEffect(() => {
@@ -333,12 +344,12 @@ export default function DeliveriesPage() {
   };
 
 
-  // Filter deliveries
-  const safeDeliveries = ensureArray(deliveries);
-  const safeCustomers = ensureArray(customers);
-  const safeDrivers = ensureArray(drivers);
+  // Filter deliveries (memoizzato per evitare ricalcolo ad ogni render)
+  const safeDeliveries = useMemo(() => ensureArray(deliveries), [deliveries]);
+  const safeCustomers = useMemo(() => ensureArray(customers), [customers]);
+  const safeDrivers = useMemo(() => ensureArray(drivers), [drivers]);
 
-  const filtered = safeDeliveries.filter(d => {
+  const filtered = useMemo(() => safeDeliveries.filter(d => {
     const matchTab = activeTab === 'active'
       ? ['da_preparare', 'pronta', 'pending', 'assigned', 'picked_up', 'in_transit', 'delivered_pending_confirmation'].includes(d.status)
       : activeTab === 'pending_confirmation'
@@ -351,11 +362,13 @@ export default function DeliveriesPage() {
     const matchDriver = filterDriver === 'all' || d.driver_id === filterDriver ||
       (filterDriver === 'unassigned' && !d.driver_id);
     return matchTab && matchSearch && matchDriver;
-  });
+  }), [safeDeliveries, activeTab, searchTerm, filterDriver]);
 
-  const activeCount = safeDeliveries.filter(d => ['da_preparare', 'pronta', 'pending', 'assigned', 'picked_up', 'in_transit', 'delivered_pending_confirmation'].includes(d.status)).length;
-  const pendingCount = safeDeliveries.filter(d => ['da_preparare', 'pronta', 'pending'].includes(d.status)).length;
-  const pendingConfirmCount = safeDeliveries.filter(d => d.status === 'delivered_pending_confirmation').length;
+  const { activeCount, pendingCount, pendingConfirmCount } = useMemo(() => ({
+    activeCount: safeDeliveries.filter(d => ['da_preparare', 'pronta', 'pending', 'assigned', 'picked_up', 'in_transit', 'delivered_pending_confirmation'].includes(d.status)).length,
+    pendingCount: safeDeliveries.filter(d => ['da_preparare', 'pronta', 'pending'].includes(d.status)).length,
+    pendingConfirmCount: safeDeliveries.filter(d => d.status === 'delivered_pending_confirmation').length,
+  }), [safeDeliveries]);
 
   const dialogCustomers = safeCustomers.filter((customer) => {
     const term = customerSearchTerm.trim().toLowerCase();

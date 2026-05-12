@@ -50,6 +50,7 @@ export default function ShiftsPage() {
       setShifts(ensureArray(shiftsRes.data));
       setDrivers(ensureArray(driversRes.data));
     } catch (err) {
+      console.error('Errore caricamento turni:', err);
       toast.error('Errore caricamento turni');
     } finally {
       setLoading(false);

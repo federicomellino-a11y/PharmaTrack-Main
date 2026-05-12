@@ -81,21 +81,28 @@ export default function LandingPage() {
 
   const handleDemoLogin = async (kind) => {
     setDemoLoading(kind);
+    const demoCreds = {
+      pharmacy: {
+        email: import.meta.env.VITE_DEMO_PHARMACY_EMAIL || 'test@farmaciaprova.it',
+        password: import.meta.env.VITE_DEMO_PHARMACY_PASSWORD || 'Test1234!',
+      },
+      driver: {
+        email: import.meta.env.VITE_DEMO_DRIVER_EMAIL || 'luca@fattorino.it',
+        password: import.meta.env.VITE_DEMO_DRIVER_PASSWORD || 'Driver123!',
+      },
+    };
     try {
       if (kind === 'pharmacy') {
-        await axios.post(`${API}/auth/login`, {
-          email: 'test@farmaciaprova.it', password: 'Test1234!',
-        }, { withCredentials: true });
+        await axios.post(`${API}/auth/login`, demoCreds.pharmacy, { withCredentials: true });
         toast.success('Demo farmacia attiva — buona esplorazione!');
         navigate('/dashboard');
       } else if (kind === 'driver') {
-        await axios.post(`${API}/driver/login`, {
-          email: 'luca@fattorino.it', password: 'Driver123!',
-        }, { withCredentials: true });
+        await axios.post(`${API}/driver/login`, demoCreds.driver, { withCredentials: true });
         toast.success('Demo fattorino attiva');
         navigate('/driver');
       }
     } catch (err) {
+      console.error('Demo login failed:', err?.response?.status, err?.response?.data);
       toast.error('Demo temporaneamente non disponibile, riprova tra un minuto');
     } finally {
       setDemoLoading(null);
@@ -209,9 +216,9 @@ export default function LandingPage() {
               ))}
               <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-background/10 to-transparent" />
               <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5">
-                {PHOTOS.map((_, i) => (
-                  <button key={i} onClick={() => setPhoto(i)} className={`h-1.5 rounded-full transition-all duration-300 ${i === photo ? 'bg-white w-5' : 'bg-white/40 w-1.5'}`} />
-                ))}
+              {PHOTOS.map((src, i) => (
+                <button key={src + '_dot'} onClick={() => setPhoto(i)} className={`h-1.5 rounded-full transition-all duration-300 ${i === photo ? 'bg-white w-5' : 'bg-white/40 w-1.5'}`} />
+              ))}
               </div>
             </div>
 

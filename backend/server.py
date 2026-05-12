@@ -684,7 +684,8 @@ async def reset_password(data: ResetPasswordRequest):
 
 @api_router.post("/auth/google")
 async def google_auth(data: GoogleAuthRequest, response: Response):
-    import urllib.request, json as _json
+    import urllib.request
+    import json as _json
     try:
         url = f"https://oauth2.googleapis.com/tokeninfo?id_token={data.credential}"
         with urllib.request.urlopen(url, timeout=5) as r:

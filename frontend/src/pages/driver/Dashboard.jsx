@@ -56,8 +56,8 @@ export default function DriverDashboard() {
     try {
       const res = await axios.get(`${API}/driver/shifts/current`, { withCredentials: true });
       setShift(res.data?.shift || null);
-    } catch {
-      // no-op
+    } catch (err) {
+      console.error('Errore caricamento turno:', err?.response?.status);
     }
   };
 
