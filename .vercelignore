@@ -1,0 +1,10 @@
+# Ignore files for Vercel deployments
+node_modules
+**/node_modules
+**/dist
+**/.cache
+.vscode
+.env.local
+.env
+
+# Keep the production env in the repo as requested (packages/backend/.env.production)
