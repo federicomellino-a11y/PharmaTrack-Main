@@ -1,0 +1,50 @@
+services:
+  - type: web
+    name: pharmatrack-api
+    runtime: python
+    plan: free
+    rootDir: backend
+    region: frankfurt
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT --workers 1
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: MONGO_URL
+        sync: false
+      - key: DB_NAME
+        value: Cluster0
+      - key: SESSION_SECRET
+        sync: false
+      - key: ADMIN_EMAIL
+        value: Admin@superadmin.it
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: ADMIN_NAME
+        value: Super Admin
+      - key: CORS_ORIGINS
+        sync: false
+      - key: SMTP_HOST
+        value: smtp-relay.brevo.com
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USERNAME
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SMTP_FROM
+        value: noreply@pharmatrack.app
+      - key: SMTP_FROM_NAME
+        value: PharmaTrack
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_CLAIM_EMAIL
+        sync: false
+      - key: COOKIE_DOMAIN
+        value: ""
+      - key: PYTHON_VERSION
+        value: "3.11.9"
