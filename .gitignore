@@ -50,3 +50,9 @@ playwright-report/
 # Temp
 /tmp/
 *.bak
+.env.*
+*.env
+credentials.json
+*.pem
+*.key
+.credentials
