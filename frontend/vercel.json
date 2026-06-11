@@ -1,9 +1,10 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "cd frontend && yarn install --frozen-lockfile && yarn build",
-  "outputDirectory": "frontend/dist/public",
-  "installCommand": "echo \"Skipping default install\"",
-  "framework": null,
+  "framework": "vite",
+  "buildCommand": "yarn build",
+  "outputDirectory": "dist/public",
+  "installCommand": "yarn install --frozen-lockfile",
+  "devCommand": "yarn dev",
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ],

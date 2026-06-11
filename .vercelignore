@@ -1,0 +1,7 @@
+# Escludi backend e file non necessari dal deploy Vercel
+backend/
+*.md
+.gitignore
+render.yaml
+test_reports/
+__pycache__/

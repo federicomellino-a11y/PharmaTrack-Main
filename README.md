@@ -60,7 +60,9 @@ Coordina fattorini, traccia ogni ordine, gestisci cassa e turni, integrazione co
 
 ### 3️⃣ Frontend — Vercel
 1. Vai su [vercel.com](https://vercel.com) → "Import Project" → seleziona il repo
-2. Vercel rileva `vercel.json` automaticamente
+2. **IMPORTANTE**: in "Configure Project" imposta:
+   - **Root Directory** → `frontend` (clicca "Edit" e seleziona la cartella frontend)
+   - Framework Preset → Vite (rilevato automaticamente)
 3. Aggiungi le Environment Variables:
    - `VITE_BACKEND_URL` = URL backend Render (es. `https://pharmatrack-api.onrender.com`)
    - `REACT_APP_BACKEND_URL` = stesso URL
