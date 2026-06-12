@@ -179,10 +179,33 @@ export default function ShiftsPage() {
         </div>
 
         {filtered.length === 0 ? (
-          <Card><CardContent className="py-12 text-center">
+          <Card><CardContent className="py-10 px-6">
             <Wallet className="w-12 h-12 mx-auto mb-3 text-muted-foreground/30" />
-            <p className="font-medium text-muted-foreground">Nessun turno trovato</p>
-            <p className="text-xs text-muted-foreground mt-1">I turni appariranno qui quando un fattorino ne aprirà uno.</p>
+            <p className="font-medium text-center mb-1">Nessun turno attivo o registrato</p>
+            <p className="text-sm text-muted-foreground text-center max-w-md mx-auto mb-5">
+              Questa è la <strong>cassa centralizzata</strong> della tua farmacia. Qui vedrai ogni turno aperto dai fattorini, l'incasso atteso vs ricevuto, e potrai confermare la chiusura cassa di fine giornata.
+            </p>
+            <div className="max-w-md mx-auto space-y-2 text-sm">
+              <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-secondary/40">
+                <span className="font-bold text-primary w-5 shrink-0">1.</span>
+                <span className="text-muted-foreground">Il fattorino apre un turno dalla sua app prima di iniziare il giro</span>
+              </div>
+              <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-secondary/40">
+                <span className="font-bold text-primary w-5 shrink-0">2.</span>
+                <span className="text-muted-foreground">Ogni consegna effettuata si aggancia automaticamente al turno</span>
+              </div>
+              <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-secondary/40">
+                <span className="font-bold text-primary w-5 shrink-0">3.</span>
+                <span className="text-muted-foreground">A fine giro il fattorino chiude il turno dichiarando i contanti raccolti</span>
+              </div>
+              <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+                <span className="font-bold text-emerald-600 w-5 shrink-0">4.</span>
+                <span className="text-emerald-700 dark:text-emerald-300">Tu confermi qui l'incasso e tutte le consegne si chiudono insieme. Zero errori di cassa.</span>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground text-center mt-4">
+              Suggerisci ai fattorini di aprire il turno all'inizio del giro consegne dalla loro Home.
+            </p>
           </CardContent></Card>
         ) : (
           <div className="space-y-2.5">

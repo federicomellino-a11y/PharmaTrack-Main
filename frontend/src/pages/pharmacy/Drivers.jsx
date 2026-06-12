@@ -16,7 +16,8 @@ import {
 } from '../../components/ui/dialog';
 import {
  Search, Plus, Pencil, Trash2, Truck, Phone, Mail, Eye, EyeOff,
- Copy, Check, Zap, KeyRound
+ Copy, Check, Zap, KeyRound, BarChart3, Banknote, CreditCard, Clock,
+ User, Star, Package, CheckCircle2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ensureArray } from '@/lib/collections';
@@ -37,6 +38,9 @@ const generatePassword = () => {
  return pwd.sort(() => Math.random() - 0.5).join('');
 };
 
+const formatCurrency = (v) => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(v || 0);
+const formatDateTime = (d) => d ? new Date(d).toLocaleString('it-IT', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '-';
+
 export default function DriversPage() {
  const [drivers, setDrivers] = useState([]);
  const [loading, setLoading] = useState(true);
@@ -46,6 +50,9 @@ export default function DriversPage() {
  const [showPassword, setShowPassword] = useState(false);
  const [credentialsDialog, setCredentialsDialog] = useState(null);
  const [copied, setCopied] = useState('');
+ const [profileDriver, setProfileDriver] = useState(null);
+ const [profileStats, setProfileStats] = useState(null);
+ const [profileLoading, setProfileLoading] = useState(false);
  const [formData, setFormData] = useState({
  name: '',
  phone: '',
@@ -180,12 +187,12 @@ export default function DriversPage() {
  {/* Header */}
  <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
  <div>
- <h1 className="text-2xl font-bold text-white">Anagrafica Fattorini</h1>
- <p className="text-zinc-400">{safeDrivers.length} fattorini registrati</p>
+ <h1 className="text-2xl font-bold text-foreground">Anagrafica Fattorini</h1>
+ <p className="text-muted-foreground">{safeDrivers.length} fattorini registrati</p>
  </div>
  <Button
  onClick={openNewDialog}
- className="btn-glow bg-teal-500 hover:bg-teal-600 text-black"
+ className="btn-primary"
  data-testid="add-driver-btn"
  >
  <Plus className="w-4 h-4 mr-2"/>
@@ -195,7 +202,7 @@ export default function DriversPage() {
 
  {/* Search */}
  <div className="relative max-w-md">
- <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500"/>
+ <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground"/>
  <Input
  placeholder="Cerca per nome, email o telefono..."
  value={searchTerm}
@@ -209,8 +216,8 @@ export default function DriversPage() {
  {filteredDrivers.length === 0 ? (
  <Card className="">
  <CardContent className="py-12 text-center">
- <Truck className="w-12 h-12 text-zinc-600 mx-auto mb-4"/>
- <p className="text-zinc-400">
+ <Truck className="w-12 h-12 text-muted-foreground/40 mx-auto mb-4"/>
+ <p className="text-muted-foreground">
  {searchTerm ? 'Nessun fattorino trovato' : 'Nessun fattorino registrato'}
  </p>
  {!searchTerm && (
@@ -229,27 +236,27 @@ export default function DriversPage() {
  {filteredDrivers.map((driver, index) => (
  <Card
  key={driver.driver_id}
- className={` hover:border-teal-500/30 transition-colors animate-slide-up stagger-${(index % 5) + 1}`}
+ className={` hover:border-primary/30 transition-colors animate-slide-up stagger-${(index % 5) + 1}`}
  >
  <CardContent className="p-5">
  <div className="flex items-start justify-between mb-4">
  <div className="flex items-center gap-3">
- <div className={`w-10 h-10 rounded-full flex items-center justify-center ${driver.is_active ? 'bg-teal-500/10' : 'bg-zinc-700/50'}`}>
- <Truck className={`w-5 h-5 ${driver.is_active ? 'text-teal-400' : 'text-zinc-500'}`} />
+ <div className={`w-10 h-10 rounded-full flex items-center justify-center ${driver.is_active ? 'bg-primary/10' : 'bg-secondary'}`}>
+ <Truck className={`w-5 h-5 ${driver.is_active ? 'text-primary' : 'text-muted-foreground'}`} />
  </div>
  <div>
- <h3 className="font-semibold text-white">{driver.name}</h3>
- <Badge className={driver.is_active ? 'bg-teal-500/20 text-teal-400' : 'bg-zinc-700/50 text-zinc-500'}>
+ <h3 className="font-semibold text-foreground">{driver.name}</h3>
+ <Badge className={driver.is_active ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300' : 'bg-secondary text-muted-foreground'}>
  {driver.is_active ? 'Attivo' : 'Inattivo'}
  </Badge>
  </div>
  </div>
- <div className="flex gap-1">
+ <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
  <Button
  variant="ghost"
  size="icon"
  onClick={() => handleEdit(driver)}
- className="h-8 w-8 text-zinc-400 hover:text-white"
+ className="h-8 w-8 text-muted-foreground hover:text-foreground"
  data-testid={`edit-driver-${driver.driver_id}`}
  >
  <Pencil className="w-4 h-4"/>
@@ -258,7 +265,7 @@ export default function DriversPage() {
  variant="ghost"
  size="icon"
  onClick={() => handleDelete(driver.driver_id)}
- className="h-8 w-8 text-zinc-400 hover:text-red-400"
+ className="h-8 w-8 text-muted-foreground hover:text-destructive"
  data-testid={`delete-driver-${driver.driver_id}`}
  >
  <Trash2 className="w-4 h-4"/>
@@ -266,26 +273,50 @@ export default function DriversPage() {
  </div>
  </div>
  <div className="space-y-2 text-sm">
- <div className="flex items-center gap-2 text-zinc-400">
+ <div className="flex items-center gap-2 text-muted-foreground">
  <Phone className="w-4 h-4"/>
  <span>{driver.phone}</span>
  </div>
- <div className="flex items-center gap-2 text-zinc-400">
+ <div className="flex items-center gap-2 text-muted-foreground">
  <Mail className="w-4 h-4"/>
  <span className="truncate">{driver.email}</span>
  </div>
- <div className="flex items-center gap-2 text-zinc-400">
+ <div className="flex items-center gap-2 text-muted-foreground">
  <Truck className="w-4 h-4"/>
  <span>{vehicleLabels[driver.vehicle_type] || driver.vehicle_type}</span>
  </div>
  </div>
- <div className="mt-4 pt-4 border-t flex items-center justify-between">
- <span className="text-sm text-zinc-500">Stato account</span>
- <Switch
- checked={driver.is_active}
- onCheckedChange={() => handleToggleActive(driver)}
- data-testid={`toggle-driver-${driver.driver_id}`}
- />
+ <div className="mt-4 pt-4 border-t flex items-center justify-between gap-2" onClick={(e) => e.stopPropagation()}>
+ <Button
+   variant="outline"
+   size="sm"
+   className="h-8 text-xs gap-1.5"
+   onClick={async () => {
+     setProfileDriver(driver);
+     setProfileStats(null);
+     setProfileLoading(true);
+     try {
+       const r = await axios.get(`${API}/drivers/${driver.driver_id}/stats`, { withCredentials: true });
+       setProfileStats(r.data);
+     } catch (err) {
+       console.error('Errore caricamento stats:', err);
+       toast.error('Errore caricamento statistiche');
+     } finally {
+       setProfileLoading(false);
+     }
+   }}
+   data-testid={`stats-driver-${driver.driver_id}`}
+ >
+   <BarChart3 className="w-3.5 h-3.5" />Statistiche
+ </Button>
+ <div className="flex items-center gap-2">
+   <span className="text-xs text-muted-foreground">Attivo</span>
+   <Switch
+     checked={driver.is_active}
+     onCheckedChange={() => handleToggleActive(driver)}
+     data-testid={`toggle-driver-${driver.driver_id}`}
+   />
+ </div>
  </div>
  </CardContent>
  </Card>
@@ -297,7 +328,7 @@ export default function DriversPage() {
  <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
  <DialogContent className="max-w-md">
  <DialogHeader>
- <DialogTitle className="text-white">
+ <DialogTitle className="text-foreground">
  {editingDriver ? 'Modifica Fattorino' : 'Nuovo Fattorino'}
  </DialogTitle>
  </DialogHeader>
@@ -361,7 +392,7 @@ export default function DriversPage() {
  <button
  type="button"
  onClick={() => setShowPassword(!showPassword)}
- className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300"
+ className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-zinc-300"
  >
  {showPassword ? <EyeOff className="w-4 h-4"/> : <Eye className="w-4 h-4"/>}
  </button>
@@ -370,7 +401,7 @@ export default function DriversPage() {
  type="button"
  variant="outline"
  size="sm"
- className="shrink-0 gap-1 border-teal-500/40 text-teal-400 hover:bg-teal-500/10"
+ className="shrink-0 gap-1 border-primary/40 text-primary hover:bg-primary/10"
  onClick={() => {
    const pwd = generatePassword();
    setFormData(f => ({ ...f, password: pwd }));
@@ -411,7 +442,7 @@ export default function DriversPage() {
  </Button>
  <Button
  type="submit"
- className="bg-teal-500 hover:bg-teal-600 text-black"
+ className="btn-primary"
  data-testid="save-driver-btn"
  >
  {editingDriver ? 'Salva Modifiche' : 'Crea Fattorino'}
@@ -426,49 +457,179 @@ export default function DriversPage() {
  <Dialog open={!!credentialsDialog} onOpenChange={() => setCredentialsDialog(null)}>
  <DialogContent className="max-w-md">
  <DialogHeader>
- <DialogTitle className="flex items-center gap-2 text-white">
- <KeyRound className="w-5 h-5 text-teal-400" />
+ <DialogTitle className="flex items-center gap-2 text-foreground">
+ <KeyRound className="w-5 h-5 text-primary" />
  Fattorino creato!
  </DialogTitle>
  </DialogHeader>
  <div className="space-y-4 py-2">
- <p className="text-sm text-zinc-400">
- Condividi queste credenziali con <span className="text-white font-semibold">{credentialsDialog?.name}</span> per permettergli di accedere all'app.
+ <p className="text-sm text-muted-foreground">
+ Condividi queste credenziali con <span className="text-foreground font-semibold">{credentialsDialog?.name}</span> per permettergli di accedere all'app.
  </p>
  <div className="space-y-2">
- <Label className="text-zinc-400 text-xs uppercase tracking-wide">Email</Label>
- <div className="flex items-center gap-2 bg-zinc-800 rounded-lg px-3 py-2">
- <span className="flex-1 text-sm text-white font-mono">{credentialsDialog?.email}</span>
+ <Label className="text-muted-foreground text-xs uppercase tracking-wide">Email</Label>
+ <div className="flex items-center gap-2 bg-secondary rounded-lg px-3 py-2">
+ <span className="flex-1 text-sm text-foreground font-mono">{credentialsDialog?.email}</span>
  <button type="button" onClick={() => copyToClipboard(credentialsDialog?.email, 'email')}
- className="text-zinc-400 hover:text-teal-400 transition-colors">
- {copied === 'email' ? <Check className="w-4 h-4 text-teal-400" /> : <Copy className="w-4 h-4" />}
+ className="text-muted-foreground hover:text-primary transition-colors">
+ {copied === 'email' ? <Check className="w-4 h-4 text-primary" /> : <Copy className="w-4 h-4" />}
  </button>
  </div>
  </div>
  <div className="space-y-2">
- <Label className="text-zinc-400 text-xs uppercase tracking-wide">Password</Label>
- <div className="flex items-center gap-2 bg-zinc-800 rounded-lg px-3 py-2">
- <span className="flex-1 text-sm text-white font-mono">{credentialsDialog?.password}</span>
+ <Label className="text-muted-foreground text-xs uppercase tracking-wide">Password</Label>
+ <div className="flex items-center gap-2 bg-secondary rounded-lg px-3 py-2">
+ <span className="flex-1 text-sm text-foreground font-mono">{credentialsDialog?.password}</span>
  <button type="button" onClick={() => copyToClipboard(credentialsDialog?.password, 'pwd')}
- className="text-zinc-400 hover:text-teal-400 transition-colors">
- {copied === 'pwd' ? <Check className="w-4 h-4 text-teal-400" /> : <Copy className="w-4 h-4" />}
+ className="text-muted-foreground hover:text-primary transition-colors">
+ {copied === 'pwd' ? <Check className="w-4 h-4 text-primary" /> : <Copy className="w-4 h-4" />}
  </button>
  </div>
  </div>
  <button type="button"
  onClick={() => copyToClipboard(`Email: ${credentialsDialog?.email}\nPassword: ${credentialsDialog?.password}`, 'all')}
- className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-teal-500/30 text-teal-400 hover:bg-teal-500/10 transition-colors text-sm font-medium">
+ className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-teal-500/30 text-primary hover:bg-primary/10 transition-colors text-sm font-medium">
  {copied === 'all' ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
  {copied === 'all' ? 'Copiato!' : 'Copia tutto'}
  </button>
- <p className="text-xs text-zinc-500 text-center">Salva queste credenziali — non potrai recuperare la password in seguito.</p>
+ <p className="text-xs text-muted-foreground text-center">Salva queste credenziali — non potrai recuperare la password in seguito.</p>
  </div>
  <DialogFooter>
- <Button onClick={() => setCredentialsDialog(null)} className="bg-teal-500 hover:bg-teal-600 text-black w-full">
+ <Button onClick={() => setCredentialsDialog(null)} className="btn-primary w-full">
  Fatto
  </Button>
  </DialogFooter>
  </DialogContent>
+ </Dialog>
+
+ {/* Profile Driver Dialog (stats) */}
+ <Dialog open={!!profileDriver} onOpenChange={(o) => { if (!o) { setProfileDriver(null); setProfileStats(null); } }}>
+   <DialogContent className="max-w-2xl max-h-[88vh] overflow-y-auto" data-testid="driver-profile-dialog">
+     <DialogHeader>
+       <DialogTitle className="flex items-center gap-3">
+         <div className={`w-11 h-11 rounded-full flex items-center justify-center ${profileDriver?.is_active ? 'bg-primary/10' : 'bg-secondary'}`}>
+           <User className={`w-5 h-5 ${profileDriver?.is_active ? 'text-primary' : 'text-muted-foreground'}`} />
+         </div>
+         <div className="flex-1">
+           <span className="text-foreground">{profileDriver?.name}</span>
+           <p className="text-xs text-muted-foreground font-normal mt-0.5">
+             {vehicleLabels[profileDriver?.vehicle_type] || profileDriver?.vehicle_type} · {profileDriver?.phone}
+           </p>
+         </div>
+         <Badge className={profileDriver?.is_active ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300' : 'bg-secondary text-muted-foreground'}>
+           {profileDriver?.is_active ? 'Attivo' : 'Inattivo'}
+         </Badge>
+       </DialogTitle>
+     </DialogHeader>
+
+     {profileLoading ? (
+       <div className="flex items-center justify-center py-12"><div className="spinner" /></div>
+     ) : profileStats ? (
+       <div className="space-y-5 py-2">
+         {/* KPIs principali */}
+         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+           <div className="rounded-xl bg-secondary/40 p-3 text-center">
+             <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Oggi</p>
+             <p className="text-xl font-bold">{profileStats.counters.today}</p>
+           </div>
+           <div className="rounded-xl bg-secondary/40 p-3 text-center">
+             <p className="text-[10px] uppercase tracking-wider text-muted-foreground">7 giorni</p>
+             <p className="text-xl font-bold">{profileStats.counters.week}</p>
+           </div>
+           <div className="rounded-xl bg-secondary/40 p-3 text-center">
+             <p className="text-[10px] uppercase tracking-wider text-muted-foreground">30 giorni</p>
+             <p className="text-xl font-bold">{profileStats.counters.month}</p>
+           </div>
+           <div className="rounded-xl bg-secondary/40 p-3 text-center">
+             <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Totali</p>
+             <p className="text-xl font-bold">{profileStats.counters.delivered}</p>
+           </div>
+         </div>
+
+         {/* Stato consegne */}
+         <div className="grid grid-cols-3 gap-2">
+           <div className="rounded-lg border border-border bg-card p-3">
+             <p className="text-xs text-muted-foreground flex items-center gap-1.5"><Package className="w-3 h-3" />In corso</p>
+             <p className="text-lg font-semibold text-primary">{profileStats.counters.active}</p>
+           </div>
+           <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+             <p className="text-xs text-amber-700 dark:text-amber-300 flex items-center gap-1.5"><Clock className="w-3 h-3" />Da confermare</p>
+             <p className="text-lg font-semibold text-amber-600">{profileStats.counters.pending_confirm}</p>
+           </div>
+           <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3">
+             <p className="text-xs text-emerald-700 dark:text-emerald-300 flex items-center gap-1.5"><CheckCircle2 className="w-3 h-3" />Consegnate</p>
+             <p className="text-lg font-semibold text-emerald-600">{profileStats.counters.delivered}</p>
+           </div>
+         </div>
+
+         {/* Soldi */}
+         <div>
+           <h3 className="text-sm font-semibold mb-2 flex items-center gap-1.5"><BarChart3 className="w-4 h-4 text-primary" />Incassi totali</h3>
+           <div className="grid grid-cols-3 gap-2">
+             <div className="rounded-lg bg-emerald-500/10 p-3">
+               <p className="text-[10px] uppercase tracking-wider text-emerald-700 dark:text-emerald-300 flex items-center gap-1"><Banknote className="w-3 h-3" />Contanti</p>
+               <p className="text-lg font-bold text-emerald-600">{formatCurrency(profileStats.money.cash_total)}</p>
+             </div>
+             <div className="rounded-lg bg-sky-500/10 p-3">
+               <p className="text-[10px] uppercase tracking-wider text-sky-700 dark:text-sky-300 flex items-center gap-1"><CreditCard className="w-3 h-3" />POS</p>
+               <p className="text-lg font-bold text-sky-600">{formatCurrency(profileStats.money.pos_total)}</p>
+             </div>
+             <div className="rounded-lg bg-primary/10 p-3">
+               <p className="text-[10px] uppercase tracking-wider text-primary">Totale</p>
+               <p className="text-lg font-bold text-primary">{formatCurrency(profileStats.money.revenue_total)}</p>
+             </div>
+           </div>
+         </div>
+
+         {/* Performance */}
+         <div className="grid sm:grid-cols-2 gap-3">
+           <div className="rounded-lg border border-border bg-card p-3">
+             <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" />Tempo medio consegna</p>
+             <p className="text-base font-semibold">
+               {profileStats.avg_delivery_minutes != null ? `${profileStats.avg_delivery_minutes} min` : '—'}
+             </p>
+           </div>
+           <div className="rounded-lg border border-border bg-card p-3">
+             <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1.5"><Star className="w-3.5 h-3.5" />Turni effettuati</p>
+             <p className="text-base font-semibold">
+               {profileStats.shifts.total}
+               <span className="text-xs text-muted-foreground ml-1.5">
+                 ({profileStats.shifts.settled} confermati
+                 {profileStats.shifts.pending > 0 && `, ${profileStats.shifts.pending} aperti`})
+               </span>
+             </p>
+           </div>
+         </div>
+
+         {/* Cliente top */}
+         {profileStats.top_customer && (
+           <div className="rounded-lg border border-border bg-card p-3">
+             <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1.5"><User className="w-3.5 h-3.5" />Cliente più servito</p>
+             <p className="text-sm font-semibold">{profileStats.top_customer.name}</p>
+             <p className="text-xs text-muted-foreground">{profileStats.top_customer.phone} · {profileStats.top_customer.count} consegne</p>
+           </div>
+         )}
+
+         {/* Ultima consegna */}
+         {profileStats.last_delivery && (
+           <div className="rounded-lg border border-border bg-card p-3">
+             <p className="text-xs text-muted-foreground mb-1">Ultima consegna</p>
+             <p className="text-sm font-semibold">{profileStats.last_delivery.customer_name}</p>
+             <p className="text-xs text-muted-foreground">{formatDateTime(profileStats.last_delivery.when)} · {formatCurrency(profileStats.last_delivery.amount)}</p>
+           </div>
+         )}
+       </div>
+     ) : (
+       <p className="text-center text-muted-foreground py-8">Nessuna statistica disponibile.</p>
+     )}
+
+     <DialogFooter className="gap-2">
+       <Button variant="outline" onClick={() => { setProfileDriver(null); setProfileStats(null); }}>Chiudi</Button>
+       <Button onClick={() => { const d = profileDriver; setProfileDriver(null); handleEdit(d); }}>
+         <Pencil className="w-3.5 h-3.5 mr-1.5" />Modifica
+       </Button>
+     </DialogFooter>
+   </DialogContent>
  </Dialog>
 
  </Layout>

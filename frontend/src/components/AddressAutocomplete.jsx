@@ -106,10 +106,12 @@ async function fetchGoogleDetails(prediction) {
         address: formatted || place.formattedAddress,
         lat: place.location?.lat(),
         lng: place.location?.lng(),
+        street, num, city, cap,
+        hasNumber: !!num,
       };
     } catch (e) {
       console.warn('[AddressAutocomplete] fetchFields failed', e);
-      return { address: prediction.description, lat: null, lng: null };
+      return { address: prediction.description, lat: null, lng: null, hasNumber: false };
     }
   }
 
@@ -133,16 +135,18 @@ async function fetchGoogleDetails(prediction) {
               address: formatted || place.formatted_address,
               lat: place.geometry?.location?.lat(),
               lng: place.geometry?.location?.lng(),
+              street, num, city, cap,
+              hasNumber: !!num,
             });
           } else {
-            resolve({ address: prediction.description, lat: null, lng: null });
+            resolve({ address: prediction.description, lat: null, lng: null, hasNumber: false });
           }
         }
       );
     });
   }
 
-  return { address: prediction.description, lat: null, lng: null };
+  return { address: prediction.description, lat: null, lng: null, hasNumber: false };
 }
 
 async function fetchNominatim(val) {
@@ -179,6 +183,9 @@ export default function AddressAutocomplete({
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const [usingGoogle, setUsingGoogle] = useState(false);
+  const [missingNumber, setMissingNumber] = useState(false);
+  const [streetNumber, setStreetNumber] = useState('');
+  const lastDetailsRef = useRef(null);
   const containerRef = useRef(null);
   const debounceRef = useRef(null);
 
@@ -304,6 +311,39 @@ export default function AddressAutocomplete({
             )}
           </li>
         </ul>
+      )}
+
+      {/* Civico mancante: chiedi all'utente */}
+      {missingNumber && !open && (
+        <div className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-2.5">
+          <p className="text-xs text-amber-700 dark:text-amber-300 mb-1.5">
+            ⚠️ Numero civico non trovato per questo indirizzo. Inseriscilo qui sotto:
+          </p>
+          <div className="flex gap-2">
+            <Input
+              value={streetNumber}
+              onChange={(e) => setStreetNumber(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); applyStreetNumber(); } }}
+              placeholder="es. 12, 4/A, 7-bis"
+              className="h-9 text-sm"
+              autoFocus
+            />
+            <button
+              type="button"
+              onClick={applyStreetNumber}
+              className="px-3 h-9 rounded-md bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold shrink-0"
+            >
+              Aggiungi
+            </button>
+            <button
+              type="button"
+              onClick={() => { setMissingNumber(false); setStreetNumber(''); }}
+              className="px-2 h-9 text-xs text-muted-foreground hover:text-foreground shrink-0"
+            >
+              Salta
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

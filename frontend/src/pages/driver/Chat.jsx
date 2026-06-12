@@ -167,8 +167,8 @@ export default function DriverChat() {
         </Card>
       </div>
 
-      <ScrollArea className="h-[calc(100vh-15rem)] px-4 pb-4">
-        <div className="space-y-4">
+      <ScrollArea className="h-[calc(100vh-15rem)] chat-wallpaper">
+        <div className="space-y-1.5 px-3 py-4">
           {safeMessages.length === 0 ? (
             <div className="py-16 text-center">
               <MessageSquare className="mx-auto mb-4 h-12 w-12 text-zinc-700" />
@@ -178,21 +178,24 @@ export default function DriverChat() {
           ) : (
             safeMessages.map((message, index) => {
               const showDateDivider = index === 0 || !sameDay(safeMessages[index - 1].created_at, message.created_at);
+              const prev = safeMessages[index - 1];
+              const groupedWithPrev = prev && prev.sender_type === message.sender_type && sameDay(prev.created_at, message.created_at);
+              const isSent = message.sender_type === 'driver';
               return (
                 <React.Fragment key={message.message_id}>
                   {showDateDivider && (
-                    <div className="flex justify-center">
-                      <span className="rounded-full bg-zinc-800 px-3 py-1 text-xs text-zinc-500">
+                    <div className="flex justify-center py-2">
+                      <span className="rounded-md bg-zinc-900/70 px-2.5 py-1 text-[11px] font-medium text-zinc-400 shadow-sm">
                         {formatDateLabel(message.created_at)}
                       </span>
                     </div>
                   )}
-                  <div className={`flex ${message.sender_type === 'driver' ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`chat-bubble ${message.sender_type === 'driver' ? 'sent' : 'received'}`}>
+                  <div className={`flex ${isSent ? 'justify-end' : 'justify-start'} ${groupedWithPrev ? 'mt-0.5' : 'mt-2'}`}>
+                    <div className={`chat-bubble ${isSent ? 'sent' : 'received'}`}>
                       <p className="whitespace-pre-wrap break-words">{message.content}</p>
-                      <p className={`mt-1 text-xs ${message.sender_type === 'driver' ? 'text-black/60' : 'text-zinc-500'}`}>
-                        {formatTime(message.created_at)}
-                      </p>
+                      <div className="chat-bubble-meta">
+                        <span>{formatTime(message.created_at)}</span>
+                      </div>
                     </div>
                   </div>
                 </React.Fragment>
@@ -203,28 +206,33 @@ export default function DriverChat() {
         </div>
       </ScrollArea>
 
-      <div className="sticky bottom-16 border-t border-white/5 bg-[#09090B]/95 px-4 py-3 backdrop-blur-md">
-        <div className="mb-2 flex items-center justify-between text-xs text-zinc-500">
-          <span>Messaggi brevi e chiari aiutano la farmacia a risponderti più in fretta.</span>
-          <span>{connected ? 'Tempo reale attivo' : 'Connessione in ripristino'}</span>
-        </div>
-        <form onSubmit={handleSendMessage} className="flex gap-2">
+      <div className="sticky bottom-16 border-t border-white/5 bg-[#09090B]/95 px-3 py-2.5 backdrop-blur-md">
+        <form onSubmit={handleSendMessage} className="flex items-end gap-2">
           <Input
             value={newMessage}
             onChange={(event) => setNewMessage(event.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSendMessage(e);
+              }
+            }}
             placeholder="Scrivi un messaggio…"
-            className="flex-1 border-zinc-700 bg-zinc-800 text-white placeholder:text-zinc-500"
+            className="flex-1 rounded-full border-zinc-700 bg-zinc-800 text-white placeholder:text-zinc-500 h-11 px-4"
             data-testid="driver-chat-input"
           />
           <Button
             type="submit"
             disabled={!newMessage.trim() || sending}
-            className="bg-teal-500 text-black hover:bg-teal-600"
+            className="bg-teal-500 text-black hover:bg-teal-600 rounded-full h-11 w-11 p-0 shrink-0"
             data-testid="driver-send-message"
           >
             <Send className="h-4 w-4" />
           </Button>
         </form>
+        {!connected && (
+          <p className="text-[11px] text-zinc-500 mt-1.5 px-1">Riconnessione in corso…</p>
+        )}
       </div>
 
       <nav className="mobile-nav">

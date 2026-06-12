@@ -12,7 +12,7 @@ import { Badge } from '../../components/ui/badge';
 import { useSocket } from '../../contexts/SocketContext';
 import {
   MessageSquare, Send, Truck, ArrowLeft, Search, Phone, Wifi,
-  WifiOff, CircleDot
+  WifiOff, CircleDot, Check, CheckCheck
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ensureArray } from '@/lib/collections';
@@ -403,37 +403,43 @@ export default function ChatPage() {
                   </div>
                 </div>
 
-                <ScrollArea className="flex-1 px-4 py-4">
+                <ScrollArea className="flex-1 chat-wallpaper">
+                <div className="px-3 py-4 sm:px-6">
                   {loadingMessages ? (
                     <div className="flex h-full flex-col items-center justify-center gap-3">
                       <div className="spinner"></div>
                       <p className="text-sm text-muted-foreground">Apro la conversazione…</p>
                     </div>
                   ) : safeMessages.length === 0 ? (
-                    <div className="flex h-full flex-col items-center justify-center text-center">
+                    <div className="flex h-full flex-col items-center justify-center text-center py-12">
                       <MessageSquare className="mb-4 h-12 w-12 text-muted-foreground/40" />
                       <p className="font-medium text-foreground">Nessun messaggio per ora</p>
                       <p className="mt-1 text-sm text-muted-foreground">Scrivi tu per primo per dare indicazioni operative al fattorino.</p>
                     </div>
                   ) : (
-                    <div className="space-y-4">
+                    <div className="space-y-1.5">
                       {safeMessages.map((message, index) => {
                         const showDayDivider = index === 0 || !sameDay(safeMessages[index - 1].created_at, message.created_at);
+                        const prev = safeMessages[index - 1];
+                        const groupedWithPrev = prev && prev.sender_type === message.sender_type && sameDay(prev.created_at, message.created_at);
+                        const isSent = message.sender_type === 'pharmacy';
+                        const isRead = !!message.read_at;
                         return (
                           <React.Fragment key={message.message_id}>
                             {showDayDivider && (
-                              <div className="flex justify-center">
-                                <span className="rounded-full bg-secondary px-3 py-1 text-xs text-muted-foreground">
+                              <div className="flex justify-center py-2">
+                                <span className="rounded-md bg-white/80 dark:bg-zinc-900/80 px-2.5 py-1 text-[11px] font-medium text-muted-foreground shadow-sm">
                                   {dayLabel(message.created_at)}
                                 </span>
                               </div>
                             )}
-                            <div className={`flex ${message.sender_type === 'pharmacy' ? 'justify-end' : 'justify-start'}`}>
-                              <div className={`chat-bubble ${message.sender_type === 'pharmacy' ? 'sent' : 'received'}`}>
+                            <div className={`flex ${isSent ? 'justify-end' : 'justify-start'} ${groupedWithPrev ? 'mt-0.5' : 'mt-2'}`}>
+                              <div className={`chat-bubble ${isSent ? 'sent' : 'received'}`}>
                                 <p className="whitespace-pre-wrap break-words">{message.content}</p>
-                                <p className={`mt-1 text-xs ${message.sender_type === 'pharmacy' ? 'text-black/60' : 'text-muted-foreground'}`}>
-                                  {new Date(message.created_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
-                                </p>
+                                <div className="chat-bubble-meta">
+                                  <span>{new Date(message.created_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}</span>
+                                  {isSent && (isRead ? <CheckCheck className="h-3.5 w-3.5 text-sky-500" /> : <CheckCheck className="h-3.5 w-3.5" />)}
+                                </div>
                               </div>
                             </div>
                           </React.Fragment>
@@ -442,25 +448,33 @@ export default function ChatPage() {
                       <div ref={messagesEndRef} />
                     </div>
                   )}
+                </div>
                 </ScrollArea>
 
-                <form onSubmit={handleSendMessage} className="border-t p-4">
-                  <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
-                    <span>Invia istruzioni brevi e chiare.</span>
-                    <span>{connected ? 'Sincronizzato' : 'Invio disponibile, realtime in ripristino'}</span>
-                  </div>
-                  <div className="flex gap-2">
+                <form onSubmit={handleSendMessage} className="border-t bg-card p-3">
+                  <div className="flex items-end gap-2">
                     <Input
                       value={newMessage}
                       onChange={(event) => setNewMessage(event.target.value)}
-                      placeholder="Scrivi un messaggio operativo…"
-                      className="flex-1"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          handleSendMessage(e);
+                        }
+                      }}
+                      placeholder="Scrivi un messaggio…"
+                      className="flex-1 rounded-full bg-secondary/60 border-0 h-11 px-4"
                       data-testid="chat-input"
                     />
-                    <Button type="submit" disabled={!newMessage.trim() || sending} className="btn-primary" data-testid="send-message-btn">
+                    <Button type="submit" disabled={!newMessage.trim() || sending} className="btn-primary rounded-full h-11 w-11 p-0 shrink-0" data-testid="send-message-btn">
                       <Send className="h-4 w-4" />
                     </Button>
                   </div>
+                  {!connected && (
+                    <p className="text-[11px] text-muted-foreground mt-1.5 px-1 flex items-center gap-1">
+                      <WifiOff className="h-3 w-3" />Riconnessione in corso, gli invii saranno sincronizzati
+                    </p>
+                  )}
                 </form>
               </>
             )}
