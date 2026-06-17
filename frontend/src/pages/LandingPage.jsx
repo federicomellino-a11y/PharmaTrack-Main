@@ -7,7 +7,7 @@ import {
   MapPin, MessageSquare, BarChart3, Users, Package, Shield,
   Zap, ArrowRight, CheckCircle2, Truck, Clock, Download,
   ChevronRight, Globe, Lock, HeartPulse, Route, Star,
-  TrendingUp, Bell, Smartphone, Sparkles,
+  TrendingUp, Bell, Smartphone, Sparkles, Loader,
 } from 'lucide-react';
 import { usePWAInstall } from '@/hooks/usePWAInstall';
 import { toast } from 'sonner';
@@ -22,12 +22,12 @@ const PHOTOS = [
 ];
 
 const FEATURES = [
-  { icon: <Package className="w-5 h-5" />, title: 'Consegne tracciate dal banco al portone', description: 'Crea l\'ordine, assegna il fattorino, stampa la bolla. Lui riceve tutto sul telefono e tu sai dove si trova in ogni momento.', color: 'from-teal-500/20 to-teal-500/5', accent: 'text-teal-600', border: 'hover:border-teal-500/40' },
-  { icon: <MapPin className="w-5 h-5" />, title: 'Indirizzi geolocalizzati', description: 'Ogni cliente ha la sua posizione esatta su Google Maps. Il fattorino apre la navigazione con un tap e parte.', color: 'from-blue-500/20 to-blue-500/5', accent: 'text-blue-600', border: 'hover:border-blue-500/40' },
-  { icon: <MessageSquare className="w-5 h-5" />, title: 'Comunicazione in un solo posto', description: 'Chat dedicata farmacia–fattorini. Niente più WhatsApp privati né telefonate ripetute mentre sei al banco.', color: 'from-violet-500/20 to-violet-500/5', accent: 'text-violet-600', border: 'hover:border-violet-500/40' },
-  { icon: <BarChart3 className="w-5 h-5" />, title: 'Report di cassa e turni', description: 'Incassi del giorno, contanti vs POS, performance per fattorino e clienti più assidui — tutto già pronto a fine giornata.', color: 'from-orange-500/20 to-orange-500/5', accent: 'text-orange-600', border: 'hover:border-orange-500/40' },
-  { icon: <Users className="w-5 h-5" />, title: 'Anagrafica clienti su misura', description: 'Storico consegne, codice fiscale, recapiti aggiuntivi e note rapide. Il farmacista trova tutto al primo colpo.', color: 'from-rose-500/20 to-rose-500/5', accent: 'text-rose-600', border: 'hover:border-rose-500/40' },
-  { icon: <Bell className="w-5 h-5" />, title: 'Doppia conferma incasso', description: 'Il fattorino segna la consegna; tu confermi l\'avvenuto incasso. Zero contestazioni, cassa sempre quadrata.', color: 'from-green-500/20 to-green-500/5', accent: 'text-green-600', border: 'hover:border-green-500/40' },
+  { icon: <Package className="w-5 h-5" />, title: 'Consegne tracciate dal banco al portone', description: 'Crea l\'ordine, assegna il fattorino, stampa la bolla. Lui riceve tutto sul telefono e tu segui ogni step in real-time.' },
+  { icon: <MapPin className="w-5 h-5" />, title: 'Indirizzi geolocalizzati', description: 'Ogni cliente ha la sua posizione esatta su Google Maps. Il fattorino apre la navigazione con un tap e parte.' },
+  { icon: <MessageSquare className="w-5 h-5" />, title: 'Comunicazione in un solo posto', description: 'Chat dedicata farmacia–fattorini. Niente più WhatsApp privati né telefonate ripetute mentre consegna.' },
+  { icon: <BarChart3 className="w-5 h-5" />, title: 'Report di cassa e turni', description: 'Incassi del giorno, contanti vs POS, performance per fattorino e clienti più assidui — tutto già pronto.' },
+  { icon: <Users className="w-5 h-5" />, title: 'Anagrafica clienti su misura', description: 'Storico consegne, codice fiscale, recapiti aggiuntivi e note rapide. Il farmacista trova tutto al primo tocco.' },
+  { icon: <Bell className="w-5 h-5" />, title: 'Doppia conferma incasso', description: 'Il fattorino segna la consegna; tu confermi l\'avvenuto incasso. Zero contestazioni, cassa sempre quadrata.' },
 ];
 
 const STEPS = [
@@ -72,6 +72,7 @@ export default function LandingPage() {
   const { isInstallable, install } = usePWAInstall();
   const [photo, setPhoto] = useState(0);
   const [demoLoading, setDemoLoading] = useState(null);
+  const [demoStarting, setDemoStarting] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -81,6 +82,8 @@ export default function LandingPage() {
 
   const handleDemoLogin = async (kind) => {
     setDemoLoading(kind);
+    setDemoStarting(kind);
+    
     const demoCreds = {
       pharmacy: {
         email: import.meta.env.VITE_DEMO_PHARMACY_EMAIL || 'test@farmaciaprova.it',
@@ -91,21 +94,45 @@ export default function LandingPage() {
         password: import.meta.env.VITE_DEMO_DRIVER_PASSWORD || 'Driver123!',
       },
     };
+    
     try {
-      if (kind === 'pharmacy') {
-        await axios.post(`${API}/auth/login`, demoCreds.pharmacy, { withCredentials: true });
-        toast.success('Demo farmacia attiva — buona esplorazione!');
-        navigate('/dashboard');
-      } else if (kind === 'driver') {
-        await axios.post(`${API}/driver/login`, demoCreds.driver, { withCredentials: true });
-        toast.success('Demo fattorino attiva');
-        navigate('/driver');
-      }
+      // Show warning about backend wake-up time
+      toast.loading(
+        kind === 'pharmacy'
+          ? '⏳ La demo si sta avviando... Se è la prima volta, aspetta 30-40 secondi per il caricamento del server.'
+          : '⏳ App fattorino si sta caricando... Primo avvio? Aspetta un po\' di più.',
+        { duration: Infinity, id: `demo-${kind}` }
+      );
+
+      const endpoint = kind === 'pharmacy' ? `${API}/auth/login` : `${API}/driver/login`;
+      const response = await axios.post(endpoint, demoCreds[kind], { 
+        withCredentials: true,
+        timeout: 60000, // 60 second timeout for first load
+      });
+
+      toast.dismiss(`demo-${kind}`);
+      toast.success(`Demo ${kind === 'pharmacy' ? 'farmacia' : 'fattorino'} attiva — buona esplorazione!`);
+      
+      setTimeout(() => {
+        navigate(kind === 'pharmacy' ? '/dashboard' : '/driver');
+      }, 500);
     } catch (err) {
+      toast.dismiss(`demo-${kind}`);
       console.error('Demo login failed:', err?.response?.status, err?.response?.data);
-      toast.error('Demo temporaneamente non disponibile, riprova tra un minuto');
+      
+      if (err?.code === 'ECONNABORTED' || err?.message?.includes('timeout')) {
+        toast.error(
+          'Il server ha impiegato troppo tempo a rispondere. Riprova tra poco — potrebbe essere in fase di avvio.',
+          { duration: 5000 }
+        );
+      } else if (err?.response?.status === 401) {
+        toast.error('Credenziali demo non trovate. Contatta il supporto.');
+      } else {
+        toast.error('Demo temporaneamente non disponibile. Riprova tra un minuto.');
+      }
     } finally {
       setDemoLoading(null);
+      setDemoStarting(null);
     }
   };
 
@@ -172,28 +199,59 @@ export default function LandingPage() {
               </Button>
             </div>
 
-            {/* Demo buttons */}
+            {/* Demo buttons with improved UX */}
             <div className="mb-9 p-3.5 rounded-xl border border-amber-500/25 bg-amber-500/5">
               <div className="flex items-center gap-2 mb-2">
                 <Sparkles className="w-4 h-4 text-amber-600" />
                 <span className="text-sm font-semibold text-amber-700 dark:text-amber-300">Provala ora con un account demo</span>
               </div>
               <div className="flex flex-col sm:flex-row gap-2">
-                <Button size="sm" variant="outline" className="border-amber-500/40 hover:bg-amber-500/10 text-foreground gap-2"
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  className="border-amber-500/40 hover:bg-amber-500/10 text-foreground gap-2"
                   onClick={() => handleDemoLogin('pharmacy')}
-                  disabled={demoLoading === 'pharmacy'}
-                  data-testid="demo-pharmacy-btn">
-                  <HeartPulse className="w-4 h-4 text-teal-600" />
-                  {demoLoading === 'pharmacy' ? 'Apro la demo…' : 'Demo Farmacia'}
+                  disabled={demoLoading !== null}
+                  data-testid="demo-pharmacy-btn"
+                >
+                  {demoLoading === 'pharmacy' ? (
+                    <>
+                      <Loader className="w-4 h-4 animate-spin" />
+                      Caricamento...
+                    </>
+                  ) : (
+                    <>
+                      <HeartPulse className="w-4 h-4 text-teal-600" />
+                      Demo Farmacia
+                    </>
+                  )}
                 </Button>
-                <Button size="sm" variant="outline" className="border-amber-500/40 hover:bg-amber-500/10 text-foreground gap-2"
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  className="border-amber-500/40 hover:bg-amber-500/10 text-foreground gap-2"
                   onClick={() => handleDemoLogin('driver')}
-                  disabled={demoLoading === 'driver'}
-                  data-testid="demo-driver-btn">
-                  <Truck className="w-4 h-4 text-blue-600" />
-                  {demoLoading === 'driver' ? 'Apro la demo…' : 'Demo Fattorino'}
+                  disabled={demoLoading !== null}
+                  data-testid="demo-driver-btn"
+                >
+                  {demoLoading === 'driver' ? (
+                    <>
+                      <Loader className="w-4 h-4 animate-spin" />
+                      Caricamento...
+                    </>
+                  ) : (
+                    <>
+                      <Truck className="w-4 h-4 text-blue-600" />
+                      Demo Fattorino
+                    </>
+                  )}
                 </Button>
               </div>
+              {demoStarting && (
+                <p className="text-xs text-amber-700 dark:text-amber-300 mt-2">
+                  💡 Primo caricamento? Il server potrebbe impiegare 30-40 secondi per avviarsi. Grazie per la pazienza!
+                </p>
+              )}
             </div>
 
             <div className="flex flex-wrap gap-5 text-sm text-muted-foreground">
@@ -281,8 +339,8 @@ export default function LandingPage() {
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {FEATURES.map((f, i) => (
               <RevealSection key={f.title} delay={i * 60}>
-                <div className={`p-6 rounded-2xl bg-gradient-to-br ${f.color} border border-border ${f.border} transition-all duration-300 hover-lift h-full group`}>
-                  <div className={`w-11 h-11 rounded-xl bg-background/70 backdrop-blur flex items-center justify-center mb-4 shadow-sm ${f.accent} group-hover:scale-110 transition-transform`}>
+                <div className={`p-6 rounded-2xl bg-gradient-to-br from-primary/5 to-primary/3 border border-border transition-all duration-300 hover-lift h-full group`}>
+                  <div className={`w-11 h-11 rounded-xl bg-background/70 backdrop-blur flex items-center justify-center mb-4 shadow-sm text-primary group-hover:scale-110 transition-transform`}>
                     {f.icon}
                   </div>
                   <h3 className="text-base font-bold mb-2 text-foreground">{f.title}</h3>
@@ -311,7 +369,7 @@ export default function LandingPage() {
             <div className="hidden sm:block absolute top-8 left-[calc(33%+2rem)] right-[calc(33%+2rem)] h-px bg-border" />
             {STEPS.map((s, i) => (
               <RevealSection key={s.n} delay={i * 100} className="flex flex-col items-center text-center">
-                <div className="w-16 h-16 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mb-5 relative z-10 bg-background hover:bg-primary/20 transition-colors duration-300 group">
+                <div className="w-16 h-16 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mb-5 relative z-10 bg-background hover:bg-primary/20 transition-color">
                   <span className="text-xl font-black text-primary">{s.n}</span>
                 </div>
                 <h3 className="font-bold mb-2 text-foreground">{s.title}</h3>
