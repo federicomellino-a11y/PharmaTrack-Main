@@ -6,7 +6,6 @@ Coordina fattorini, traccia ogni ordine, gestisci cassa e turni, integrazione co
 🌐 Demo live: [pharmatrack.vercel.app](https://pharmatrack.vercel.app)
 
 ---
-
 ## ✨ Funzionalità
 
 | Modulo | Cosa fa |
