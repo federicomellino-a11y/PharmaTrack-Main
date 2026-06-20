@@ -20,16 +20,20 @@ import {
   Bell,
   BellRing,
   Building2,
+  Copy,
   Crown,
   Download,
+  Key,
   Lock,
   MapPinned,
   Moon,
   Palette,
+  RefreshCw,
   Save,
   Shield,
   Smartphone,
   Sun,
+  Trash2,
   User,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -72,9 +76,54 @@ export default function SettingsPage() {
   } = useSocket();
   const { isInstallable, isInstalled, isSupported: pwaSupported, install } = usePWAInstall();
 
+  // Load API token on mount
+  useEffect(() => {
+    axios.get(`${API}/auth/token`, { withCredentials: true })
+      .then(res => setApiToken(res.data))
+      .catch(() => setApiToken(null));
+  }, []);
+
+  const handleGenerateToken = async () => {
+    setApiTokenLoading(true);
+    try {
+      const res = await axios.post(`${API}/auth/token`, {}, { withCredentials: true });
+      setApiToken(res.data);
+      setApiTokenVisible(true);
+      toast.success('Token API generato');
+    } catch {
+      toast.error('Errore nella generazione del token');
+    } finally {
+      setApiTokenLoading(false);
+    }
+  };
+
+  const handleRevokeToken = async () => {
+    setApiTokenLoading(true);
+    try {
+      await axios.delete(`${API}/auth/token`, { withCredentials: true });
+      setApiToken(null);
+      setApiTokenVisible(false);
+      toast.success('Token API revocato');
+    } catch {
+      toast.error('Errore nella revoca del token');
+    } finally {
+      setApiTokenLoading(false);
+    }
+  };
+
+  const handleCopyToken = () => {
+    if (apiToken?.token) {
+      navigator.clipboard.writeText(apiToken.token);
+      toast.success('Token copiato negli appunti');
+    }
+  };
+
   const [drivers, setDrivers] = useState([]);
   const [saving, setSaving] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
+  const [apiToken, setApiToken] = useState(null);
+  const [apiTokenLoading, setApiTokenLoading] = useState(false);
+  const [apiTokenVisible, setApiTokenVisible] = useState(false);
   const [installingPwa, setInstallingPwa] = useState(false);
   const [formData, setFormData] = useState(() => buildFormData(user));
   const [settings, setSettings] = useState(() => buildSettingsData(user));
@@ -477,6 +526,57 @@ export default function SettingsPage() {
               ))}
             </div>
             <p className="text-xs text-center text-muted-foreground mt-4">Queste funzioni saranno disponibili presto!</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Key className="w-5 h-5 text-primary" />
+              Token API
+            </CardTitle>
+            <CardDescription>Token Bearer per integrazioni esterne (Winfarm, ecc.)</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {apiToken ? (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 font-mono text-xs bg-muted rounded px-3 py-2 truncate select-all">
+                    {apiTokenVisible ? apiToken.token : '•'.repeat(40)}
+                  </div>
+                  <Button variant="ghost" size="icon" onClick={() => setApiTokenVisible(v => !v)} title={apiTokenVisible ? 'Nascondi' : 'Mostra'}>
+                    <Key className="w-4 h-4" />
+                  </Button>
+                  <Button variant="ghost" size="icon" onClick={handleCopyToken} title="Copia token">
+                    <Copy className="w-4 h-4" />
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Generato: {apiToken.created_at ? new Date(apiToken.created_at).toLocaleString('it-IT') : '—'}
+                </p>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={handleGenerateToken} disabled={apiTokenLoading}>
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Rigenera
+                  </Button>
+                  <Button variant="destructive" size="sm" onClick={handleRevokeToken} disabled={apiTokenLoading}>
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Revoca
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Usa come header <code className="bg-muted px-1 rounded">Authorization: Bearer &lt;token&gt;</code>
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">Nessun token API attivo.</p>
+                <Button onClick={handleGenerateToken} disabled={apiTokenLoading} size="sm">
+                  <Key className="w-4 h-4 mr-2" />
+                  {apiTokenLoading ? 'Generazione…' : 'Genera token API'}
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
 
