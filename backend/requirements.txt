@@ -10,3 +10,5 @@ httpx==0.28.1
 starlette==0.37.2
 python-multipart==0.0.22
 pywebpush==2.0.3
+slowapi==0.5.7
+sentry-sdk[fastapi]==2.6.0
