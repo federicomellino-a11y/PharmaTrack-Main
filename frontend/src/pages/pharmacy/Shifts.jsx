@@ -281,6 +281,11 @@ export default function ShiftsPage() {
             </DialogTitle>
             <DialogDescription>
               {confirmShift?.driver_name} · {confirmShift?.totals?.delivered_count ?? 0} consegne · attesi {formatCurrency(confirmShift?.totals?.cash_total ?? 0)} contanti
+              {(confirmShift?.totals?.pending_confirmation ?? 0) > 0 && (
+                <span className="block mt-1 text-amber-600 dark:text-amber-400">
+                  ⚠ {confirmShift.totals.pending_confirmation} consegn{confirmShift.totals.pending_confirmation === 1 ? 'a' : 'e'} in attesa di conferma incasso verr{confirmShift.totals.pending_confirmation === 1 ? 'à' : 'anno'} segnata{confirmShift.totals.pending_confirmation === 1 ? '' : 'e'} automaticamente come consegnata{confirmShift.totals.pending_confirmation === 1 ? '' : 'e'}.
+                </span>
+              )}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
