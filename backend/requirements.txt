@@ -12,3 +12,5 @@ python-multipart==0.0.22
 pywebpush==2.0.3
 slowapi==0.5.7
 sentry-sdk[fastapi]==2.6.0
+pytest>=8.0.0
+pytest-asyncio>=0.23.0
