@@ -2102,6 +2102,24 @@ async def winfarm_import(request: Request, user: dict = Depends(get_current_user
     if not (customer_id or customer_phone or customer_name):
         raise HTTPException(status_code=400, detail="Specifica customer_id, customer_phone o customer_name")
 
+    # Deduplicazione: se abbiamo external_ref, controlla se la consegna esiste già
+    if external_ref:
+        existing_delivery = await db.deliveries.find_one(
+            {"pharmacy_id": user["user_id"], "external_ref": external_ref},
+            {"_id": 0},
+        )
+        if existing_delivery:
+            existing_customer = await db.customers.find_one(
+                {"customer_id": existing_delivery.get("customer_id"), "pharmacy_id": user["user_id"]},
+                {"_id": 0},
+            ) or {}
+            return {
+                "delivery": existing_delivery,
+                "customer_created": False,
+                "customer": existing_customer,
+                "duplicate": True,
+            }
+
     # Cerca cliente per id, telefono normalizzato o nome
     customer = None
     if customer_id:
@@ -2612,6 +2630,12 @@ async def setup_indexes():
     # ── Deliveries ────────────────────────────────────────────────────────────
     await safe_create_index(db.deliveries, [("delivery_id", pymongo.ASCENDING)], unique=True, name="deliveries_id_idx", background=True)
     await safe_create_index(db.deliveries, [("pharmacy_id", pymongo.ASCENDING), ("status", pymongo.ASCENDING), ("created_at", pymongo.DESCENDING)], name="deliveries_pharm_status_idx", background=True)
+    await safe_create_index(db.deliveries, [("pharmacy_id", pymongo.ASCENDING), ("external_ref", pymongo.ASCENDING)], sparse=True, name="deliveries_external_ref_idx", background=True)
+
+    # driver_shifts
+    await safe_create_index(db.driver_shifts, [("shift_id", pymongo.ASCENDING)], unique=True, name="shifts_id_idx", background=True)
+    await safe_create_index(db.driver_shifts, [("pharmacy_id", pymongo.ASCENDING), ("status", pymongo.ASCENDING), ("started_at", pymongo.DESCENDING)], name="shifts_pharm_status_idx", background=True)
+    await safe_create_index(db.driver_shifts, [("driver_id", pymongo.ASCENDING), ("status", pymongo.ASCENDING)], name="shifts_driver_status_idx", background=True)
     await safe_create_index(db.deliveries, [("driver_id", pymongo.ASCENDING), ("status", pymongo.ASCENDING), ("created_at", pymongo.DESCENDING)], name="deliveries_driver_status_idx", background=True)
     await safe_create_index(db.deliveries, [("pharmacy_id", pymongo.ASCENDING), ("customer_id", pymongo.ASCENDING), ("created_at", pymongo.DESCENDING)], name="deliveries_pharm_customer_idx", background=True)
     await safe_create_index(db.deliveries, [("pharmacy_id", pymongo.ASCENDING), ("scheduled_date", pymongo.ASCENDING)], name="deliveries_scheduled_idx", sparse=True, background=True)
