@@ -592,7 +592,7 @@ async def get_current_admin(request: Request) -> dict:
 
     return {"email": ADMIN_EMAIL, "name": ADMIN_NAME}
 
-@api_router.get("/health")
+@api_router.get("/health", tags=["System"])
 async def public_health():
     await db.command("ping")
     return {
@@ -606,7 +606,7 @@ async def public_health():
     }
 
 
-@api_router.get("/push/config")
+@api_router.get("/push/config", tags=["Push"])
 async def get_push_config():
     return {
         "enabled": push_notifications_enabled(),
@@ -616,7 +616,7 @@ async def get_push_config():
 
 # ============ PHARMACY AUTH ============
 
-@api_router.post("/auth/register")
+@api_router.post("/auth/register", tags=["Auth"])
 async def register(data: PharmacyRegister, response: Response):
     existing = await db.users.find_one({"email": data.email})
     if existing:
@@ -666,7 +666,7 @@ async def register(data: PharmacyRegister, response: Response):
     
     return {k: v for k, v in new_user.items() if k not in ["_id", "password_hash"]}
 
-@api_router.post("/auth/login")
+@api_router.post("/auth/login", tags=["Auth"])
 async def login(request: Request, data: PharmacyLogin, response: Response):
     user = await db.users.find_one({"email": data.email}, {"_id": 0})
     if not user:
@@ -693,11 +693,11 @@ async def login(request: Request, data: PharmacyLogin, response: Response):
     
     return {k: v for k, v in user.items() if k not in ["_id", "password_hash"]}
 
-@api_router.get("/auth/me")
+@api_router.get("/auth/me", tags=["Auth"])
 async def get_me(user: dict = Depends(get_current_user)):
     return {k: v for k, v in user.items() if k != "password_hash"}
 
-@api_router.post("/auth/logout")
+@api_router.post("/auth/logout", tags=["Auth"])
 async def logout(request: Request, response: Response):
     session_token = request.cookies.get("session_token")
     if session_token:
@@ -831,7 +831,7 @@ async def google_auth(data: GoogleAuthRequest, response: Response):
     return {k: v for k, v in user.items() if k not in ["_id", "password_hash"]}
 
 
-@api_router.put("/auth/profile")
+@api_router.put("/auth/profile", tags=["Auth"])
 async def update_profile(request: Request, user: dict = Depends(get_current_user)):
     body = await request.json()
     update_data = {}
@@ -1188,12 +1188,12 @@ async def update_driver_location(request: Request, driver: dict = Depends(get_cu
 
 # ============ CUSTOMERS ============
 
-@api_router.get("/customers")
+@api_router.get("/customers", tags=["Customers"])
 async def get_customers(user: dict = Depends(get_current_user)):
     customers = await db.customers.find({"pharmacy_id": user["user_id"]}, {"_id": 0}).sort("name", 1).to_list(1000)
     return customers
 
-@api_router.post("/customers")
+@api_router.post("/customers", tags=["Customers"])
 async def create_customer(customer: CustomerCreate, user: dict = Depends(get_current_user)):
     customer_data = {
         "customer_id": f"cust_{uuid.uuid4().hex[:12]}",
@@ -1209,14 +1209,14 @@ async def create_customer(customer: CustomerCreate, user: dict = Depends(get_cur
     await db.customers.insert_one(customer_data)
     return {k: v for k, v in customer_data.items() if k != "_id"}
 
-@api_router.get("/customers/{customer_id}")
+@api_router.get("/customers/{customer_id}", tags=["Customers"])
 async def get_customer(customer_id: str, user: dict = Depends(get_current_user)):
     customer = await db.customers.find_one({"customer_id": customer_id, "pharmacy_id": user["user_id"]}, {"_id": 0})
     if not customer:
         raise HTTPException(status_code=404, detail="Cliente non trovato")
     return customer
 
-@api_router.put("/customers/{customer_id}")
+@api_router.put("/customers/{customer_id}", tags=["Customers"])
 async def update_customer(customer_id: str, request: Request, user: dict = Depends(get_current_user)):
     body = await request.json()
     update_data = {f: body[f] for f in ["name", "phone", "address", "email", "fiscal_code", "birth_date", "notes", "customer_lat", "customer_lng", "place_id", "extra_phones"] if f in body}
@@ -1313,7 +1313,7 @@ async def get_customer_stats(customer_id: str, user: dict = Depends(get_current_
         "recent_deliveries": deliveries[:10]
     }
 
-@api_router.delete("/customers/{customer_id}")
+@api_router.delete("/customers/{customer_id}", tags=["Customers"])
 async def delete_customer(customer_id: str, user: dict = Depends(get_current_user)):
     result = await db.customers.delete_one({"customer_id": customer_id, "pharmacy_id": user["user_id"]})
     if result.deleted_count == 0:
@@ -1324,12 +1324,12 @@ async def delete_customer(customer_id: str, user: dict = Depends(get_current_use
 
 # ============ DRIVERS ============
 
-@api_router.get("/drivers")
+@api_router.get("/drivers", tags=["Drivers"])
 async def get_drivers(user: dict = Depends(get_current_user)):
     drivers = await db.drivers.find({"pharmacy_id": user["user_id"]}, {"_id": 0, "password_hash": 0}).sort("name", 1).to_list(100)
     return drivers
 
-@api_router.post("/drivers")
+@api_router.post("/drivers", tags=["Drivers"])
 async def create_driver(driver: DriverCreate, user: dict = Depends(get_current_user)):
     existing = await db.drivers.find_one({"email": driver.email})
     if existing:
@@ -1346,7 +1346,7 @@ async def create_driver(driver: DriverCreate, user: dict = Depends(get_current_u
     await db.drivers.insert_one(driver_data)
     return {k: v for k, v in driver_data.items() if k not in ["_id", "password_hash"]}
 
-@api_router.get("/drivers/{driver_id}")
+@api_router.get("/drivers/{driver_id}", tags=["Drivers"])
 async def get_driver(driver_id: str, user: dict = Depends(get_current_user)):
     driver = await db.drivers.find_one({"driver_id": driver_id, "pharmacy_id": user["user_id"]}, {"_id": 0, "password_hash": 0})
     if not driver:
@@ -1473,7 +1473,7 @@ async def get_driver_stats(driver_id: str, user: dict = Depends(get_current_user
     }
 
 
-@api_router.put("/drivers/{driver_id}")
+@api_router.put("/drivers/{driver_id}", tags=["Drivers"])
 async def update_driver(driver_id: str, request: Request, user: dict = Depends(get_current_user)):
     body = await request.json()
     update_data = {f: body[f] for f in ["name", "phone", "vehicle_type", "is_active"] if f in body}
@@ -1485,7 +1485,7 @@ async def update_driver(driver_id: str, request: Request, user: dict = Depends(g
             raise HTTPException(status_code=404, detail="Fattorino non trovato")
     return await db.drivers.find_one({"driver_id": driver_id, "pharmacy_id": user["user_id"]}, {"_id": 0, "password_hash": 0})
 
-@api_router.delete("/drivers/{driver_id}")
+@api_router.delete("/drivers/{driver_id}", tags=["Drivers"])
 async def delete_driver(driver_id: str, user: dict = Depends(get_current_user)):
     result = await db.drivers.delete_one({"driver_id": driver_id, "pharmacy_id": user["user_id"]})
     if result.deleted_count == 0:
@@ -1518,7 +1518,7 @@ async def _attach_delivery_to_open_shift(driver_id: str, delivery_id: str):
     )
 
 
-@api_router.get("/deliveries")
+@api_router.get("/deliveries", tags=["Deliveries"])
 async def get_deliveries(status: Optional[str] = None, driver_id: Optional[str] = None, user: dict = Depends(get_current_user)):
     query = {"pharmacy_id": user["user_id"]}
     if status:
@@ -1534,7 +1534,7 @@ async def get_deliveries(status: Optional[str] = None, driver_id: Optional[str] 
         query["driver_id"] = driver_id
     return await db.deliveries.find(query, {"_id": 0}).sort("created_at", -1).to_list(500)
 
-@api_router.post("/deliveries")
+@api_router.post("/deliveries", tags=["Deliveries"])
 async def create_delivery(delivery: DeliveryCreate, user: dict = Depends(get_current_user)):
     customer = await db.customers.find_one({"customer_id": delivery.customer_id, "pharmacy_id": user["user_id"]}, {"_id": 0})
     if not customer:
@@ -1584,14 +1584,14 @@ async def create_delivery(delivery: DeliveryCreate, user: dict = Depends(get_cur
         await create_notification_internal(assigned_driver["driver_id"], "driver", "Nuova consegna assegnata", f"Hai una nuova consegna per {delivery_data['customer_name']}", "delivery", {"delivery_id": delivery_data["delivery_id"]})
     return {k: v for k, v in delivery_data.items() if k != "_id"}
 
-@api_router.get("/deliveries/{delivery_id}")
+@api_router.get("/deliveries/{delivery_id}", tags=["Deliveries"])
 async def get_delivery(delivery_id: str, user: dict = Depends(get_current_user)):
     delivery = await db.deliveries.find_one({"delivery_id": delivery_id, "pharmacy_id": user["user_id"]}, {"_id": 0})
     if not delivery:
         raise HTTPException(status_code=404, detail="Consegna non trovata")
     return delivery
 
-@api_router.put("/deliveries/{delivery_id}")
+@api_router.put("/deliveries/{delivery_id}", tags=["Deliveries"])
 async def update_delivery(delivery_id: str, update: DeliveryUpdate, user: dict = Depends(get_current_user)):
     delivery = await db.deliveries.find_one({"delivery_id": delivery_id, "pharmacy_id": user["user_id"]}, {"_id": 0})
     if not delivery:
@@ -1630,7 +1630,7 @@ async def update_delivery(delivery_id: str, update: DeliveryUpdate, user: dict =
         await create_notification_internal(update.driver_id, "driver", "Nuova consegna assegnata", f"Hai una nuova consegna per {delivery['customer_name']}", "delivery", {"delivery_id": delivery_id})
     return await db.deliveries.find_one({"delivery_id": delivery_id}, {"_id": 0})
 
-@api_router.delete("/deliveries/{delivery_id}")
+@api_router.delete("/deliveries/{delivery_id}", tags=["Deliveries"])
 async def delete_delivery(delivery_id: str, user: dict = Depends(get_current_user)):
     result = await db.deliveries.delete_one({"delivery_id": delivery_id, "pharmacy_id": user["user_id"]})
     if result.deleted_count == 0:
@@ -1706,7 +1706,7 @@ def _format_amount(delivery: dict) -> str:
     return f"{method_label} €{float(amount):.2f}"
 
 
-@api_router.post("/deliveries/{delivery_id}/confirm-payment")
+@api_router.post("/deliveries/{delivery_id}/confirm-payment", tags=["Deliveries"])
 async def confirm_delivery_payment(delivery_id: str, request: Request, user: dict = Depends(get_current_user)):
     """La farmacia conferma di aver ricevuto l'incasso dal fattorino → consegna chiusa."""
     delivery = await db.deliveries.find_one({"delivery_id": delivery_id, "pharmacy_id": user["user_id"]}, {"_id": 0})
@@ -1759,7 +1759,7 @@ async def confirm_delivery_payment(delivery_id: str, request: Request, user: dic
     return await db.deliveries.find_one({"delivery_id": delivery_id}, {"_id": 0})
 
 
-@api_router.post("/deliveries/{delivery_id}/dispute-payment")
+@api_router.post("/deliveries/{delivery_id}/dispute-payment", tags=["Deliveries"])
 async def dispute_delivery_payment(delivery_id: str, request: Request, user: dict = Depends(get_current_user)):
     """La farmacia segnala un problema con l'incasso (importo errato, contestazione)."""
     delivery = await db.deliveries.find_one({"delivery_id": delivery_id, "pharmacy_id": user["user_id"]}, {"_id": 0})
@@ -2041,9 +2041,100 @@ async def get_statistics(user: dict = Depends(get_current_user)):
         "priority": {}
     }
 
+# ============ ANALYTICS ============
+
+@api_router.get("/analytics/overview", tags=["Analytics"])
+async def get_analytics_overview(
+    period: str = "today",
+    user: dict = Depends(get_current_user),
+):
+    """
+    Panoramica consegne per la farmacia corrente.
+
+    - **period**: `today` | `week` | `month`
+
+    Ritorna: totale consegne, consegnate, cancellate, entrate previste,
+    top 3 fattorini, distribuzione per stato, media giornaliera.
+    """
+    allowed_periods = {"today", "week", "month"}
+    if period not in allowed_periods:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Periodo non valido. Usa: {', '.join(sorted(allowed_periods))}",
+        )
+
+    now = datetime.now(timezone.utc)
+    if period == "today":
+        start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        days = 1
+    elif period == "week":
+        start = now - timedelta(days=7)
+        days = 7
+    else:
+        start = now - timedelta(days=30)
+        days = 30
+
+    base_match = {
+        "pharmacy_id": user["user_id"],
+        "created_at": {"$gte": start.isoformat()},
+    }
+
+    # ── Status breakdown ──────────────────────────────────────────────────────
+    status_pipeline = [
+        {"$match": base_match},
+        {"$group": {
+            "_id": "$status",
+            "count": {"$sum": 1},
+            "total_amount": {"$sum": {"$ifNull": ["$amount", 0]}},
+        }},
+    ]
+    status_stats = await db.deliveries.aggregate(status_pipeline).to_list(None)
+    status_map: dict[str, int] = {s["_id"]: s["count"] for s in status_stats}
+    revenue_map: dict[str, float] = {s["_id"]: s.get("total_amount", 0) for s in status_stats}
+
+    total = sum(status_map.values())
+    completed = status_map.get("delivered", 0)
+    cancelled = status_map.get("cancelled", 0)
+    in_progress = sum(v for k, v in status_map.items()
+                      if k not in {"delivered", "cancelled"})
+    revenue = sum(revenue_map.get(s, 0) for s in ("delivered",))
+
+    # ── Top drivers ──────────────────────────────────────────────────────────
+    driver_pipeline = [
+        {"$match": {**base_match, "status": "delivered", "driver_id": {"$ne": None}}},
+        {"$group": {"_id": "$driver_id", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}},
+        {"$limit": 3},
+    ]
+    top_driver_docs = await db.deliveries.aggregate(driver_pipeline).to_list(3)
+    top_drivers = []
+    for d in top_driver_docs:
+        drv = await db.drivers.find_one({"driver_id": d["_id"]}, {"_id": 0, "name": 1, "driver_id": 1})
+        top_drivers.append({
+            "driver_id": d["_id"],
+            "name": drv.get("name", "—") if drv else "—",
+            "deliveries": d["count"],
+        })
+
+    # ── Daily average ─────────────────────────────────────────────────────────
+    daily_avg = round(total / days, 1) if days else 0
+
+    return {
+        "period": period,
+        "total_deliveries": total,
+        "completed": completed,
+        "cancelled": cancelled,
+        "in_progress": in_progress,
+        "revenue": round(revenue, 2),
+        "daily_avg": daily_avg,
+        "status_breakdown": status_map,
+        "top_drivers": top_drivers,
+        "generated_at": now.isoformat(),
+    }
+
 # ============ ARCHIVE ============
 
-@api_router.get("/archive")
+@api_router.get("/archive", tags=["Deliveries"])
 async def get_archive(page: int = 1, limit: int = 20, user: dict = Depends(get_current_user)):
     skip = (page - 1) * limit
     query = {"pharmacy_id": user["user_id"], "status": {"$in": ["delivered", "cancelled"]}}
@@ -2165,7 +2256,7 @@ async def get_reports(period: str = "month", user: dict = Depends(get_current_us
     cash_count = sum(1 for d in deliveries if d.get("payment_method") == "cash")
     return {"period": period, "total_revenue": total_revenue, "total_deliveries": total_deliveries, "avg_order_value": total_revenue / total_deliveries if total_deliveries > 0 else 0, "top_customers": top_customers, "top_drivers": top_drivers, "payment_breakdown": {"cash": cash_count, "pos": total_deliveries - cash_count}}
 
-@api_router.post("/integrations/winfarm/import")
+@api_router.post("/integrations/winfarm/import", tags=["Integrations"])
 async def winfarm_import(request: Request, user: dict = Depends(get_current_user)):
     """Endpoint generico per il bridge Winfarm: accetta una vendita e crea
     una delivery in stato `da_preparare`. Il farmacista la troverà su
@@ -2486,7 +2577,7 @@ async def driver_list_shifts(driver: dict = Depends(get_current_driver), limit: 
     return [await _enrich_shift(s) for s in shifts]
 
 
-@api_router.get("/shifts")
+@api_router.get("/shifts", tags=["Shifts"])
 async def pharmacy_list_shifts(
     user: dict = Depends(get_current_user),
     driver_id: Optional[str] = None,
@@ -2502,7 +2593,7 @@ async def pharmacy_list_shifts(
     return [await _enrich_shift(s) for s in shifts]
 
 
-@api_router.get("/shifts/{shift_id}")
+@api_router.get("/shifts/{shift_id}", tags=["Shifts"])
 async def pharmacy_get_shift(shift_id: str, user: dict = Depends(get_current_user)):
     shift = await db.driver_shifts.find_one(
         {"shift_id": shift_id, "pharmacy_id": user["user_id"]}, {"_id": 0}
@@ -2512,7 +2603,7 @@ async def pharmacy_get_shift(shift_id: str, user: dict = Depends(get_current_use
     return await _enrich_shift(shift, include_deliveries=True)
 
 
-@api_router.post("/shifts/{shift_id}/settle")
+@api_router.post("/shifts/{shift_id}/settle", tags=["Shifts"])
 async def pharmacy_settle_shift(shift_id: str, request: Request, user: dict = Depends(get_current_user)):
     shift = await db.driver_shifts.find_one(
         {"shift_id": shift_id, "pharmacy_id": user["user_id"]}, {"_id": 0}
@@ -2633,7 +2724,7 @@ class ApiTokenResponse(BaseModel):
     created_at: str
     pharmacy_id: str
 
-@api_router.post("/auth/token", response_model=ApiTokenResponse)
+@api_router.post("/auth/token", response_model=ApiTokenResponse, tags=["Auth"])
 async def generate_api_token(user: dict = Depends(get_current_user)):
     """Generate a new Bearer API token for external integrations (Winfarm, etc.)."""
     token_value = f"pt_{uuid.uuid4().hex}{uuid.uuid4().hex}"
@@ -2646,7 +2737,7 @@ async def generate_api_token(user: dict = Depends(get_current_user)):
     logger.info("API token generated", extra={"pharmacy_id": user["user_id"]})
     return {"token": token_value, "created_at": created_at, "pharmacy_id": user["user_id"]}
 
-@api_router.get("/auth/token")
+@api_router.get("/auth/token", tags=["Auth"])
 async def get_api_token(user: dict = Depends(get_current_user)):
     """Get current API token info (token value masked)."""
     doc = await db.api_tokens.find_one({"pharmacy_id": user["user_id"]}, {"_id": 0})
@@ -2654,7 +2745,7 @@ async def get_api_token(user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=404, detail="Nessun token API attivo")
     return doc
 
-@api_router.delete("/auth/token")
+@api_router.delete("/auth/token", tags=["Auth"])
 async def revoke_api_token(user: dict = Depends(get_current_user)):
     """Revoke current API token."""
     result = await db.api_tokens.delete_one({"pharmacy_id": user["user_id"]})
