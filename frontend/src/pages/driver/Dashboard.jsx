@@ -13,6 +13,11 @@ import {
   Play, Square, Euro, AlertCircle, Wallet
 } from 'lucide-react';
 import { toast } from 'sonner';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
+} from '../../components/ui/dialog';
+import { Input } from '../../components/ui/input';
+import { Label } from '../../components/ui/label';
 import { ensureArray } from '@/lib/collections';
 
 const LOCATION_DISTANCE_THRESHOLD = 0.00005;
@@ -26,6 +31,8 @@ export default function DriverDashboard() {
   const [locationStatus, setLocationStatus] = useState('idle');
   const [shift, setShift] = useState(null);
   const [shiftLoading, setShiftLoading] = useState(false);
+  const [closeShiftDialog, setCloseShiftDialog] = useState(false);
+  const [closeShiftCash, setCloseShiftCash] = useState('');
   const watchIdRef = useRef(null);
   const lastSentLocationRef = useRef(null);
 
@@ -74,23 +81,23 @@ export default function DriverDashboard() {
     }
   };
 
-  const handleCloseShift = async () => {
+  const handleCloseShift = () => {
     if (!shift) return;
-    const expectedCash = shift.totals?.cash_total ?? 0;
-    const declared = window.prompt(
-      `Chiudi turno?\n\nIncasso atteso in contanti: €${Number(expectedCash).toFixed(2)}\n\nQuanto consegni alla farmacia? (puoi anche lasciare vuoto)`,
-      expectedCash ? expectedCash.toFixed(2) : ''
-    );
-    if (declared === null) return;
+    setCloseShiftCash((shift.totals?.cash_total ?? '').toString());
+    setCloseShiftDialog(true);
+  };
+
+  const submitCloseShift = async () => {
     let declaredCash = null;
-    if (declared.trim() !== '') {
-      const parsed = parseFloat(declared.replace(',', '.'));
+    if (closeShiftCash.trim() !== '') {
+      const parsed = parseFloat(closeShiftCash.replace(',', '.'));
       if (!Number.isNaN(parsed)) declaredCash = parsed;
     }
     setShiftLoading(true);
     try {
       await axios.post(`${API}/driver/shifts/close`, { declared_cash: declaredCash }, { withCredentials: true });
       toast.success('Turno chiuso · in attesa conferma farmacia');
+      setCloseShiftDialog(false);
       fetchShift();
     } catch {
       toast.error('Errore chiusura turno');
@@ -491,6 +498,48 @@ export default function DriverDashboard() {
           </button>
         </div>
       </nav>
+
+      <Dialog open={closeShiftDialog} onOpenChange={setCloseShiftDialog}>
+        <DialogContent className="dark bg-zinc-900 border-zinc-800 text-white max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Chiudi turno</DialogTitle>
+            <DialogDescription className="text-zinc-400">
+              Incasso atteso in contanti:{' '}
+              <strong className="text-emerald-400">
+                €{Number(shift?.totals?.cash_total ?? 0).toFixed(2)}
+              </strong>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <Label className="text-zinc-300 text-sm">Quanto consegni alla farmacia?</Label>
+            <Input
+              type="number"
+              inputMode="decimal"
+              placeholder="Es. 35.50"
+              value={closeShiftCash}
+              onChange={(e) => setCloseShiftCash(e.target.value)}
+              className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-600"
+            />
+            <p className="text-xs text-zinc-500">Puoi anche lasciare vuoto se non hai ancora contato.</p>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              className="border-zinc-700 text-zinc-300 hover:bg-zinc-800"
+              onClick={() => setCloseShiftDialog(false)}
+            >
+              Annulla
+            </Button>
+            <Button
+              onClick={submitCloseShift}
+              disabled={shiftLoading}
+              className="bg-amber-500 hover:bg-amber-600 text-black font-semibold"
+            >
+              <Square className="w-4 h-4 mr-1.5" />Chiudi turno
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
