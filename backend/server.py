@@ -6,8 +6,15 @@ from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
 from pathlib import Path
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import List, Optional, Dict, Any
+try:
+    from slowapi import Limiter, _rate_limit_exceeded_handler
+    from slowapi.util import get_remote_address
+    from slowapi.errors import RateLimitExceeded
+    _SLOWAPI_AVAILABLE = True
+except ImportError:
+    _SLOWAPI_AVAILABLE = False
 import uuid
 from datetime import datetime, timezone, timedelta
 import json
@@ -35,10 +42,64 @@ database_name = os.environ['DB_NAME'].strip()
 client = AsyncIOMotorClient(mongo_url)
 db = client[database_name]
 
-app = FastAPI(title="PharmaTrack API")
+app = FastAPI(
+    title="PharmaTrack API",
+    version="1.0.0",
+    description="Gestionale consegne farmacie italiane",
+)
 api_router = APIRouter(prefix="/api")
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+# ── Sentry (optional — set SENTRY_DSN env var to enable) ─────────────────────
+_sentry_dsn = os.environ.get("SENTRY_DSN", "").strip()
+if _sentry_dsn:
+    try:
+        import sentry_sdk
+        from sentry_sdk.integrations.fastapi import FastApiIntegration
+        from sentry_sdk.integrations.starlette import StarletteIntegration
+        sentry_sdk.init(
+            dsn=_sentry_dsn,
+            integrations=[StarletteIntegration(), FastApiIntegration()],
+            traces_sample_rate=0.1,
+            environment=os.environ.get("ENVIRONMENT", "production"),
+        )
+        logger.info("Sentry initialized", extra={"dsn_domain": _sentry_dsn.split("@")[-1] if "@" in _sentry_dsn else "?"})
+    except Exception as _sentry_exc:
+        logger.warning("Sentry init failed: %s", _sentry_exc)
+
+# ── Rate limiter (slowapi) ─────────────────────────────────────────────────────
+if _SLOWAPI_AVAILABLE:
+    limiter = Limiter(key_func=get_remote_address, default_limits=["300/minute"])
+    app.state.limiter = limiter
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+else:
+    limiter = None
+
+# ── Structured JSON logging ──────────────────────────────────────────────────
+class _JsonFormatter(logging.Formatter):
+    def format(self, record: logging.LogRecord) -> str:  # type: ignore[override]
+        import json as _json
+        log_obj: Dict[str, Any] = {
+            "time": self.formatTime(record, "%Y-%m-%dT%H:%M:%S"),
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+        }
+        if record.exc_info:
+            log_obj["exc_info"] = self.formatException(record.exc_info)
+        extra_skip = {"name", "msg", "args", "levelname", "levelno", "pathname",
+                      "filename", "module", "exc_info", "exc_text", "stack_info",
+                      "lineno", "funcName", "created", "msecs", "relativeCreated",
+                      "thread", "threadName", "processName", "process", "message",
+                      "taskName", "asctime"}
+        for k, v in record.__dict__.items():
+            if k not in extra_skip:
+                log_obj[k] = v
+        return _json.dumps(log_obj, ensure_ascii=False, default=str)
+
+_log_handler = logging.StreamHandler()
+_log_handler.setFormatter(_JsonFormatter())
+logging.root.setLevel(logging.INFO)
+logging.root.handlers = [_log_handler]
 logger = logging.getLogger(__name__)
 
 # ============ WEBSOCKET MANAGER ============
@@ -139,11 +200,34 @@ class DeliveryCreate(BaseModel):
     driver_id: Optional[str] = None
     notes: Optional[str] = None
     payment_method: str = "cash"
-    amount: Optional[float] = Field(default=None, ge=0)
-    amount_given: Optional[float] = Field(default=None, ge=0)
+    amount: Optional[float] = Field(default=None, ge=0, le=99999)
+    amount_given: Optional[float] = Field(default=None, ge=0, le=99999)
     scheduled_date: Optional[str] = None
     scheduled_time: Optional[str] = None
     priority: str = "normal"
+
+    @field_validator("payment_method")
+    @classmethod
+    def validate_payment_method(cls, v: str) -> str:
+        allowed = {"cash", "card", "bank_transfer", "prepaid"}
+        if v not in allowed:
+            raise ValueError(f"Metodo di pagamento non valido. Valori accettati: {', '.join(sorted(allowed))}")
+        return v
+
+    @field_validator("notes")
+    @classmethod
+    def sanitize_notes(cls, v: Optional[str]) -> Optional[str]:
+        if v:
+            return v.strip()[:1000]
+        return v
+
+    @field_validator("priority")
+    @classmethod
+    def validate_priority(cls, v: str) -> str:
+        allowed = {"low", "normal", "high", "urgent"}
+        if v not in allowed:
+            raise ValueError(f"Priorità non valida. Valori accettati: {', '.join(sorted(allowed))}")
+        return v"
 
 class DeliveryUpdate(BaseModel):
     driver_id: Optional[str] = None
@@ -583,7 +667,7 @@ async def register(data: PharmacyRegister, response: Response):
     return {k: v for k, v in new_user.items() if k not in ["_id", "password_hash"]}
 
 @api_router.post("/auth/login")
-async def login(data: PharmacyLogin, response: Response):
+async def login(request: Request, data: PharmacyLogin, response: Response):
     user = await db.users.find_one({"email": data.email}, {"_id": 0})
     if not user:
         raise HTTPException(status_code=401, detail="Credenziali non valide")
@@ -773,7 +857,7 @@ async def delete_account(response: Response, user: dict = Depends(get_current_us
 # ============ SUPER ADMIN ============
 
 @api_router.post("/admin/login")
-async def admin_login(data: AdminLogin, response: Response):
+async def admin_login(request: Request, data: AdminLogin, response: Response):
     if not ADMIN_EMAIL or not ADMIN_PASSWORD:
         raise HTTPException(status_code=503, detail="Super amministratore non configurato")
     if data.email != ADMIN_EMAIL or data.password != ADMIN_PASSWORD:
@@ -2541,6 +2625,61 @@ async def websocket_driver(websocket: WebSocket, driver_id: str):
         manager.disconnect(websocket, driver_id, "driver")
 
 
+
+# ============ API TOKEN ENDPOINTS ============
+
+class ApiTokenResponse(BaseModel):
+    token: str
+    created_at: str
+    pharmacy_id: str
+
+@api_router.post("/auth/token", response_model=ApiTokenResponse)
+async def generate_api_token(user: dict = Depends(get_current_user)):
+    """Generate a new Bearer API token for external integrations (Winfarm, etc.)."""
+    token_value = f"pt_{uuid.uuid4().hex}{uuid.uuid4().hex}"
+    created_at = datetime.now(timezone.utc).isoformat()
+    await db.api_tokens.replace_one(
+        {"pharmacy_id": user["user_id"]},
+        {"pharmacy_id": user["user_id"], "token": token_value, "created_at": created_at},
+        upsert=True,
+    )
+    logger.info("API token generated", extra={"pharmacy_id": user["user_id"]})
+    return {"token": token_value, "created_at": created_at, "pharmacy_id": user["user_id"]}
+
+@api_router.get("/auth/token")
+async def get_api_token(user: dict = Depends(get_current_user)):
+    """Get current API token info (token value masked)."""
+    doc = await db.api_tokens.find_one({"pharmacy_id": user["user_id"]}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Nessun token API attivo")
+    return doc
+
+@api_router.delete("/auth/token")
+async def revoke_api_token(user: dict = Depends(get_current_user)):
+    """Revoke current API token."""
+    result = await db.api_tokens.delete_one({"pharmacy_id": user["user_id"]})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Nessun token API da revocare")
+    logger.info("API token revoked", extra={"pharmacy_id": user["user_id"]})
+    return {"revoked": True}
+
+async def get_current_user_or_token(request: Request):
+    """Dependency: accept either session cookie or Bearer token."""
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        raw_token = auth_header[7:]
+        doc = await db.api_tokens.find_one({"token": raw_token})
+        if not doc:
+            raise HTTPException(status_code=401, detail="Token API non valido")
+        user = await db.users.find_one({"user_id": doc["pharmacy_id"]}, {"_id": 0})
+        if not user:
+            raise HTTPException(status_code=401, detail="Farmacia non trovata")
+        if user.get("is_active", True) is False:
+            raise HTTPException(status_code=403, detail="Account disattivato")
+        return user
+    # Fallback to session cookie
+    return await get_current_user(request)
+
 # ============ CORS — FIX CRITICO ============
 # allow_credentials=True è incompatibile con allow_origins=["*"].
 # Se CORS_ORIGINS è "*" usiamo allow_all senza credentials (fallback sicuro per dev locale).
@@ -2566,6 +2705,21 @@ else:
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
+    )
+
+
+# ── Standardized error response handler ──────────────────────────────────────
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "error": {
+                "code": exc.status_code,
+                "message": exc.detail,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+        },
     )
 
 app.include_router(api_router)
