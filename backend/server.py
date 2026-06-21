@@ -1,5 +1,6 @@
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, WebSocket, WebSocketDisconnect, Response, Request
 from fastapi.responses import JSONResponse
+from starlette.responses import StreamingResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -15,6 +16,8 @@ try:
     _SLOWAPI_AVAILABLE = True
 except ImportError:
     _SLOWAPI_AVAILABLE = False
+import csv
+import io as _io
 import uuid
 from datetime import datetime, timezone, timedelta
 import json
@@ -2132,6 +2135,117 @@ async def get_analytics_overview(
         "generated_at": now.isoformat(),
     }
 
+
+@api_router.get("/analytics/hourly", tags=["Analytics"])
+async def get_analytics_hourly(
+    period: str = "today",
+    user: dict = Depends(get_current_user),
+):
+    """
+    Distribuzione consegne per fascia oraria.
+    Utile per identificare i picchi operativi (periodo: today | week | month).
+    """
+    allowed = {"today", "week", "month"}
+    if period not in allowed:
+        raise HTTPException(status_code=400, detail=f"Periodo non valido. Usa: {', '.join(sorted(allowed))}")
+
+    now = datetime.now(timezone.utc)
+    start = (now.replace(hour=0, minute=0, second=0, microsecond=0)
+             if period == "today"
+             else now - timedelta(days=7 if period == "week" else 30))
+
+    pipeline = [
+        {"$match": {
+            "pharmacy_id": user["user_id"],
+            "created_at": {"$gte": start.isoformat()},
+        }},
+        {"$addFields": {
+            "created_dt": {"$dateFromString": {"dateString": "$created_at", "onError": None}},
+        }},
+        {"$match": {"created_dt": {"$ne": None}}},
+        {"$group": {
+            "_id": {"$hour": "$created_dt"},
+            "count": {"$sum": 1},
+        }},
+        {"$sort": {"_id": 1}},
+    ]
+    results = await db.deliveries.aggregate(pipeline).to_list(24)
+    hourly_map = {r["_id"]: r["count"] for r in results}
+    hourly = [{"hour": h, "label": f"{h:02d}:00", "count": hourly_map.get(h, 0)} for h in range(24)]
+    peak_hour = max(hourly, key=lambda x: x["count"]) if any(x["count"] > 0 for x in hourly) else None
+    return {
+        "period": period,
+        "hourly": hourly,
+        "peak_hour": peak_hour,
+        "generated_at": now.isoformat(),
+    }
+
+
+@api_router.get("/analytics/export/csv", tags=["Analytics"])
+async def export_deliveries_csv(
+    period: str = "month",
+    user: dict = Depends(get_current_user),
+):
+    """Esporta le consegne del periodo in formato CSV (UTF-8 BOM per Excel italiano)."""
+    allowed = {"today", "week", "month"}
+    if period not in allowed:
+        raise HTTPException(status_code=400, detail=f"Periodo non valido. Usa: {', '.join(sorted(allowed))}")
+
+    now = datetime.now(timezone.utc)
+    start = (now.replace(hour=0, minute=0, second=0, microsecond=0)
+             if period == "today"
+             else now - timedelta(days=7 if period == "week" else 30))
+
+    deliveries = await db.deliveries.find(
+        {"pharmacy_id": user["user_id"], "created_at": {"$gte": start.isoformat()}},
+        {"_id": 0},
+    ).sort("created_at", -1).to_list(5000)
+
+    # Enrich with customer / driver names
+    customer_cache: dict = {}
+    driver_cache: dict = {}
+
+    output = _io.StringIO()
+    output.write("﻿")  # UTF-8 BOM — Excel opens without encoding issues
+    writer = csv.writer(output, delimiter=";")
+    writer.writerow([
+        "ID Consegna", "Stato", "Cliente", "Fattorino",
+        "Importo (€)", "Metodo Pagamento", "Data Creazione",
+        "Note", "Priorità",
+    ])
+
+    for d in deliveries:
+        cid = d.get("customer_id", "")
+        if cid and cid not in customer_cache:
+            c = await db.customers.find_one({"customer_id": cid}, {"_id": 0, "name": 1})
+            customer_cache[cid] = c.get("name", cid) if c else cid
+        did = d.get("driver_id", "")
+        if did and did not in driver_cache:
+            dr = await db.drivers.find_one({"driver_id": did}, {"_id": 0, "name": 1})
+            driver_cache[did] = dr.get("name", did) if dr else did
+
+        writer.writerow([
+            d.get("delivery_id", ""),
+            d.get("status", ""),
+            customer_cache.get(cid, ""),
+            driver_cache.get(did, "") if did else "",
+            str(d.get("amount", "")).replace(".", ","),
+            d.get("payment_method", ""),
+            d.get("created_at", "")[:19].replace("T", " ") if d.get("created_at") else "",
+            (d.get("notes", "") or "").replace("
+", " "),
+            d.get("priority", "normal"),
+        ])
+
+    csv_bytes = output.getvalue().encode("utf-8-sig")
+    period_label = {"today": "oggi", "week": "settimana", "month": "mese"}[period]
+    filename = f"consegne_{period_label}_{now.strftime('%Y%m%d')}.csv"
+    return StreamingResponse(
+        _io.BytesIO(csv_bytes),
+        media_type="text/csv; charset=utf-8-sig",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
 # ============ ARCHIVE ============
 
 @api_router.get("/archive", tags=["Deliveries"])
@@ -2814,6 +2928,18 @@ async def http_exception_handler(request: Request, exc: HTTPException):
     )
 
 app.include_router(api_router)
+# ── Security headers ──────────────────────────────────────────────────────────
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault("X-XSS-Protection", "1; mode=block")
+    response.headers.setdefault("Permissions-Policy", "geolocation=(), camera=(), microphone=()")
+    return response
+
+
 async def safe_create_index(collection, keys, **kwargs):
     """Create an index, dropping any conflicting same-name index first."""
     import pymongo.errors as _pe
