@@ -65,9 +65,9 @@ if _sentry_dsn:
             traces_sample_rate=0.1,
             environment=os.environ.get("ENVIRONMENT", "production"),
         )
-        logger.info("Sentry initialized", extra={"dsn_domain": _sentry_dsn.split("@")[-1] if "@" in _sentry_dsn else "?"})
+        logging.info("Sentry initialized (domain=%s)", _sentry_dsn.split("@")[-1] if "@" in _sentry_dsn else "?")
     except Exception as _sentry_exc:
-        logger.warning("Sentry init failed: %s", _sentry_exc)
+        logging.warning("Sentry init failed: %s", _sentry_exc)
 
 # ── Rate limiter (slowapi) ─────────────────────────────────────────────────────
 if _SLOWAPI_AVAILABLE:
