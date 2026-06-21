@@ -230,7 +230,7 @@ class DeliveryCreate(BaseModel):
         allowed = {"low", "normal", "high", "urgent"}
         if v not in allowed:
             raise ValueError(f"Priorità non valida. Valori accettati: {', '.join(sorted(allowed))}")
-        return v"
+        return v
 
 class DeliveryUpdate(BaseModel):
     driver_id: Optional[str] = None
@@ -2232,8 +2232,7 @@ async def export_deliveries_csv(
             str(d.get("amount", "")).replace(".", ","),
             d.get("payment_method", ""),
             d.get("created_at", "")[:19].replace("T", " ") if d.get("created_at") else "",
-            (d.get("notes", "") or "").replace("
-", " "),
+            (d.get("notes", "") or "").replace("\n", " "),
             d.get("priority", "normal"),
         ])
 
