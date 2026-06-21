@@ -14,7 +14,7 @@ import { Badge } from './ui/badge';
 import { ensureArray } from '@/lib/collections';
 import {
   LayoutDashboard, Users, Package, Truck, MessageSquare, Archive, Settings,
-  Bell, LogOut, Menu, X, ChevronRight, BarChart3, Stethoscope,
+  Bell, LogOut, Menu, X, ChevronRight, BarChart3, LineChart, Stethoscope,
   Phone, StickyNote, Sun, Moon, Plus, Home, Check, Trash2, RefreshCw, Map, Wallet, Plug
 } from 'lucide-react';
 
@@ -28,6 +28,7 @@ const navItems = [
   { path: '/shifts',        icon: Wallet,          label: 'Turni & Cassa' },
   { path: '/tracking',      icon: Map,             label: 'Tracking Live' },
   { path: '/reports',       icon: BarChart3,       label: 'Report' },
+  { path: '/analytics',     icon: LineChart,       label: 'Analytics' },
   { path: '/doctors',       icon: Stethoscope,     label: 'Medici' },
   { path: '/useful-numbers',icon: Phone,           label: 'Numeri Utili' },
   { path: '/notes',         icon: StickyNote,      label: 'Block Notes' },
