@@ -44,5 +44,5 @@ asyncio.run(reset())
 ```
 
 ## URL produzione (Emergent preview)
-- Frontend: https://med-inventory-76.preview.emergentagent.com
-- API: https://med-inventory-76.preview.emergentagent.com/api
+- Frontend: https://backend-modular-62.preview.emergentagent.com
+- API: https://backend-modular-62.preview.emergentagent.com/api
