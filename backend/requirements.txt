@@ -12,3 +12,4 @@ python-multipart==0.0.22
 pywebpush==2.0.3
 slowapi==0.1.10
 sentry-sdk[fastapi]>=1.40.0
+stripe==11.1.1
