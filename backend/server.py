@@ -2926,7 +2926,167 @@ async def http_exception_handler(request: Request, exc: HTTPException):
         },
     )
 
+
+# ============ BILLING & SUBSCRIPTIONS (Stripe) ============
+# Abbonamento mensile per le farmacie che usano PharmaTrack.
+# Variabili d'ambiente richieste (Render):
+#   STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_PRICE_BASIC, STRIPE_PRICE_PRO
+#   BILLING_SUCCESS_URL, BILLING_CANCEL_URL (opzionali, default sotto)
+# NOTA: i prezzi in PLANS sono solo per la UI (fallback informativo). L'importo
+# reale addebitato è sempre quello del Price configurato su Stripe Dashboard.
+
+STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY")
+STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET")
+BILLING_SUCCESS_URL = os.environ.get("BILLING_SUCCESS_URL", "https://pharmatrack.vercel.app/pharmacy/settings?billing=success")
+BILLING_CANCEL_URL = os.environ.get("BILLING_CANCEL_URL", "https://pharmatrack.vercel.app/pharmacy/settings?billing=cancel")
+TRIAL_DAYS = 14
+
+PLANS: Dict[str, Dict[str, Any]] = {
+    "basic": {
+        "name": "Basic",
+        "price_env": "STRIPE_PRICE_BASIC",
+        "display_price_eur": 99,
+        "features": ["Fino a 3 fattorini", "Tracking live", "Doppia conferma incasso", "Chat realtime"],
+    },
+    "pro": {
+        "name": "Pro",
+        "price_env": "STRIPE_PRICE_PRO",
+        "display_price_eur": 199,
+        "features": ["Fattorini illimitati", "Analytics avanzate + export CSV", "Bridge Winfarm", "Supporto prioritario"],
+    },
+}
+
+
+def _get_stripe():
+    if not STRIPE_SECRET_KEY:
+        raise HTTPException(status_code=503, detail="Fatturazione non configurata (STRIPE_SECRET_KEY mancante)")
+    import stripe as _stripe
+    _stripe.api_key = STRIPE_SECRET_KEY
+    return _stripe
+
+
+class CheckoutRequest(BaseModel):
+    plan: str
+
+    @field_validator("plan")
+    @classmethod
+    def validate_plan(cls, v: str) -> str:
+        if v not in PLANS:
+            raise ValueError(f"Piano non valido. Scegli tra: {', '.join(PLANS.keys())}")
+        return v
+
+
+billing_router = APIRouter(prefix="/api/billing", tags=["Billing"])
+
+
+@billing_router.get("/plans")
+async def list_plans():
+    """Elenco pubblico dei piani disponibili. Nessuna autenticazione richiesta."""
+    return {"plans": PLANS, "trial_days": TRIAL_DAYS}
+
+
+@billing_router.get("/subscription")
+async def get_subscription(user: dict = Depends(get_current_user)):
+    sub = await db.subscriptions.find_one({"pharmacy_id": user["user_id"]}, {"_id": 0})
+    if not sub:
+        return {"status": "none", "plan": None}
+    return sub
+
+
+@billing_router.post("/checkout")
+async def create_checkout_session(data: CheckoutRequest, user: dict = Depends(get_current_user)):
+    stripe = _get_stripe()
+    price_id = os.environ.get(PLANS[data.plan]["price_env"])
+    if not price_id:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Prezzo Stripe non configurato per il piano {data.plan} ({PLANS[data.plan]['price_env']})",
+        )
+
+    existing = await db.subscriptions.find_one({"pharmacy_id": user["user_id"]}, {"_id": 0})
+    customer_id = existing.get("stripe_customer_id") if existing else None
+
+    try:
+        session_kwargs = dict(
+            mode="subscription",
+            line_items=[{"price": price_id, "quantity": 1}],
+            success_url=BILLING_SUCCESS_URL,
+            cancel_url=BILLING_CANCEL_URL,
+            metadata={"pharmacy_id": user["user_id"], "plan": data.plan},
+        )
+        if customer_id:
+            session_kwargs["customer"] = customer_id
+        else:
+            session_kwargs["customer_email"] = user.get("email")
+            session_kwargs["subscription_data"] = {"trial_period_days": TRIAL_DAYS}
+
+        session = stripe.checkout.Session.create(**session_kwargs)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Errore creazione Stripe Checkout Session: %s", e)
+        raise HTTPException(status_code=502, detail="Errore nella comunicazione con Stripe")
+
+    return {"checkout_url": session.url}
+
+
+@billing_router.post("/webhook")
+async def stripe_webhook(request: Request):
+    stripe = _get_stripe()
+    if not STRIPE_WEBHOOK_SECRET:
+        raise HTTPException(status_code=503, detail="Webhook secret non configurato")
+
+    payload = await request.body()
+    sig_header = request.headers.get("stripe-signature")
+    try:
+        event = stripe.Webhook.construct_event(payload, sig_header, STRIPE_WEBHOOK_SECRET)
+    except Exception as e:
+        logger.warning("Webhook Stripe non valido: %s", e)
+        raise HTTPException(status_code=400, detail="Payload non valido")
+
+    event_type = event["type"]
+    obj = event["data"]["object"]
+
+    if event_type == "checkout.session.completed":
+        pharmacy_id = (obj.get("metadata") or {}).get("pharmacy_id")
+        plan = (obj.get("metadata") or {}).get("plan")
+        if pharmacy_id:
+            await db.subscriptions.update_one(
+                {"pharmacy_id": pharmacy_id},
+                {"$set": {
+                    "pharmacy_id": pharmacy_id,
+                    "plan": plan,
+                    "status": "active",
+                    "stripe_customer_id": obj.get("customer"),
+                    "stripe_subscription_id": obj.get("subscription"),
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                }},
+                upsert=True,
+            )
+    elif event_type in ("customer.subscription.updated", "customer.subscription.deleted"):
+        sub_id = obj.get("id")
+        status = obj.get("status")
+        await db.subscriptions.update_one(
+            {"stripe_subscription_id": sub_id},
+            {"$set": {"status": status, "updated_at": datetime.now(timezone.utc).isoformat()}},
+        )
+
+    return {"received": True}
+
+
+async def require_active_subscription(user: dict = Depends(get_current_user)) -> dict:
+    """Dependency opzionale per gating di route premium (non ancora applicata a nessuna
+    route esistente — da aggiungere manualmente dove serve, es.:
+    @api_router.get("/analytics/overview", dependencies=[Depends(require_active_subscription)])
+    """
+    sub = await db.subscriptions.find_one({"pharmacy_id": user["user_id"]}, {"_id": 0})
+    if not sub or sub.get("status") not in ("active", "trialing"):
+        raise HTTPException(status_code=402, detail="Abbonamento richiesto. Attiva un piano per continuare.")
+    return user
+
+
 app.include_router(api_router)
+app.include_router(billing_router)
 # ── Security headers ──────────────────────────────────────────────────────────
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next):
@@ -3036,6 +3196,10 @@ async def setup_indexes():
     # ── Push subscriptions ────────────────────────────────────────────────────
     await safe_create_index(db.push_subscriptions, [("user_id", pymongo.ASCENDING), ("user_type", pymongo.ASCENDING), ("endpoint", pymongo.ASCENDING)], unique=True, name="push_subscriptions_user_type_endpoint_idx", background=True)
     await safe_create_index(db.push_subscriptions, [("updated_at", pymongo.DESCENDING)], name="push_subscriptions_updated_idx", background=True)
+
+    # ── Subscriptions (billing) ──────────────────────────────────────────────
+    await safe_create_index(db.subscriptions, [("pharmacy_id", pymongo.ASCENDING)], unique=True, name="subscriptions_pharmacy_idx", background=True)
+    await safe_create_index(db.subscriptions, [("stripe_subscription_id", pymongo.ASCENDING)], name="subscriptions_stripe_sub_idx", background=True, sparse=True)
 
     if ADMIN_EMAIL and ADMIN_PASSWORD:
         logger.info("Super admin configured for %s", ADMIN_EMAIL)
