@@ -78,6 +78,16 @@ Esempio di feature richiesta: doppia conferma consegna+incasso (la farmacia deve
 
 **Test backend**: 23/23 pytest passed (14 Phase-1 regression + 9 nuovi Winfarm). Bug ObjectId in winfarm_import scoperto e corretto durante i test.
 
+### 2026-07-14 — Fix sicurezza + chiusura funzionalità ✓
+1. **Rate limiting login** (SlowAPI, per IP, messaggio 429 "Troppi tentativi, riprova tra qualche minuto"):
+   - `/api/auth/login` 5/min · `/api/driver/login` 5/min · `/api/admin/login` 5/min · `/api/auth/register` 3/min · `/api/auth/forgot-password` 3/min. Limiti override-abili via env (`LOGIN_RATE_LIMIT`, `REGISTER_RATE_LIMIT`, `FORGOT_RATE_LIMIT`).
+2. **Validazione password/email**: `field_validator` password (min 8, ≥1 lettera, ≥1 numero, messaggi IT) su `PharmacyRegister`, `DriverCreate`, `ResetPasswordRequest`. Campi email → `EmailStr` sui modelli auth (email-validator installato).
+3. **Verifica email reale**: registrazione genera token in `email_verifications` (scadenza 24h) + `users.email_verified=false` + email SMTP con link `{APP_BASE_URL}/verify-email?token=…`. Endpoint `POST /api/auth/verify-email` e `POST /api/auth/resend-verification`. `VerifyEmail.jsx` chiama davvero l'endpoint (loading/success/error). Banner "Verifica la tua email" in Dashboard (solo se `email_verified===false`, non blocca il login). Aggiunto `APP_BASE_URL` in config/.env.
+4. **.env.example**: `backend/.env.example` completo (incl. APP_BASE_URL, SENTRY_*, REDIS_*); `frontend/.env.example` con VITE_BACKEND_URL, VITE_GOOGLE_CLIENT_ID, VITE_VAPID_PUBLIC_KEY, VITE_GOOGLE_MAPS_KEY.
+5. **Pulizia**: nessun duplicato `ErrorBoundary.tsx` presente (solo `.jsx`, già importato in App.tsx) → niente da rimuovere.
+
+**Test**: 29/29 pytest verdi. Verificati via curl/DB: password 422 (IT), email 422, register→email_verified false + token, verify-email 200→verified, resend, 429 custom su login (5/min). VerifyEmail page states OK via screenshot.
+
 ### 2026-06-27 — Roadmap 5 Stelle: modularizzazione backend + FASE 1→4 ✓
 **FASE 1 — Modularizzazione** (`server.py` da 2654 righe → entrypoint snello):
 - `app/core/`: `database.py` (Mongo client/db), `config.py` (env settings), `security.py` (auth deps + sessioni), `notifications.py` (push/email/notifiche), `websocket.py` (ConnectionManager), `shifts_service.py` (helper turni), `limiter.py`, `logging_config.py`, `errors.py`, `sentry.py`, `cache.py`

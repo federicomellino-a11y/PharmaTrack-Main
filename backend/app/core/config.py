@@ -18,3 +18,11 @@ ADMIN_NAME = os.getenv("ADMIN_NAME") or os.getenv("SUPERADMIN_NAME") or "Super A
 VAPID_PUBLIC_KEY = os.getenv("VAPID_PUBLIC_KEY")
 VAPID_PRIVATE_KEY = os.getenv("VAPID_PRIVATE_KEY")
 VAPID_SUBJECT = os.getenv("VAPID_SUBJECT", "mailto:support@pharmatrack.app")
+
+# Base URL del frontend per i link nelle email (verifica/reset)
+APP_BASE_URL = (os.getenv("APP_BASE_URL") or os.getenv("FRONTEND_URL") or "http://localhost:3000").rstrip("/")
+
+# Rate limit su endpoint sensibili (override via env, es. nei test)
+LOGIN_RATE_LIMIT = os.getenv("LOGIN_RATE_LIMIT", "5/minute")
+REGISTER_RATE_LIMIT = os.getenv("REGISTER_RATE_LIMIT", "3/minute")
+FORGOT_RATE_LIMIT = os.getenv("FORGOT_RATE_LIMIT", "3/minute")

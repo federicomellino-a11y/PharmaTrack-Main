@@ -57,14 +57,27 @@ const formatCurrency = (v) => new Intl.NumberFormat('it-IT', { style: 'currency'
 export default function PharmacyDashboard() {
   const navigate = useNavigate();
   const { isDark } = useTheme();
-  const { user } = useAuth();
+  const { user, checkAuth } = useAuth();
   const [stats, setStats] = useState(null);
   const [recentDeliveries, setRecentDeliveries] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [customerCoords, setCustomerCoords] = useState({});
   const [pharmacyCoords, setPharmacyCoords] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [resending, setResending] = useState(false);
   const mapKey = useRef(`dash-map-${Date.now()}`);
+
+  const resendVerification = useCallback(async () => {
+    setResending(true);
+    try {
+      await axios.post(`${API}/auth/resend-verification`, {}, { withCredentials: true });
+      toast.success('Email di verifica inviata. Controlla la casella di posta.');
+    } catch {
+      toast.error('Impossibile inviare l\'email ora. Riprova tra poco.');
+    } finally {
+      setResending(false);
+    }
+  }, []);
 
   const loadCustomerCoordinates = useCallback(async (customer) => {
     if (!customer?.customer_id) return;
@@ -171,6 +184,31 @@ export default function PharmacyDashboard() {
   return (
     <Layout title="Dashboard">
       <div className="space-y-5 animate-fade-in-up" data-testid="pharmacy-dashboard">
+
+        {/* Email verification banner */}
+        {user?.email_verified === false && (
+          <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-5 py-3.5 flex items-center justify-between gap-4" data-testid="verify-email-banner">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
+              <div>
+                <p className="text-sm font-semibold text-amber-900 dark:text-amber-100">Verifica la tua email</p>
+                <p className="text-xs text-amber-800/80 dark:text-amber-200/80 mt-0.5">
+                  Conferma <strong>{user?.email}</strong> per proteggere il tuo account. Controlla la posta o richiedi un nuovo link.
+                </p>
+              </div>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              className="shrink-0 border-amber-500/40 text-amber-900 dark:text-amber-100 hover:bg-amber-500/20"
+              onClick={resendVerification}
+              disabled={resending}
+              data-testid="resend-verification-btn"
+            >
+              {resending ? 'Invio…' : 'Reinvia email'}
+            </Button>
+          </div>
+        )}
 
         {/* Welcome banner */}
         <div className="rounded-2xl bg-gradient-to-r from-primary/10 via-primary/5 to-transparent border border-primary/15 px-5 py-4 flex items-center justify-between gap-4">

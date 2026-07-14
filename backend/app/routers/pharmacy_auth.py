@@ -31,8 +31,40 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+async def _send_verification_email(user_id: str, email: str, name: str) -> str:
+    token = uuid.uuid4().hex
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
+    await db.email_verifications.delete_many({"user_id": user_id})
+    await db.email_verifications.insert_one({
+        "user_id": user_id,
+        "token": token,
+        "expires_at": expires_at.isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+    verify_url = f"{APP_BASE_URL}/verify-email?token={token}"
+    html_body = f"""
+    <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px">
+      <h2 style="color:#0d9488">PharmaTrack — Verifica la tua email</h2>
+      <p>Ciao <strong>{name}</strong>,</p>
+      <p>Grazie per esserti registrato. Conferma il tuo indirizzo email per completare l'attivazione dell'account.</p>
+      <p style="margin:24px 0">
+        <a href="{verify_url}" style="background:#0d9488;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold">
+          Verifica email
+        </a>
+      </p>
+      <p style="color:#666;font-size:13px">Il link scade tra 24 ore. Se non ti sei registrato, ignora questa email.</p>
+    </div>
+    """
+    text_body = f"Ciao {name},\n\nVerifica la tua email su PharmaTrack:\n{verify_url}\n\nIl link scade tra 24 ore."
+    sent = await send_transactional_email(email, "Verifica la tua email — PharmaTrack", text_body, html_body)
+    if not sent:
+        logger.info("SMTP non configurato – verify URL: %s", verify_url)
+    return verify_url
+
+
 @router.post("/auth/register")
-async def register(data: PharmacyRegister, response: Response):
+@limiter.limit(REGISTER_RATE_LIMIT)
+async def register(request: Request, data: PharmacyRegister, response: Response):
     existing = await db.users.find_one({"email": data.email})
     if existing:
         raise HTTPException(status_code=400, detail="Email già registrata")
@@ -48,6 +80,7 @@ async def register(data: PharmacyRegister, response: Response):
         "password_hash": password_hash,
         "picture": None,
         "is_active": True,
+        "email_verified": False,
         "pharmacy_name": data.pharmacy_name,
         "pharmacy_address": data.pharmacy_address,
         "pharmacy_phone": data.pharmacy_phone,
@@ -61,11 +94,7 @@ async def register(data: PharmacyRegister, response: Response):
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     await db.users.insert_one(new_user)
-    await send_transactional_email(
-        data.email,
-        "Benvenuto in PharmaTrack",
-        f"Ciao {data.name},\n\nil tuo account PharmaTrack è stato creato con successo.\nDa ora puoi gestire clienti, consegne e fattorini dalla tua dashboard.\n\nGrazie per esserti iscritto!",
-    )
+    await _send_verification_email(user_id, data.email, data.name)
     
     session_token = f"sess_{uuid.uuid4().hex}"
     expires_at = datetime.now(timezone.utc) + timedelta(days=7)
@@ -82,7 +111,7 @@ async def register(data: PharmacyRegister, response: Response):
     return {k: v for k, v in new_user.items() if k not in ["_id", "password_hash"]}
 
 @router.post("/auth/login")
-@limiter.limit("10/minute")
+@limiter.limit(LOGIN_RATE_LIMIT)
 async def login(request: Request, data: PharmacyLogin, response: Response):
     user = await db.users.find_one({"email": data.email}, {"_id": 0})
     if not user:
@@ -122,7 +151,8 @@ async def logout(request: Request, response: Response):
     return {"message": "Logged out"}
 
 @router.post("/auth/forgot-password")
-async def forgot_password(data: ForgotPasswordRequest):
+@limiter.limit(FORGOT_RATE_LIMIT)
+async def forgot_password(request: Request, data: ForgotPasswordRequest):
     user = await db.users.find_one({"email": data.email}, {"_id": 0})
     if not user:
         # Always return success to prevent email enumeration
@@ -138,7 +168,7 @@ async def forgot_password(data: ForgotPasswordRequest):
         "created_at": datetime.now(timezone.utc).isoformat(),
     })
 
-    reset_url = f"https://{os.environ.get('REPLIT_DEV_DOMAIN', 'localhost')}/reset-password?token={reset_token}"
+    reset_url = f"{APP_BASE_URL}/reset-password?token={reset_token}"
     html_body = f"""
     <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px">
       <h2 style="color:#0d9488">PharmaTrack — Recupero password</h2>
@@ -180,6 +210,29 @@ async def reset_password(data: ResetPasswordRequest):
     await db.password_reset_tokens.delete_one({"token": data.token})
     await db.user_sessions.delete_many({"user_id": record["user_id"]})
     return {"message": "Password aggiornata con successo"}
+
+
+@router.post("/auth/verify-email")
+async def verify_email(data: VerifyEmailRequest):
+    record = await db.email_verifications.find_one({"token": data.token})
+    if not record:
+        raise HTTPException(status_code=400, detail="Link di verifica non valido o già utilizzato")
+    expires_at = datetime.fromisoformat(record["expires_at"])
+    if datetime.now(timezone.utc) > expires_at:
+        await db.email_verifications.delete_one({"token": data.token})
+        raise HTTPException(status_code=400, detail="Link di verifica scaduto. Richiedine uno nuovo")
+    await db.users.update_one({"user_id": record["user_id"]}, {"$set": {"email_verified": True}})
+    await db.email_verifications.delete_many({"user_id": record["user_id"]})
+    return {"message": "Email verificata con successo"}
+
+
+@router.post("/auth/resend-verification")
+@limiter.limit(FORGOT_RATE_LIMIT)
+async def resend_verification(request: Request, user: dict = Depends(get_current_user)):
+    if user.get("email_verified"):
+        return {"message": "Email già verificata"}
+    await _send_verification_email(user["user_id"], user["email"], user.get("name") or "")
+    return {"message": "Email di verifica inviata"}
 
 
 @router.post("/auth/google")

@@ -1,9 +1,17 @@
 import logging
 from fastapi import Request
 from fastapi.responses import JSONResponse
+from slowapi.errors import RateLimitExceeded
 from app.core.sentry import capture_exception
 
 logger = logging.getLogger(__name__)
+
+
+async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
+    return JSONResponse(
+        status_code=429,
+        content={"detail": "Troppi tentativi, riprova tra qualche minuto"},
+    )
 
 
 async def unhandled_exception_handler(request: Request, exc: Exception):

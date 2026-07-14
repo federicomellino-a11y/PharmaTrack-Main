@@ -32,7 +32,7 @@ router = APIRouter()
 
 
 @router.post("/admin/login")
-@limiter.limit("10/minute")
+@limiter.limit(LOGIN_RATE_LIMIT)
 async def admin_login(request: Request, data: AdminLogin, response: Response):
     if not ADMIN_EMAIL or not ADMIN_PASSWORD:
         raise HTTPException(status_code=503, detail="Super amministratore non configurato")

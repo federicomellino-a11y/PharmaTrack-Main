@@ -1,9 +1,20 @@
-from pydantic import BaseModel, Field
+import re
+from pydantic import BaseModel, Field, EmailStr, field_validator
 from typing import List, Optional
 
 
+def _validate_password(v: str) -> str:
+    if v is None or len(v) < 8:
+        raise ValueError("La password deve contenere almeno 8 caratteri")
+    if not re.search(r"[A-Za-z]", v):
+        raise ValueError("La password deve contenere almeno una lettera")
+    if not re.search(r"\d", v):
+        raise ValueError("La password deve contenere almeno un numero")
+    return v
+
+
 class PharmacyRegister(BaseModel):
-    email: str
+    email: EmailStr
     password: str
     name: str
     pharmacy_name: Optional[str] = None
@@ -12,23 +23,36 @@ class PharmacyRegister(BaseModel):
     pharmacy_lat: Optional[float] = None
     pharmacy_lng: Optional[float] = None
 
+    @field_validator("password")
+    @classmethod
+    def _check_password(cls, v):
+        return _validate_password(v)
+
 class PharmacyLogin(BaseModel):
-    email: str
+    email: EmailStr
     password: str
 
 class ForgotPasswordRequest(BaseModel):
-    email: str
+    email: EmailStr
 
 class ResetPasswordRequest(BaseModel):
     token: str
     new_password: str
 
+    @field_validator("new_password")
+    @classmethod
+    def _check_password(cls, v):
+        return _validate_password(v)
+
 class GoogleAuthRequest(BaseModel):
     credential: str
 
 class AdminLogin(BaseModel):
-    email: str
+    email: EmailStr
     password: str
+
+class VerifyEmailRequest(BaseModel):
+    token: str
 
 class AdminUserStatusUpdate(BaseModel):
     is_active: bool
@@ -49,9 +73,14 @@ class CustomerCreate(BaseModel):
 class DriverCreate(BaseModel):
     name: str
     phone: str
-    email: str
+    email: EmailStr
     password: str
     vehicle_type: str = "scooter"
+
+    @field_validator("password")
+    @classmethod
+    def _check_password(cls, v):
+        return _validate_password(v)
 
 class DeliveryCreate(BaseModel):
     customer_id: str

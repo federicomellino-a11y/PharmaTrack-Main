@@ -32,7 +32,7 @@ router = APIRouter()
 
 
 @router.post("/driver/login")
-@limiter.limit("10/minute")
+@limiter.limit(LOGIN_RATE_LIMIT)
 async def driver_login(request: Request, response: Response):
     body = await request.json()
     email = body.get("email")
