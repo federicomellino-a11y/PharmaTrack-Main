@@ -1,0 +1,14 @@
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+from starlette.requests import Request
+
+
+def get_client_ip(request: Request) -> str:
+    """Resolve the real client IP behind the Kubernetes ingress proxy."""
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return get_remote_address(request)
+
+
+limiter = Limiter(key_func=get_client_ip)

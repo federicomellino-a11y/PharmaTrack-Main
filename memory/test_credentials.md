@@ -14,8 +14,9 @@
 
 ## Super Admin
 - Email: `Admin@superadmin.it`
-- Password: `Admin1234!`
+- Password: `Admin`
 - URL: `/admin/login` o `/console-federico` (path nascosto)
+- NB: la password admin è quella impostata in `backend/.env` (`ADMIN_PASSWORD`), attualmente `Admin`.
 
 ## Seed
 Per (re)creare i dati di test:

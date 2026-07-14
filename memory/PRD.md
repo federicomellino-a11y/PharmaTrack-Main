@@ -78,6 +78,31 @@ Esempio di feature richiesta: doppia conferma consegna+incasso (la farmacia deve
 
 **Test backend**: 23/23 pytest passed (14 Phase-1 regression + 9 nuovi Winfarm). Bug ObjectId in winfarm_import scoperto e corretto durante i test.
 
+### 2026-06-27 — Roadmap 5 Stelle: modularizzazione backend + FASE 1→4 ✓
+**FASE 1 — Modularizzazione** (`server.py` da 2654 righe → entrypoint snello):
+- `app/core/`: `database.py` (Mongo client/db), `config.py` (env settings), `security.py` (auth deps + sessioni), `notifications.py` (push/email/notifiche), `websocket.py` (ConnectionManager), `shifts_service.py` (helper turni), `limiter.py`, `logging_config.py`, `errors.py`, `sentry.py`, `cache.py`
+- `app/models/schemas.py`: tutti i Pydantic model
+- `app/routers/`: 19 router tematici (health, pharmacy_auth, admin, driver_auth, customers, drivers, deliveries, driver_deliveries, messages, notifications, statistics, archive, doctors, useful_numbers, notes, reports, integrations, shifts, analytics)
+- `server.py` monta i router sotto `/api`, gestisce WebSocket, CORS, startup index, lifecycle. ZERO cambi di comportamento API (23/23 test regressione verdi)
+
+**FASE 2 — Qualità**:
+- Swagger/OpenAPI completo su `/api/docs`, `/api/redoc`, `/api/openapi.json` (title/version/tags per ogni dominio)
+- Logging JSON strutturato (python-json-logger), uvicorn incluso
+- Gestione errori standardizzata: handler globale `Exception` → `{detail}` coerente + Sentry capture
+- Rate limiting anti brute-force (SlowAPI, `10/minute` per IP su login farmacia/fattorino/admin, proxy-aware X-Forwarded-For)
+
+**FASE 3 — Monitoring & Security**:
+- Sentry SDK integrato, DSN-gated (no-op se `SENTRY_DSN` assente) + FastApi/Starlette integration + capture nel handler globale
+- CORS già env-driven (`CORS_ORIGINS`): wildcard senza credentials in dev, origins espliciti + credentials in prod
+- Validazione input via Pydantic (type + `ge=0` su importi)
+
+**FASE 4 — Scalabilità & Analytics**:
+- `app/core/cache.py`: cache TTL con backend Redis opzionale (`REDIS_URL`) + fallback in-memory
+- `GET /api/analytics?period=week|month|quarter|year`: revenue totale, avg order value, completion rate, split pagamento, trend giornaliero, top clienti, performance fattorini (cached)
+
+**Test**: 29/29 pytest verdi (23 regressione + 6 nuovi `test_modularization.py` per Swagger/errori/admin/analytics). Rate limiting 429 verificato via curl.
+**Dipendenze aggiunte**: slowapi, python-json-logger, sentry-sdk, redis.
+
 ### 2026-05-12 — Crea Cliente in-dialog + Display "Importo da incassare" + Hotkey Alt+C ✓
 - **Card lista consegne**: ora mostra `amount_given` (€ che il fattorino incassa fisicamente) quando il cliente paga in contanti con un importo superiore alla vendita. Sotto in piccolo "Vendita 8,00 € · Resto 2,00 €". Le statistiche di fatturato continuano a usare `amount` (vendita reale).
 - **Crea Cliente al volo**: pulsante "Nuovo cliente" e fallback "Aggiungi cliente" nel dialog Nuova Consegna ora aprono un nested dialog locale invece di redirigere. Cliente creato → aggiunto immediatamente alla lista e auto-selezionato. Form: nome (obbligatorio), telefono, indirizzo, note.
