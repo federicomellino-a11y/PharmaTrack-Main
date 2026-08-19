@@ -176,7 +176,8 @@ export default function AddressAutocomplete({
   value, onChange, onAddressSelect,
   label = 'Indirizzo',
   placeholder = 'Via Rossi 119, Volla (NA)',
-  required = false, className = '', id = 'address'
+  required = false, className = '', id = 'address',
+  testId = 'address-input'
 }) {
   const [query, setQuery] = useState(value || '');
   const [suggestions, setSuggestions] = useState([]);
@@ -277,7 +278,7 @@ export default function AddressAutocomplete({
           className="pl-9 pr-9"
           autoComplete="off"
           autoCorrect="off"
-          data-testid="address-input"
+          data-testid={testId}
         />
         {loading && (
           <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground animate-spin" />
@@ -327,6 +328,7 @@ export default function AddressAutocomplete({
               placeholder="es. 12, 4/A, 7-bis"
               className="h-9 text-sm"
               autoFocus
+              data-testid={`${testId}-civico`}
             />
             <button
               type="button"

@@ -1,4 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { useDeliveriesQuery, useCustomersQuery, useDriversQuery } from '@/hooks/queries';
+import { ListSkeleton } from '../../components/Skeletons';
 import axios from 'axios';
 import { API } from '@/lib/config';
 import { Layout } from '../../components/Layout';
@@ -102,10 +105,13 @@ const printDeliverySlip = (delivery, drivers, user) => {
 
 export default function DeliveriesPage() {
   const { user } = useAuth();
-  const [deliveries, setDeliveries] = useState([]);
-  const [customers, setCustomers] = useState([]);
-  const [drivers, setDrivers] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const { data: deliveries = [], isLoading: loading } = useDeliveriesQuery();
+  const { data: customers = [] } = useCustomersQuery();
+  const { data: drivers = [] } = useDriversQuery();
+  const setCustomers = (updater) =>
+    queryClient.setQueryData(['customers'], (prev) =>
+      typeof updater === 'function' ? updater(ensureArray(prev)) : updater);
   const [refreshing, setRefreshing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [customerSearchTerm, setCustomerSearchTerm] = useState('');
@@ -165,21 +171,10 @@ export default function DeliveriesPage() {
   };
 
   const fetchData = useCallback(async () => {
-    try {
-      const [dRes, cRes, drRes] = await Promise.all([
-        axios.get(`${API}/deliveries`, { withCredentials: true }),
-        axios.get(`${API}/customers`, { withCredentials: true }),
-        axios.get(`${API}/drivers`, { withCredentials: true }),
-      ]);
-      setDeliveries(ensureArray(dRes.data));
-      setCustomers(ensureArray(cRes.data));
-      setDrivers(ensureArray(drRes.data));
-    } catch (err) {
-      console.error('Errore caricamento dati:', err);
-      toast.error('Errore nel caricamento');
-    }
-    finally { setLoading(false); setRefreshing(false); }
-  }, []);
+    await queryClient.invalidateQueries({ queryKey: ['deliveries'] });
+    await queryClient.invalidateQueries({ queryKey: ['drivers'] });
+    setRefreshing(false);
+  }, [queryClient]);
 
   // Open new delivery if ?new=true or ?new=1, supporta deep-link da Winfarm
   useEffect(() => {
@@ -200,8 +195,14 @@ export default function DeliveriesPage() {
       setDialogOpen(true);
       window.history.replaceState({}, '', '/deliveries');
     }
-    fetchData();
-  }, [fetchData]);
+  }, []);
+
+  // Autofocus sul campo cliente quando si apre "Nuova consegna" (meno click al banco)
+  useEffect(() => {
+    if (!dialogOpen) return;
+    const t = setTimeout(() => customerInputRef.current?.focus?.(), 120);
+    return () => clearTimeout(t);
+  }, [dialogOpen]);
 
   // Applica i dati pre-compilati di Winfarm quando i clienti sono pronti
   useEffect(() => {
@@ -422,7 +423,7 @@ export default function DeliveriesPage() {
   const change_due = amountValue !== null && amountGivenValue !== null
     ? amountGivenValue - amountValue : null;
 
-  if (loading) return <Layout title="Consegne"><div className="flex items-center justify-center h-64"><div className="spinner" /></div></Layout>;
+  if (loading) return <Layout title="Consegne"><div className="p-4"><ListSkeleton rows={8} /></div></Layout>;
 
   return (
     <Layout title="Consegne">
@@ -657,6 +658,7 @@ export default function DeliveriesPage() {
                             )}
                             {d.status !== 'delivered_pending_confirmation' && (
                               <Button variant="outline" size="sm" className="h-7 px-2 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+                                data-testid={`cancel-delivery-${d.delivery_id}`}
                                 onClick={() => handleCancel(d.delivery_id)}>
                                 <XCircle className="w-3 h-3" />
                               </Button>
@@ -716,6 +718,8 @@ export default function DeliveriesPage() {
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground z-10 pointer-events-none" />
                   <Input
                     ref={customerInputRef}
+                    autoFocus
+                    data-testid="delivery-customer-search"
                     placeholder="Cerca per nome, telefono o indirizzo..."
                     value={customerSearchTerm}
                     onChange={(e) => { setCustomerSearchTerm(e.target.value); setCustomerDropdownOpen(true); }}
@@ -807,7 +811,7 @@ export default function DeliveriesPage() {
               <Button type="button" variant="outline" onClick={() => { setDialogOpen(false); resetForm(); }}>
                 Annulla
               </Button>
-              <Button type="submit" className="btn-primary">
+              <Button type="submit" className="btn-primary" data-testid="create-delivery-submit">
                 <Package className="w-4 h-4 mr-1.5" />Crea Consegna
               </Button>
             </DialogFooter>
@@ -841,6 +845,7 @@ export default function DeliveriesPage() {
               <div className="form-group">
                 <Label>Importo (€)</Label>
                 <Input type="number" step="0.01" min="0" placeholder="0.00"
+                  data-testid="delivery-amount-input"
                   value={form.amount} onChange={e => setForm({...form, amount: e.target.value})} />
               </div>
             </div>
@@ -848,6 +853,7 @@ export default function DeliveriesPage() {
               <div className="form-group">
                 <Label>Pagato con (€)</Label>
                 <Input type="number" step="0.01" min="0" placeholder="0.00"
+                  data-testid="delivery-amount-given-input"
                   value={form.amount_given} onChange={e => setForm({...form, amount_given: e.target.value})} />
               </div>
             )}
@@ -996,6 +1002,7 @@ export default function DeliveriesPage() {
                   value={newCustomer.address}
                   onChange={(e) => setNewCustomer((p) => ({ ...p, address: e.target.value }))}
                   className="h-11"
+                  data-testid="qc-address-input"
                 />
               </div>
             </div>

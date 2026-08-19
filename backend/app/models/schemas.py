@@ -59,8 +59,8 @@ class AdminUserStatusUpdate(BaseModel):
 
 class CustomerCreate(BaseModel):
     name: str
-    phone: str
-    address: str
+    phone: Optional[str] = None
+    address: Optional[str] = None
     email: Optional[str] = None
     fiscal_code: Optional[str] = None
     birth_date: Optional[str] = None

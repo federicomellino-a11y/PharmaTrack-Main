@@ -11,11 +11,12 @@ import {
 } from './ui/dropdown-menu';
 import { ScrollArea } from './ui/scroll-area';
 import { Badge } from './ui/badge';
+import CommandPalette from './CommandPalette';
 import { ensureArray } from '@/lib/collections';
 import {
   LayoutDashboard, Users, Package, Truck, MessageSquare, Archive, Settings,
   Bell, LogOut, Menu, X, ChevronRight, BarChart3, Stethoscope,
-  Phone, StickyNote, Sun, Moon, Plus, Home, Check, Trash2, RefreshCw, Map, Wallet, Plug
+  Phone, StickyNote, Sun, Moon, Plus, Home, Check, Trash2, RefreshCw, Map, Wallet, Plug, Search
 } from 'lucide-react';
 
 const navItems = [
@@ -61,7 +62,9 @@ export const Layout = ({ children, title }) => {
     const handler = (e) => {
       // Ignora se sta digitando in input/textarea/contenteditable
       const tag = (e.target?.tagName || '').toLowerCase();
-      const editing = tag === 'input' || tag === 'textarea' || e.target?.isContentEditable;
+      const role = (e.target?.getAttribute?.('role') || '').toLowerCase();
+      const editing = tag === 'input' || tag === 'textarea' || e.target?.isContentEditable
+        || ['combobox', 'listbox', 'option', 'menu', 'menuitem'].includes(role);
       if (editing || e.metaKey || e.ctrlKey || e.altKey) return;
       const k = e.key.toLowerCase();
       if (k === 'n') {
@@ -94,6 +97,7 @@ export const Layout = ({ children, title }) => {
 
   return (
     <div className="min-h-screen bg-background flex gradient-mesh">
+      <CommandPalette />
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div className="fixed inset-0 bg-black/60 z-40 lg:hidden backdrop-blur-sm"
@@ -201,6 +205,18 @@ export const Layout = ({ children, title }) => {
           </div>
 
           <div className="flex items-center gap-1.5">
+            {/* Command palette trigger */}
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new Event('open-command-palette'))}
+              className="hidden sm:flex items-center gap-2 h-9 pl-3 pr-2 rounded-xl border border-border bg-secondary/50 text-muted-foreground text-sm hover:bg-secondary transition-colors mr-1"
+              data-testid="command-palette-trigger"
+              title="Cerca / comandi rapidi"
+            >
+              <Search className="w-4 h-4" />
+              <span>Cerca…</span>
+              <kbd className="ml-1 px-1.5 py-0.5 rounded bg-background border border-border text-[10px] font-mono">⌘K</kbd>
+            </button>
             {/* Notifications */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

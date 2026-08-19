@@ -78,6 +78,22 @@ Esempio di feature richiesta: doppia conferma consegna+incasso (la farmacia deve
 
 **Test backend**: 23/23 pytest passed (14 Phase-1 regression + 9 nuovi Winfarm). Bug ObjectId in winfarm_import scoperto e corretto durante i test.
 
+### 2026-08-19 — "Sito veloce e intuitivo" (performance + UX) ✓
+**Performance (velocità percepita)**:
+- **React Query (TanStack)** per il caching lato client: `lib/queryClient.js` (staleTime 30s, no refetch on focus), hooks in `hooks/queries.js` (customers/drivers/deliveries/statistics). Migrate: Dashboard, Consegne, Clienti → tornando su una pagina i dati appaiono ISTANTANEI (niente spinner ad ogni navigazione). Le mutazioni aggiornano la cache via `queryClient.setQueryData` / `invalidateQueries`.
+- **Cache backend su `/api/statistics`** (modulo `app/core/cache.py`): prima chiamata ~3.2s → cached ~0.47s.
+- **Geocoding**: preferenza risultati a livello civico (ROOFTOP/RANGE_INTERPOLATED, penalità partial_match) + normalizzazione indirizzo IT; le coordinate del cliente vengono **salvate in DB** al primo geocoding (PUT /customers/{id}) così la mappa non ri-geocodifica più.
+**UX**:
+- **Skeleton loader** (`components/Skeletons.jsx`) al posto degli spinner su Dashboard/Consegne/Clienti.
+- **Command Palette globale** (`components/CommandPalette.jsx`, ⌘K/Ctrl+K + bottone header): naviga a ogni sezione + azioni rapide (Nuova consegna, Nuovo cliente).
+- **Nuova Consegna**: autofocus sul campo cliente (meno click).
+- Fix scorciatoie: ignorate quando è attivo un combobox/select.
+**Bugfix trovati in test e risolti**:
+- CRITICO: interceptor axios globale (`lib/config.js`) che converte il `detail` di un 422 (array Pydantic) in stringa → niente più crash "Objects are not valid as a React child" con schermo bianco su errori di validazione.
+- `CustomerCreate.phone`/`address` resi opzionali (la creazione rapida cliente li tratta come opzionali).
+
+**Test**: testing agent frontend (iteration_3) — cache, skeleton, palette, CRUD clienti, creazione consegna OK; crash critico e autofocus verificati risolti via screenshot; 29/29 pytest backend verdi.
+
 ### 2026-07-14 — Fix sicurezza + chiusura funzionalità ✓
 1. **Rate limiting login** (SlowAPI, per IP, messaggio 429 "Troppi tentativi, riprova tra qualche minuto"):
    - `/api/auth/login` 5/min · `/api/driver/login` 5/min · `/api/admin/login` 5/min · `/api/auth/register` 3/min · `/api/auth/forgot-password` 3/min. Limiti override-abili via env (`LOGIN_RATE_LIMIT`, `REGISTER_RATE_LIMIT`, `FORGOT_RATE_LIMIT`).

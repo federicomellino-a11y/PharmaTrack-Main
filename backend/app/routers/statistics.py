@@ -24,6 +24,7 @@ from app.core.shifts_service import (
     _attach_delivery_to_open_shift, _shift_aggregate_totals, _enrich_shift,
 )
 from app.models.schemas import *
+from app.core.cache import cache_get, cache_set
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -32,6 +33,10 @@ router = APIRouter()
 @router.get("/statistics")
 async def get_statistics(user: dict = Depends(get_current_user)):
     pharmacy_id = user["user_id"]
+    cache_key = f"statistics:{pharmacy_id}"
+    cached = await cache_get(cache_key)
+    if cached is not None:
+        return cached
     total_customers = await db.customers.count_documents({"pharmacy_id": pharmacy_id})
     total_drivers = await db.drivers.count_documents({"pharmacy_id": pharmacy_id})
     active_drivers = await db.drivers.count_documents({"pharmacy_id": pharmacy_id, "is_active": True})
@@ -51,10 +56,12 @@ async def get_statistics(user: dict = Depends(get_current_user)):
         count = await db.deliveries.count_documents({"pharmacy_id": pharmacy_id, "created_at": {"$gte": day_start.isoformat(), "$lt": day_end.isoformat()}})
         completed = await db.deliveries.count_documents({"pharmacy_id": pharmacy_id, "status": "delivered", "actual_delivery": {"$gte": day_start.isoformat(), "$lt": day_end.isoformat()}})
         weekly_data.append({"date": day_start.strftime("%Y-%m-%d"), "day": day_start.strftime("%a"), "total": count, "completed": completed})
-    return {
+    result = {
         "customers": {"total": total_customers},
         "drivers": {"total": total_drivers, "active": active_drivers},
         "deliveries": {"total": total_deliveries, "pending": pending_deliveries, "active": active_deliveries, "completed": completed_deliveries, "cancelled": cancelled_deliveries, "today": today_deliveries, "today_completed": today_completed},
         "weekly": weekly_data,
         "priority": {}
     }
+    await cache_set(cache_key, result)
+    return result

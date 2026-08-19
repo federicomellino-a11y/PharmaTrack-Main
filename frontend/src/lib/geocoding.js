@@ -52,6 +52,25 @@ function loadGoogleMapsGeocoder() {
   return googleLoadPromise;
 }
 
+function pickBestGoogleResult(results) {
+  if (!results?.length) return null;
+  // Preferisci risultati a livello civico (ROOFTOP/RANGE_INTERPOLATED) e non parziali
+  const rank = (r) => {
+    const lt = r?.geometry?.location_type;
+    const hasStreetNumber = (r?.types || []).includes('street_address') ||
+      (r?.address_components || []).some((c) => (c.types || []).includes('street_number'));
+    let score = 0;
+    if (lt === 'ROOFTOP') score += 100;
+    else if (lt === 'RANGE_INTERPOLATED') score += 70;
+    else if (lt === 'GEOMETRIC_CENTER') score += 30;
+    else score += 10; // APPROXIMATE
+    if (hasStreetNumber) score += 40;
+    if (r?.partial_match) score -= 25;
+    return score;
+  };
+  return [...results].sort((a, b) => rank(b) - rank(a))[0];
+}
+
 async function fetchGoogleCoordinates(address) {
   const ready = googleLoaded || await loadGoogleMapsGeocoder();
   if (!ready || !geocoder) return null;
@@ -64,10 +83,13 @@ async function fetchGoogleCoordinates(address) {
         componentRestrictions: { country: 'IT' },
       },
       (results, status) => {
-        if (status === 'OK' && results?.[0]?.geometry?.location) {
-          const location = results[0].geometry.location;
-          resolve({ lat: location.lat(), lng: location.lng() });
-          return;
+        if (status === 'OK' && results?.length) {
+          const best = pickBestGoogleResult(results);
+          const location = best?.geometry?.location;
+          if (location) {
+            resolve({ lat: location.lat(), lng: location.lng() });
+            return;
+          }
         }
 
         if (status === 'ZERO_RESULTS') {
@@ -120,17 +142,24 @@ async function fetchNominatimCoordinates(address) {
   };
 }
 
+function normalizeItalianAddress(address) {
+  const a = (address || '').trim();
+  if (!a) return a;
+  return /ital(y|ia)/i.test(a) ? a : `${a}, Italia`;
+}
+
 async function fetchCoordinates(address) {
+  const normalized = normalizeItalianAddress(address);
   if (GOOGLE_KEY) {
     try {
-      const googleCoords = await fetchGoogleCoordinates(address);
+      const googleCoords = await fetchGoogleCoordinates(normalized);
       if (googleCoords) return googleCoords;
     } catch {
       // fallback to Nominatim
     }
   }
 
-  return fetchNominatimCoordinates(address);
+  return fetchNominatimCoordinates(normalized);
 }
 
 export function geocodeAddress(address) {

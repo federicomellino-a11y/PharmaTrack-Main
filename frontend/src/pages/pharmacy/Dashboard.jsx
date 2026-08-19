@@ -19,6 +19,8 @@ import { toast } from 'sonner';
 import 'leaflet/dist/leaflet.css';
 import { geocodeAddress as geocodeWithRateLimit } from '../../lib/geocoding';
 import { ensureArray, ensureObject } from '@/lib/collections';
+import { useStatisticsQuery, useDeliveriesQuery, useCustomersQuery } from '@/hooks/queries';
+import { DashboardSkeleton } from '../../components/Skeletons';
 
 
 delete L.Icon.Default.prototype._getIconUrl;
@@ -58,14 +60,16 @@ export default function PharmacyDashboard() {
   const navigate = useNavigate();
   const { isDark } = useTheme();
   const { user, checkAuth } = useAuth();
-  const [stats, setStats] = useState(null);
-  const [recentDeliveries, setRecentDeliveries] = useState([]);
-  const [customers, setCustomers] = useState([]);
   const [customerCoords, setCustomerCoords] = useState({});
   const [pharmacyCoords, setPharmacyCoords] = useState(null);
-  const [loading, setLoading] = useState(true);
   const [resending, setResending] = useState(false);
   const mapKey = useRef(`dash-map-${Date.now()}`);
+
+  const { data: stats } = useStatisticsQuery();
+  const { data: activeDeliveries = [] } = useDeliveriesQuery('active');
+  const { data: customers = [], isLoading: customersLoading } = useCustomersQuery();
+  const loading = stats === undefined && customersLoading;
+  const recentDeliveries = ensureArray(activeDeliveries).slice(0, 6);
 
   const resendVerification = useCallback(async () => {
     setResending(true);
@@ -91,34 +95,20 @@ export default function PharmacyDashboard() {
     const coords = await geocodeWithRateLimit(customer?.address);
     if (!coords) return;
     setCustomerCoords(prev => ({ ...prev, [customer.customer_id]: coords }));
+    // Persist so the map never re-geocodes this customer again
+    axios.put(`${API}/customers/${customer.customer_id}`,
+      { customer_lat: coords.lat, customer_lng: coords.lng },
+      { withCredentials: true }).catch(() => null);
   }, []);
 
-  const fetchData = useCallback(async () => {
-    try {
-      const [statsRes, deliveriesRes, customersRes] = await Promise.all([
-        axios.get(`${API}/statistics`, { withCredentials: true }),
-        axios.get(`${API}/deliveries?status=active`, { withCredentials: true }),
-        axios.get(`${API}/customers`, { withCredentials: true }),
-      ]);
-      const safeDeliveries = ensureArray(deliveriesRes.data);
-      const safeCustomers = ensureArray(customersRes.data);
-      setStats(statsRes.data);
-      setRecentDeliveries(safeDeliveries.slice(0, 6));
-      setCustomers(safeCustomers);
-      setCustomerCoords({});
-      safeCustomers.slice(0, 20).forEach((customer) => {
-        loadCustomerCoordinates(customer).catch(() => null);
-      });
-    } catch {
-      toast.error('Errore caricamento');
-    } finally {
-      setLoading(false);
-    }
-  }, [loadCustomerCoordinates]);
-
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    const safeCustomers = ensureArray(customers);
+    if (!safeCustomers.length) return;
+    setCustomerCoords({});
+    safeCustomers.slice(0, 20).forEach((customer) => {
+      loadCustomerCoordinates(customer).catch(() => null);
+    });
+  }, [customers, loadCustomerCoordinates]);
 
   useEffect(() => {
     let mounted = true;
@@ -147,10 +137,8 @@ export default function PharmacyDashboard() {
   const statusLabels = { pending: 'In attesa', assigned: 'Assegnata', picked_up: 'Ritirata', in_transit: 'In consegna' };
 
   if (loading) return (
-    <Layout>
-      <div className="flex items-center justify-center h-64">
-        <div className="spinner" />
-      </div>
+    <Layout title="Dashboard">
+      <DashboardSkeleton />
     </Layout>
   );
 

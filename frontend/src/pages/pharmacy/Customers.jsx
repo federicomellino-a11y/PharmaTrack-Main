@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { API } from '@/lib/config';
+import { useCustomersQuery } from '@/hooks/queries';
+import { ListSkeleton } from '../../components/Skeletons';
 import { Layout } from '../../components/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
@@ -134,8 +137,8 @@ const CustomerMetricCard = ({ icon: Icon, label, value, hint, accent = 'text-pri
 );
 
 export default function CustomersPage() {
-  const [customers, setCustomers] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const { data: customers = [], isLoading: loading } = useCustomersQuery();
   const [searchTerm, setSearchTerm] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState(null);
@@ -144,25 +147,18 @@ export default function CustomersPage() {
   const [loadingStats, setLoadingStats] = useState(false);
   const [formData, setFormData] = useState(emptyForm);
 
+  const setCustomers = (updater) =>
+    queryClient.setQueryData(['customers'], (prev) =>
+      typeof updater === 'function' ? updater(ensureArray(prev)) : updater);
+  const fetchCustomers = () => queryClient.invalidateQueries({ queryKey: ['customers'] });
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('new') === 'true') {
       setDialogOpen(true);
       window.history.replaceState({}, '', '/customers');
     }
-    fetchCustomers();
   }, []);
-
-  const fetchCustomers = async () => {
-    try {
-      const response = await axios.get(`${API}/customers`, { withCredentials: true });
-      setCustomers(ensureArray(response.data));
-    } catch {
-      toast.error('Errore nel caricamento clienti');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const fetchCustomerStats = async (customerId, customerSnapshot = null) => {
     setLoadingStats(true);
@@ -261,10 +257,7 @@ export default function CustomersPage() {
   if (loading) {
     return (
       <Layout title="Clienti">
-        <div className="flex h-64 flex-col items-center justify-center gap-3">
-          <div className="spinner"></div>
-          <p className="text-sm text-muted-foreground">Caricamento anagrafica clienti…</p>
-        </div>
+        <div className="p-4"><ListSkeleton rows={8} /></div>
       </Layout>
     );
   }
@@ -782,6 +775,7 @@ export default function CustomersPage() {
                     id="address"
                     label="Indirizzo"
                     required
+                    testId="customer-address-input"
                     value={formData.address}
                     onChange={(value) => setFormData({ ...formData, address: value, customer_lat: null, customer_lng: null, place_id: '' })}
                     onAddressSelect={(selection) => setFormData({
