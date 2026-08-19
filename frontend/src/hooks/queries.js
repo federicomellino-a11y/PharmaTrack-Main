@@ -21,3 +21,6 @@ export const useDeliveriesQuery = (status, options = {}) =>
 
 export const useStatisticsQuery = (options = {}) =>
   useQuery({ queryKey: ['statistics'], queryFn: getObj('/statistics'), ...options });
+
+export const useAnalyticsQuery = (period = 'month', options = {}) =>
+  useQuery({ queryKey: ['analytics', period], queryFn: getObj(`/analytics?period=${period}`), ...options });

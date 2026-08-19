@@ -78,6 +78,10 @@ Esempio di feature richiesta: doppia conferma consegna+incasso (la farmacia deve
 
 **Test backend**: 23/23 pytest passed (14 Phase-1 regression + 9 nuovi Winfarm). Bug ObjectId in winfarm_import scoperto e corretto durante i test.
 
+### 2026-08-19 — Analytics Dashboard + Deploy readiness ✓
+- **Report → /api/analytics**: pagina `Reports.jsx` riscritta per usare il nuovo endpoint analytics (via React Query, cache 30s). Aggiunti: KPI (Fatturato, Consegne completate/totali, Media ordine, % Completamento), **grafico area "Andamento fatturato"** (daily_revenue), bar chart Top clienti, torta Fatturato per metodo pagamento, Classifica fattorini; selettore periodo Settimana/Mese/Trimestre/Anno; export CSV aggiornato. Verificato con dati reali (period=year): grafici popolati correttamente.
+- **Deploy readiness (Vercel FE + Render BE)**: compilazione OK, tutti gli URL/secret in `.env` (nessun hardcoding in sorgente), `render.yaml`/`vercel.json`/`Procfile` corretti, nuove dipendenze in `requirements.txt`. NOTA CORS: l'app usa auth a COOKIE (credentials) → in produzione cross-origin `CORS_ORIGINS` deve essere l'URL Vercel ESPLICITO (NON `*`, che disabilita i cookie). `APP_BASE_URL` va impostato all'URL Vercel su Render.
+
 ### 2026-08-19 — "Sito veloce e intuitivo" (performance + UX) ✓
 **Performance (velocità percepita)**:
 - **React Query (TanStack)** per il caching lato client: `lib/queryClient.js` (staleTime 30s, no refetch on focus), hooks in `hooks/queries.js` (customers/drivers/deliveries/statistics). Migrate: Dashboard, Consegne, Clienti → tornando su una pagina i dati appaiono ISTANTANEI (niente spinner ad ogni navigazione). Le mutazioni aggiornano la cache via `queryClient.setQueryData` / `invalidateQueries`.
