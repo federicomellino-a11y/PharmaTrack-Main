@@ -51,6 +51,11 @@ class AdminLogin(BaseModel):
     email: EmailStr
     password: str
 
+    @field_validator("password")
+    @classmethod
+    def _check_password(cls, v):
+        return _validate_password(v)
+
 class VerifyEmailRequest(BaseModel):
     token: str
 
