@@ -1,5 +1,36 @@
 {
-  "env_image_name": "fastapi_react_mongo_shadcn_base_image_cloud_arm:release-17042026-1",
+  "env_image_name": "fastapi_react_mongo_shadcn_base_image_cloud_arm:release-20082026-1",
   "job_id": "3a3048ec-3b88-4649-9a1f-ba1e4b70a618",
-  "created_at": "2026-08-19T22:05:31.578456+00:00Z"
+  "created_at": "2026-08-20T14:30:00Z",
+  "features_added": [
+    "billing_stripe_subscriptions",
+    "analytics_advanced",
+    "api_token_bearer_auth",
+    "security_hardening_sentry_slowapi",
+    "comprehensive_tests_pytest"
+  ],
+  "new_dependencies": {
+    "production": [
+      "stripe==11.1.1",
+      "slowapi==0.1.10",
+      "sentry-sdk[fastapi]>=1.40.0"
+    ],
+    "development": [
+      "pytest>=8.0.0",
+      "pytest-asyncio>=0.23.0"
+    ]
+  },
+  "frontend_changes": [
+    "Analytics page with charts and CSV export",
+    "Error Boundary for app robustness",
+    "API token management in Settings",
+    "Improved demo loading UX",
+    "Vercel build output path fix"
+  ],
+  "migrations_required": [
+    "Create collections: subscriptions, api_tokens",
+    "Create indexes: subscriptions (pharmacy_id unique, stripe_subscription_id)",
+    "Add STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_PRICE_BASIC, STRIPE_PRICE_PRO env vars on Render"
+  ],
+  "status": "ready_for_merge_after_rebase"
 }
