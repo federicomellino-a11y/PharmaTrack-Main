@@ -30,6 +30,7 @@ const NotesPage = lazy(() => import('./pages/pharmacy/Notes'))
 const ShiftsPage = lazy(() => import('./pages/pharmacy/Shifts'))
 const AnalyticsPage = lazy(() => import('./pages/pharmacy/Analytics'))
 const IntegrationsPage = lazy(() => import('./pages/pharmacy/Integrations'))
+const BillingUpgrade = lazy(() => import('./pages/pharmacy/BillingUpgrade'))
 const DriverLogin = lazy(() => import('./pages/driver/Login'))
 const DriverDashboard = lazy(() => import('./pages/driver/Dashboard'))
 const DriverDeliveryDetail = lazy(() => import('./pages/driver/DeliveryDetail'))
@@ -151,6 +152,7 @@ const AppRouter = () => (
     <Route path="/analytics" element={<PharmacyProtectedPage><AnalyticsPage /></PharmacyProtectedPage>} />
     <Route path="/integrations" element={<PharmacyProtectedPage><IntegrationsPage /></PharmacyProtectedPage>} />
     <Route path="/settings" element={<PharmacyProtectedPage><SettingsPage /></PharmacyProtectedPage>} />
+    <Route path="/pharmacy/billing-upgrade" element={<PharmacyProtectedPage><BillingUpgrade /></PharmacyProtectedPage>} />
     <Route path="/driver/login" element={<DriverPublicPage><DriverLogin /></DriverPublicPage>} />
     <Route path="/driver" element={<DriverProtectedPage><DriverDashboard /></DriverProtectedPage>} />
     <Route path="/driver/delivery/:deliveryId" element={<DriverProtectedPage><DriverDeliveryDetail /></DriverProtectedPage>} />
