@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useDeliveriesQuery, useCustomersQuery, useDriversQuery } from '@/hooks/queries';
 import { ListSkeleton } from '../../components/Skeletons';
+import AddressAutocomplete from '../../components/AddressAutocomplete';
 import axios from 'axios';
 import { API } from '@/lib/config';
 import { Layout } from '../../components/Layout';
@@ -152,6 +153,9 @@ export default function DeliveriesPage() {
         name: newCustomer.name.trim(),
         phone: newCustomer.phone.trim() || null,
         address: newCustomer.address.trim() || null,
+        customer_lat: newCustomer.lat || null,
+        customer_lng: newCustomer.lng || null,
+        place_id: newCustomer.placeId || null,
         notes: newCustomer.notes.trim() || null,
       }, { withCredentials: true });
       const created = res.data;
@@ -429,19 +433,11 @@ export default function DeliveriesPage() {
       .filter(Boolean)
       .some((value) => value.toLowerCase().includes(term));
   });
-  const recentCustomers = useMemo(() => {
-    const seen = new Set();
-    const sorted = [...(deliveries || [])].sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
-    const out = [];
-    for (const d of sorted) {
-      if (d.customer_id && !seen.has(d.customer_id)) {
-        seen.add(d.customer_id);
-        const c = safeCustomers.find((x) => x.customer_id === d.customer_id);
-        if (c) out.push(c);
-      }
-      if (out.length >= 5) break;
-    }
-    return out;
+  const frequentCustomers = useMemo(() => {
+    const counts = new Map();
+    (deliveries || []).forEach((d) => { if (d.customer_id) counts.set(d.customer_id, (counts.get(d.customer_id) || 0) + 1); });
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5)
+      .map(([id]) => safeCustomers.find((c) => c.customer_id === id)).filter(Boolean);
   }, [deliveries, safeCustomers]);
 
   const selectCustomer = (c) => {
@@ -467,14 +463,6 @@ export default function DeliveriesPage() {
   const selectedCustomer = safeCustomers.find(c => c.customer_id === form.customer_id) || null;
 
   // V28: ultima consegna del cliente selezionato (per "Ripeti")
-  const lastDeliveryForCustomer = (customerId) => {
-    if (!customerId) return null;
-    const past = (deliveries || [])
-      .filter(d => d.customer_id === customerId && d.delivery_id)
-      .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
-    return past[0] || null;
-  };
-
   const amountValue = normalizeMoney(form.amount);
   const amountGivenValue = normalizeMoney(form.amount_given);
   const change_due = amountValue !== null && amountGivenValue !== null
@@ -737,6 +725,14 @@ export default function DeliveriesPage() {
         )}
       </div>
 
+      {/* FAB mobile: Nuova Consegna */}
+      <button
+        className="lg:hidden fixed bottom-24 right-4 z-30 w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-xl flex items-center justify-center active:scale-95 transition-transform"
+        onClick={() => { resetForm(); setDialogOpen(true); }}
+        aria-label="Nuova Consegna">
+        <Plus className="w-6 h-6" />
+      </button>
+
       {/* Create dialog */}
       <Dialog open={dialogOpen} onOpenChange={(o) => { if (!o) resetForm(); setDialogOpen(o); }}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
@@ -787,7 +783,7 @@ export default function DeliveriesPage() {
                     onChange={(e) => { setCustomerSearchTerm(e.target.value); setCustomerDropdownOpen(true); setActiveCustomerIndex(-1); }}
                     onKeyDown={(e) => {
                       if (!customerDropdownOpen) return;
-                      const list = customerSearchTerm.trim() ? dialogCustomers.slice(0, 8) : recentCustomers;
+                      const list = customerSearchTerm.trim() ? dialogCustomers.slice(0, 8) : frequentCustomers;
                       if (e.key === 'ArrowDown') { e.preventDefault(); setActiveCustomerIndex((i) => Math.min(i + 1, list.length - 1)); }
                       else if (e.key === 'ArrowUp') { e.preventDefault(); setActiveCustomerIndex((i) => Math.max(i - 1, 0)); }
                       else if (e.key === 'Enter' && activeCustomerIndex >= 0 && list[activeCustomerIndex]) { e.preventDefault(); selectCustomer(list[activeCustomerIndex]); }
@@ -810,10 +806,10 @@ export default function DeliveriesPage() {
                           </div>
                         ) : (
                           <>
-                            {!customerSearchTerm.trim() && recentCustomers.length > 0 && (
-                              <p className="px-4 pt-2.5 pb-1 text-[10px] uppercase tracking-wide text-muted-foreground">Clienti recenti</p>
+                            {!customerSearchTerm.trim() && frequentCustomers.length > 0 && (
+                              <p className="px-4 pt-2.5 pb-1 text-[10px] uppercase tracking-wide text-muted-foreground">I più frequenti</p>
                             )}
-                            {(customerSearchTerm.trim() ? dialogCustomers.slice(0, 8) : recentCustomers).map((c, i) => (
+                            {(customerSearchTerm.trim() ? dialogCustomers.slice(0, 8) : frequentCustomers).map((c, i) => (
                               <button type="button" key={c.customer_id}
                                 className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors border-b border-border/50 last:border-0 ${i === activeCustomerIndex ? 'bg-accent' : 'hover:bg-accent'}`}
                                 onMouseEnter={() => setActiveCustomerIndex(i)}
@@ -843,23 +839,6 @@ export default function DeliveriesPage() {
               )}
             </div>
 
-            {selectedCustomer && lastDeliveryForCustomer(selectedCustomer.customer_id) && (
-              <div className="flex items-center gap-2 p-2.5 rounded-xl bg-secondary/60 border border-border text-xs">
-                <History className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                <span className="text-muted-foreground truncate flex-1">
-                  Ultima: {lastDeliveryForCustomer(selectedCustomer.customer_id).notes || 'senza note'}
-                  {lastDeliveryForCustomer(selectedCustomer.customer_id).amount ? ` · ${formatCurrency(lastDeliveryForCustomer(selectedCustomer.customer_id).amount)}` : ''}
-                </span>
-                <Button type="button" variant="outline" size="sm" className="h-6 px-2 text-xs shrink-0"
-                  onClick={() => {
-                    const last = lastDeliveryForCustomer(selectedCustomer.customer_id);
-                    setForm(f => ({ ...f, amount: last.amount != null ? String(last.amount) : f.amount, notes: last.notes || f.notes }));
-                    toast.info('Ripetuta ultima consegna — importo e note copiati');
-                  }}
-                  data-testid="repeat-last-delivery">
-                  <RotateCcw className="w-3 h-3 mr-1" />Ripeti
-                </Button>
-              </div>
             )}
 
             <div className="form-group space-y-2">
@@ -915,6 +894,23 @@ export default function DeliveriesPage() {
               </div>
             </div>
 
+            <div className="grid grid-cols-2 gap-3">
+              <div className="form-group">
+                <Label>Importo (€) — opzionale</Label>
+                <Input type="number" step="0.01" min="0" inputMode="decimal" placeholder="0.00"
+                  value={form.amount} onChange={e => setForm({...form, amount: e.target.value})} />
+              </div>
+              <div className="form-group">
+                <Label>Pagato con (€)</Label>
+                <Input type="number" step="0.01" min="0" inputMode="decimal" placeholder="0.00"
+                  value={form.amount_given} onChange={e => setForm({...form, amount_given: e.target.value})} />
+              </div>
+            </div>
+            {change_due !== null && (
+              <p className={`text-lg font-bold text-center py-1 ${change_due >= 0 ? 'text-emerald-600' : 'text-destructive'}`} style={{ fontVariantNumeric: 'tabular-nums' }}>
+                {change_due >= 0 ? `Resto: ${formatCurrency(change_due)}` : 'Il pagato con deve coprire l’importo'}
+              </p>
+            )}
             <DialogFooter className="gap-2">
               <Button type="button" variant="outline" onClick={() => { setDialogOpen(false); resetForm(); }}>
                 Annulla
@@ -1104,13 +1100,14 @@ export default function DeliveriesPage() {
                 />
               </div>
               <div>
-                <Label htmlFor="qc-address">Indirizzo</Label>
-                <Input id="qc-address"
-                  placeholder="Via Roma 5"
+                <AddressAutocomplete
+                  id="qc-address"
+                  label="Indirizzo"
+                  testId="qc-address-input"
+                  placeholder="Via Roma 5, Volla (NA)"
                   value={newCustomer.address}
-                  onChange={(e) => setNewCustomer((p) => ({ ...p, address: e.target.value }))}
-                  className="h-11"
-                  data-testid="qc-address-input"
+                  onChange={(value) => setNewCustomer((p) => ({ ...p, address: value, lat: null, lng: null, placeId: '' }))}
+                  onAddressSelect={(sel) => setNewCustomer((p) => ({ ...p, address: sel.address, lat: sel.lat, lng: sel.lng, placeId: sel.placeId || '' }))}
                 />
               </div>
             </div>
