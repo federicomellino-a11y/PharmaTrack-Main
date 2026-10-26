@@ -3,7 +3,7 @@
 **Gestionale consegne a domicilio per farmacie italiane.**
 Coordina fattorini, traccia ogni ordine, gestisci cassa e turni, integrazione con Winfarm (Pharmaservice).
 
-🌐 Demo live: [pharmatrack.vercel.app](https://pharmatrack.vercel.app)
+🌐 Demo live: [pharmatrack-zeta.vercel.app](https://pharmatrack-zeta.vercel.app)
 
 ---
 
@@ -50,7 +50,7 @@ Coordina fattorini, traccia ogni ordine, gestisci cassa e turni, integrazione co
    - `MONGO_URL` → connection string Atlas
    - `SESSION_SECRET` → stringa casuale lunga (es. `openssl rand -base64 64`)
    - `ADMIN_PASSWORD` → password admin
-   - `CORS_ORIGINS` → URL del frontend Vercel (es. `https://pharmatrack.vercel.app`)
+   - `CORS_ORIGINS` → URL del frontend Vercel (es. `https://pharmatrack-zeta.vercel.app`)
    - `SMTP_USERNAME`, `SMTP_PASSWORD` → da [brevo.com](https://brevo.com)
    - `GOOGLE_CLIENT_ID` → da [console.cloud.google.com](https://console.cloud.google.com) (OAuth Web)
    - `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` → vedi sotto come generarle
@@ -68,7 +68,7 @@ Coordina fattorini, traccia ogni ordine, gestisci cassa e turni, integrazione co
    - `REACT_APP_BACKEND_URL` = stesso URL
    - `VITE_GOOGLE_CLIENT_ID` = stesso client id
    - `VITE_VAPID_PUBLIC_KEY` = stessa public key dei VAPID
-4. Deploy → frontend online su `https://pharmatrack.vercel.app`
+4. Deploy → frontend online su `https://pharmatrack-zeta.vercel.app`
 5. **Torna su Render** e aggiorna `CORS_ORIGINS` con l'URL Vercel finale
 
 ### 4️⃣ Genera le VAPID keys (push notifications)

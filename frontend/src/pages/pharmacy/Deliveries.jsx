@@ -17,7 +17,7 @@ import { Tabs, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import { ScrollArea } from '../../components/ui/scroll-area';
 import {
   Search, Plus, Package, MapPin, Phone, User, Clock, Truck, CheckCircle2, XCircle,
-  Euro, CreditCard, Banknote, Calculator, Pencil, Calendar, AlertTriangle, Filter, RefreshCw, Printer, Share2,
+  Euro, CreditCard, Banknote, Calculator, Pencil, Calendar, AlertTriangle, Filter, RefreshCw, Printer, History, RotateCcw, Share2,
   ClipboardCheck, ChevronRight
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -190,6 +190,7 @@ export default function DeliveriesPage() {
         amount: params.get('amount') || params.get('importo') || '',
         payment_method: params.get('payment_method') || params.get('pagamento') || 'cash',
         notes: params.get('notes') || params.get('note') || '',
+        priority: params.get('priority') || params.get('priorita') || null,
       };
       const hasPrefill = !!(prefill.customer_name || prefill.customer_phone || prefill.amount);
       if (hasPrefill) setWinfarmPrefill(prefill);
@@ -225,6 +226,7 @@ export default function DeliveriesPage() {
       amount: winfarmPrefill.amount || prev.amount,
       payment_method: winfarmPrefill.payment_method || prev.payment_method,
       notes: winfarmPrefill.notes || prev.notes,
+      priority: ['low', 'normal', 'high', 'urgent'].includes(winfarmPrefill.priority) ? winfarmPrefill.priority : prev.priority,
     }));
     if (!matched && winfarmPrefill.customer_name) {
       // mostra termine di ricerca così il farmacista vede la lista filtrata
@@ -404,6 +406,16 @@ export default function DeliveriesPage() {
     return matchTab && matchSearch && matchDriver;
   }), [safeDeliveries, activeTab, searchTerm, filterDriver]);
 
+  // V17: la lista attiva si ordina per priorità reale, poi orario, poi data
+  const sorted = useMemo(() => {
+    if (activeTab !== 'active') return filtered;
+    const rank = (d) => ({ urgent: 0, high: 1, normal: 2, low: 3 }[d.priority || 'normal'] ?? 2);
+    return [...filtered].sort((a, b) =>
+      rank(a) - rank(b) ||
+      (a.scheduled_time || '99').localeCompare(b.scheduled_time || '99') ||
+      (b.created_at || '').localeCompare(a.created_at || ''));
+  }, [filtered, activeTab]);
+
   const { activeCount, pendingCount, pendingConfirmCount } = useMemo(() => ({
     activeCount: safeDeliveries.filter(d => ['da_preparare', 'pronta', 'pending', 'assigned', 'picked_up', 'in_transit', 'delivered_pending_confirmation'].includes(d.status)).length,
     pendingCount: safeDeliveries.filter(d => ['da_preparare', 'pronta', 'pending'].includes(d.status)).length,
@@ -453,6 +465,15 @@ export default function DeliveriesPage() {
   };
 
   const selectedCustomer = safeCustomers.find(c => c.customer_id === form.customer_id) || null;
+
+  // V28: ultima consegna del cliente selezionato (per "Ripeti")
+  const lastDeliveryForCustomer = (customerId) => {
+    if (!customerId) return null;
+    const past = (deliveries || [])
+      .filter(d => d.customer_id === customerId && d.delivery_id)
+      .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+    return past[0] || null;
+  };
 
   const amountValue = normalizeMoney(form.amount);
   const amountGivenValue = normalizeMoney(form.amount_given);
@@ -538,7 +559,7 @@ export default function DeliveriesPage() {
           </Card>
         ) : (
           <div className="space-y-2.5">
-            {filtered.map(d => {
+            {sorted.map(d => {
               const StatusIcon = STATUS_ICONS[d.status] || Package;
               const driver = safeDrivers.find(dr => dr.driver_id === d.driver_id);
               const PriorityIcon = d.priority && PRIORITY_ICONS[d.priority];
@@ -822,17 +843,45 @@ export default function DeliveriesPage() {
               )}
             </div>
 
-            <div className="form-group">
+            {selectedCustomer && lastDeliveryForCustomer(selectedCustomer.customer_id) && (
+              <div className="flex items-center gap-2 p-2.5 rounded-xl bg-secondary/60 border border-border text-xs">
+                <History className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                <span className="text-muted-foreground truncate flex-1">
+                  Ultima: {lastDeliveryForCustomer(selectedCustomer.customer_id).notes || 'senza note'}
+                  {lastDeliveryForCustomer(selectedCustomer.customer_id).amount ? ` · ${formatCurrency(lastDeliveryForCustomer(selectedCustomer.customer_id).amount)}` : ''}
+                </span>
+                <Button type="button" variant="outline" size="sm" className="h-6 px-2 text-xs shrink-0"
+                  onClick={() => {
+                    const last = lastDeliveryForCustomer(selectedCustomer.customer_id);
+                    setForm(f => ({ ...f, amount: last.amount != null ? String(last.amount) : f.amount, notes: last.notes || f.notes }));
+                    toast.info('Ripetuta ultima consegna — importo e note copiati');
+                  }}
+                  data-testid="repeat-last-delivery">
+                  <RotateCcw className="w-3 h-3 mr-1" />Ripeti
+                </Button>
+              </div>
+            )}
+
+            <div className="form-group space-y-2">
               <Label>Priorità</Label>
-              <Select value={form.priority} onValueChange={v => setForm({...form, priority: v})}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="low">🟢 Bassa</SelectItem>
-                  <SelectItem value="normal">🔵 Normale</SelectItem>
-                  <SelectItem value="high">🟡 Alta</SelectItem>
-                  <SelectItem value="urgent">🔴 Urgente</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="flex gap-2" data-testid="priority-chips">
+                {[
+                  { value: 'low', dot: 'bg-emerald-500', label: 'Bassa' },
+                  { value: 'normal', dot: 'bg-blue-500', label: 'Normale' },
+                  { value: 'high', dot: 'bg-amber-400', label: 'Alta' },
+                  { value: 'urgent', dot: 'bg-red-500', label: 'Urgente' },
+                ].map(opt => (
+                  <button key={opt.value} type="button"
+                    onClick={() => setForm({ ...form, priority: opt.value })}
+                    className={`flex-1 flex items-center justify-center gap-1.5 h-9 rounded-lg border text-xs font-medium transition-colors ${
+                      form.priority === opt.value
+                        ? 'border-primary bg-primary/10 text-primary'
+                        : 'border-border text-muted-foreground hover:bg-accent'
+                    }`}>
+                    <span className={`w-2 h-2 rounded-full ${opt.dot}`} />{opt.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
 
@@ -854,6 +903,16 @@ export default function DeliveriesPage() {
               <Label>Note / Farmaci</Label>
               <Textarea placeholder="Es: Augmentin 1g, Tachipirina 1000..." value={form.notes}
                 onChange={e => setForm({...form, notes: e.target.value})} className="min-h-[80px]" />
+              <div className="flex flex-wrap gap-1.5">
+                {['Ritirare ricetta', 'Chiamare all\'arrivo', 'Solo pomeriggio', 'Frigorifero', 'Lasciare al portiere'].map(chip => (
+                  <button key={chip} type="button"
+                    onClick={() => setForm(f => ({ ...f, notes: f.notes ? `${f.notes}, ${chip}` : chip }))}
+                    className="px-2 h-7 rounded-full border border-border text-xs text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+                    data-testid="note-chip">
+                    + {chip}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <DialogFooter className="gap-2">
@@ -893,7 +952,7 @@ export default function DeliveriesPage() {
               </div>
               <div className="form-group">
                 <Label>Importo (€)</Label>
-                <Input type="number" step="0.01" min="0" placeholder="0.00"
+                <Input type="number" step="0.01" min="0" placeholder="0.00" inputMode="decimal"
                   data-testid="delivery-amount-input"
                   value={form.amount} onChange={e => setForm({...form, amount: e.target.value})} />
               </div>
@@ -901,7 +960,7 @@ export default function DeliveriesPage() {
             {form.payment_method === 'cash' && (
               <div className="form-group">
                 <Label>Pagato con (€)</Label>
-                <Input type="number" step="0.01" min="0" placeholder="0.00"
+                <Input type="number" step="0.01" min="0" placeholder="0.00" inputMode="decimal"
                   data-testid="delivery-amount-given-input"
                   value={form.amount_given} onChange={e => setForm({...form, amount_given: e.target.value})} />
               </div>
@@ -909,7 +968,7 @@ export default function DeliveriesPage() {
             {form.payment_method === 'cash' && change_due !== null && (
               <div className={`flex items-center gap-2 p-3 rounded-xl border ${change_due >= 0 ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-destructive/10 border-destructive/20'}`}>
                 <Calculator className={`w-4 h-4 ${change_due >= 0 ? 'text-emerald-600' : 'text-destructive'}`} />
-                <span className={`text-sm font-semibold ${change_due >= 0 ? 'text-emerald-700' : 'text-destructive'}`}>
+                <span className={`text-2xl font-bold tabular-nums ${change_due >= 0 ? 'text-emerald-700' : 'text-destructive'}`}>
                   {change_due >= 0 ? `Resto: ${formatCurrency(change_due)}` : "Il pagato con non copre l'importo"}
                 </span>
               </div>
@@ -946,19 +1005,19 @@ export default function DeliveriesPage() {
               </div>
               <div className="form-group">
                 <Label>Importo (€)</Label>
-                <Input type="number" step="0.01" value={form.amount}
+                <Input type="number" step="0.01" inputMode="decimal" value={form.amount}
                   onChange={e => setForm({...form, amount: e.target.value})} />
               </div>
             </div>
             {form.payment_method === 'cash' && (
               <div className="form-group">
                 <Label>Pagato con (€)</Label>
-                <Input type="number" step="0.01" min="0" value={form.amount_given}
+                <Input type="number" step="0.01" min="0" inputMode="decimal" value={form.amount_given}
                   onChange={e => setForm({...form, amount_given: e.target.value})} />
               </div>
             )}
             {form.payment_method === 'cash' && change_due !== null && (
-              <p className={`text-xs ${change_due >= 0 ? 'text-emerald-600' : 'text-destructive'}`}>
+              <p className={`text-base font-semibold tabular-nums ${change_due >= 0 ? 'text-emerald-600' : 'text-destructive'}`}>
                 {change_due >= 0 ? `Resto calcolato: ${formatCurrency(change_due)}` : 'Il pagato con deve coprire l’importo totale'}
               </p>
             )}

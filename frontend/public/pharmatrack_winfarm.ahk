@@ -25,6 +25,7 @@
 
 ; === CONFIGURAZIONE ===
 PharmaTrackURL := "https://pharmatrack-zeta.vercel.app"
+; Priorità opzionale nell'URL di apertura: &priority=urgent (valori: low/normal/high/urgent)
 ; ↑ se hai un dominio personalizzato, scrivilo qui (es. https://farmacia-mia.it)
 
 ; === HOTKEY: Alt+C ===

@@ -202,7 +202,7 @@ export default function PharmacyDashboard() {
         <div className="rounded-2xl bg-gradient-to-r from-primary/10 via-primary/5 to-transparent border border-primary/15 px-5 py-4 flex items-center justify-between gap-4">
           <div>
             <h1 className="text-lg font-bold">
-              Buongiorno{user?.name ? `, ${user.name.split(' ')[0]}` : ''}! 👋
+              {new Date().getHours() < 12 ? 'Buongiorno' : new Date().getHours() >= 18 ? 'Buonasera' : 'Buon pomeriggio'}{user?.name ? `, ${user.name.split(' ')[0]}` : ''}! 👋
             </h1>
             <p className="text-sm text-muted-foreground mt-0.5">
               {user?.pharmacy_name || 'La tua farmacia'} · {new Date().toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })}

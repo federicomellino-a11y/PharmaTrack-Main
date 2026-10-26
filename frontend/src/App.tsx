@@ -18,6 +18,7 @@ const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'))
 const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'))
 const VerifyEmailPage = lazy(() => import('./pages/VerifyEmail'))
 const QuickAddPage = lazy(() => import('./pages/QuickAdd'))
+const DockPage = lazy(() => import('./pages/DockPage'))
 const PublicTrackingPage = lazy(() => import('./pages/PublicTracking'))
 const PharmacyDashboard = lazy(() => import('./pages/pharmacy/Dashboard'))
 const CustomersPage = lazy(() => import('./pages/pharmacy/Customers'))
@@ -143,6 +144,7 @@ const AppRouter = () => (
     <Route path="/deliveries" element={<PharmacyProtectedPage><DeliveriesPage /></PharmacyProtectedPage>} />
     <Route path="/tracking" element={<PharmacyProtectedPage><TrackingPage /></PharmacyProtectedPage>} />
     <Route path="/quick" element={<PharmacyProtectedPage><QuickAddPage /></PharmacyProtectedPage>} />
+    <Route path="/dock" element={<PharmacyProtectedPage><DockPage /></PharmacyProtectedPage>} />
     <Route path="/t/:token" element={<PublicTrackingPage />} />
     <Route path="/drivers" element={<PharmacyProtectedPage><DriversPage /></PharmacyProtectedPage>} />
     <Route path="/chat" element={<PharmacyProtectedPage><ChatPage /></PharmacyProtectedPage>} />
