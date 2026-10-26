@@ -15,7 +15,7 @@ export const ThemeProvider = ({ children }) => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('pharmatrack-theme');
       if (saved) return saved;
-      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      return 'light'; // default: tema chiaro, coerente col gestionale al banco
     }
     return 'light';
   });
