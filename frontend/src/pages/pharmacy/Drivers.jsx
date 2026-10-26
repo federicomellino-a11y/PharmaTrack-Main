@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ensureArray } from '@/lib/collections';
+import { useAuth } from '../../contexts/AuthContext';
 
 const generatePassword = () => {
  const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
@@ -42,6 +43,7 @@ const formatCurrency = (v) => new Intl.NumberFormat('it-IT', { style: 'currency'
 const formatDateTime = (d) => d ? new Date(d).toLocaleString('it-IT', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '-';
 
 export default function DriversPage() {
+ const { user, updateProfile } = useAuth();
  const [drivers, setDrivers] = useState([]);
  const [loading, setLoading] = useState(true);
  const [searchTerm, setSearchTerm] = useState('');
@@ -88,11 +90,19 @@ export default function DriversPage() {
  resetForm();
  fetchDrivers();
  } else {
- await axios.post(`${API}/drivers`, formData, { withCredentials: true });
+ const { data: newDriver } = await axios.post(`${API}/drivers`, formData, { withCredentials: true });
  setDialogOpen(false);
  setCredentialsDialog({ name: formData.name, email: formData.email, password: formData.password });
  resetForm();
  fetchDrivers();
+ if (!user?.settings?.default_driver_id && newDriver?.driver_id) {
+ toast('Impostarlo come fattorino predefinito?', {
+ description: 'Le nuove consegne verranno assegnate automaticamente.',
+ action: { label: 'Sì, predefinito', onClick: () => handleSetDefaultDriver(newDriver) },
+ duration: 12000,
+ id: 'default-driver-onboarding',
+ });
+ }
  }
  } catch (err) {
  toast.error(err.response?.data?.detail || 'Errore');
@@ -131,6 +141,16 @@ export default function DriversPage() {
  fetchDrivers();
  } catch (err) {
  toast.error('Errore');
+ }
+ };
+
+ const handleSetDefaultDriver = async (driver) => {
+ try {
+ await updateProfile({ settings: { ...(user?.settings || {}), default_driver_id: driver.driver_id } });
+ toast.success(`${driver.name} è ora il fattorino predefinito — le nuove consegne gli verranno assegnate automaticamente`);
+ fetchDrivers();
+ } catch (err) {
+ toast.error('Errore impostazione predefinito');
  }
  };
 
@@ -308,6 +328,14 @@ export default function DriversPage() {
    data-testid={`stats-driver-${driver.driver_id}`}
  >
    <BarChart3 className="w-3.5 h-3.5" />Statistiche
+ </Button>
+ <Button variant={user?.settings?.default_driver_id === driver.driver_id ? 'default' : 'outline'} size="sm" className="h-7 px-2 text-xs"
+   onClick={() => handleSetDefaultDriver(driver)}
+   disabled={!driver.is_active}
+   title={user?.settings?.default_driver_id === driver.driver_id ? 'Fattorino predefinito' : 'Imposta come predefinito'}
+   data-testid={`default-driver-${driver.driver_id}`}>
+   <Star className={`w-3 h-3 ${user?.settings?.default_driver_id === driver.driver_id ? 'fill-current' : ''}`} />
+   {user?.settings?.default_driver_id === driver.driver_id ? 'Predefinito' : 'Predef.'}
  </Button>
  <div className="flex items-center gap-2">
    <span className="text-xs text-muted-foreground">Attivo</span>

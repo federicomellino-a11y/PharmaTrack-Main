@@ -21,8 +21,9 @@ from app.routers import (
     health, pharmacy_auth, admin, driver_auth, customers, drivers,
     deliveries, driver_deliveries, messages, notifications, statistics,
     archive, doctors, useful_numbers, notes, reports, integrations, shifts,
-    analytics,
+    analytics, photos,
 )
+from middleware_security import SecurityHeadersMiddleware
 
 setup_logging()
 init_sentry()
@@ -67,6 +68,8 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, rate_limit_handler)
 app.add_middleware(SlowAPIMiddleware)
+# Security headers from PR blocco-1: wired so they actually apply (were dead code)
+app.add_middleware(SecurityHeadersMiddleware)
 
 # Gestione errori standardizzata
 register_exception_handlers(app)
@@ -86,7 +89,7 @@ for module in [
     health, pharmacy_auth, admin, driver_auth, customers, drivers,
     deliveries, driver_deliveries, messages, notifications, statistics,
     archive, doctors, useful_numbers, notes, reports, integrations, shifts,
-    analytics,
+    analytics, photos,
 ]:
     tag = _ROUTER_TAGS.get(module.__name__.split(".")[-1])
     api_router.include_router(module.router, tags=[tag] if tag else None)
