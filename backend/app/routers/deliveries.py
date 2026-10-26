@@ -2,6 +2,8 @@ import os
 import json
 import uuid
 import logging
+import hashlib
+import secrets
 import bcrypt
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List, Dict, Any
@@ -147,3 +149,61 @@ async def delete_delivery(delivery_id: str, user: dict = Depends(get_current_use
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Consegna non trovata")
     return {"message": "Consegna eliminata"}
+
+
+# ============ PUBLIC TRACKING LINK (GDPR-minimized) ============
+TRACKING_TTL_HOURS = 72
+
+
+@router.post("/deliveries/{delivery_id}/share-link")
+async def create_delivery_share_link(delivery_id: str, user: dict = Depends(get_current_user)):
+    """Generate a public tracking token (72h TTL). Only the SHA-256 hash is stored."""
+    delivery = await db.deliveries.find_one(
+        {"delivery_id": delivery_id, "pharmacy_id": user["user_id"]}
+    )
+    if not delivery:
+        raise HTTPException(status_code=404, detail="Consegna non trovata")
+    if delivery.get("status") in ("delivered", "cancelled"):
+        raise HTTPException(status_code=400, detail="Consegna già chiusa")
+
+    token = secrets.token_urlsafe(16)
+    token_hash = hashlib.sha256(token.encode()).hexdigest()
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=TRACKING_TTL_HOURS)
+    await db.deliveries.update_one(
+        {"delivery_id": delivery_id},
+        {"$set": {
+            "tracking_token_hash": token_hash,
+            "tracking_expires_at": expires_at.isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }},
+    )
+    return {"token": token, "expires_at": expires_at.isoformat(), "expires_in_hours": TRACKING_TTL_HOURS}
+
+
+@router.get("/public/tracking/{token}")
+async def public_delivery_tracking(token: str):
+    """Public, minimal tracking status. No auth, no PII beyond first name."""
+    token_hash = hashlib.sha256(token.encode()).hexdigest()
+    delivery = await db.deliveries.find_one({"tracking_token_hash": token_hash})
+    if not delivery:
+        raise HTTPException(status_code=404, detail="Link non valido")
+
+    expires_at = delivery.get("tracking_expires_at")
+    if expires_at:
+        try:
+            if datetime.fromisoformat(expires_at) < datetime.now(timezone.utc):
+                raise HTTPException(status_code=410, detail="Link scaduto")
+        except ValueError:
+            pass
+
+    pharmacy = await db.users.find_one(
+        {"user_id": delivery.get("pharmacy_id")}, {"pharmacy_name": 1, "_id": 0}
+    )
+    first_name = (delivery.get("customer_name") or "").split(" ")[0] or "Cliente"
+    return {
+        "customer_first_name": first_name,
+        "status": delivery.get("status"),
+        "updated_at": delivery.get("updated_at"),
+        "pharmacy_name": (pharmacy or {}).get("pharmacy_name") or "Farmacia",
+        "has_pod": bool(delivery.get("pod_confirmed_at")),
+    }

@@ -17,6 +17,8 @@ const RegisterPage = lazy(() => import('./pages/RegisterPage'))
 const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'))
 const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'))
 const VerifyEmailPage = lazy(() => import('./pages/VerifyEmail'))
+const QuickAddPage = lazy(() => import('./pages/QuickAdd'))
+const PublicTrackingPage = lazy(() => import('./pages/PublicTracking'))
 const PharmacyDashboard = lazy(() => import('./pages/pharmacy/Dashboard'))
 const CustomersPage = lazy(() => import('./pages/pharmacy/Customers'))
 const DeliveriesPage = lazy(() => import('./pages/pharmacy/Deliveries'))
@@ -140,6 +142,8 @@ const AppRouter = () => (
     <Route path="/customers" element={<PharmacyProtectedPage><CustomersPage /></PharmacyProtectedPage>} />
     <Route path="/deliveries" element={<PharmacyProtectedPage><DeliveriesPage /></PharmacyProtectedPage>} />
     <Route path="/tracking" element={<PharmacyProtectedPage><TrackingPage /></PharmacyProtectedPage>} />
+    <Route path="/quick" element={<PharmacyProtectedPage><QuickAddPage /></PharmacyProtectedPage>} />
+    <Route path="/t/:token" element={<PublicTrackingPage />} />
     <Route path="/drivers" element={<PharmacyProtectedPage><DriversPage /></PharmacyProtectedPage>} />
     <Route path="/chat" element={<PharmacyProtectedPage><ChatPage /></PharmacyProtectedPage>} />
     <Route path="/chat/:driverId" element={<PharmacyProtectedPage><ChatPage /></PharmacyProtectedPage>} />

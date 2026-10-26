@@ -17,7 +17,7 @@ import { Tabs, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import { ScrollArea } from '../../components/ui/scroll-area';
 import {
   Search, Plus, Package, MapPin, Phone, User, Clock, Truck, CheckCircle2, XCircle,
-  Euro, CreditCard, Banknote, Calculator, Pencil, Calendar, AlertTriangle, Filter, RefreshCw, Printer,
+  Euro, CreditCard, Banknote, Calculator, Pencil, Calendar, AlertTriangle, Filter, RefreshCw, Printer, Share2,
   ClipboardCheck, ChevronRight
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -116,6 +116,7 @@ export default function DeliveriesPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [customerSearchTerm, setCustomerSearchTerm] = useState('');
   const [customerDropdownOpen, setCustomerDropdownOpen] = useState(false);
+  const [activeCustomerIndex, setActiveCustomerIndex] = useState(-1);
   const customerInputRef = React.useRef(null);
   const [activeTab, setActiveTab] = useState('active');
   const [filterDriver, setFilterDriver] = useState('all');
@@ -416,6 +417,41 @@ export default function DeliveriesPage() {
       .filter(Boolean)
       .some((value) => value.toLowerCase().includes(term));
   });
+  const recentCustomers = useMemo(() => {
+    const seen = new Set();
+    const sorted = [...(deliveries || [])].sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+    const out = [];
+    for (const d of sorted) {
+      if (d.customer_id && !seen.has(d.customer_id)) {
+        seen.add(d.customer_id);
+        const c = safeCustomers.find((x) => x.customer_id === d.customer_id);
+        if (c) out.push(c);
+      }
+      if (out.length >= 5) break;
+    }
+    return out;
+  }, [deliveries, safeCustomers]);
+
+  const selectCustomer = (c) => {
+    setForm((prev) => ({ ...prev, customer_id: c.customer_id }));
+    setCustomerSearchTerm('');
+    setCustomerDropdownOpen(false);
+    setActiveCustomerIndex(-1);
+  };
+
+  const shareDelivery = async (d) => {
+    try {
+      const res = await axios.post(`${API}/deliveries/${d.delivery_id}/share-link`, {}, { withCredentials: true });
+      const url = `${window.location.origin}/t/${res.data.token}`;
+      const firstName = (d.customer_name || '').split(' ')[0] || 'cliente';
+      const msg = `Ciao ${firstName}, puoi seguire la tua consegna in tempo reale: ${url}`;
+      window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+      toast.success('Link tracking creato (valido 72 ore)');
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || 'Impossibile creare il link');
+    }
+  };
+
   const selectedCustomer = safeCustomers.find(c => c.customer_id === form.customer_id) || null;
 
   const amountValue = normalizeMoney(form.amount);
@@ -614,6 +650,11 @@ export default function DeliveriesPage() {
                               </>
                             )}
                             <Button variant="outline" size="sm" className="h-7 px-2 text-xs"
+                              onClick={() => shareDelivery(d)}
+                              title="Condividi link tracking (WhatsApp)">
+                              <Share2 className="w-3 h-3" />
+                            </Button>
+                            <Button variant="outline" size="sm" className="h-7 px-2 text-xs"
                               onClick={() => printDeliverySlip(d, safeDrivers, user)}
                               title="Stampa bolla">
                               <Printer className="w-3 h-3" />
@@ -722,7 +763,15 @@ export default function DeliveriesPage() {
                     data-testid="delivery-customer-search"
                     placeholder="Cerca per nome, telefono o indirizzo..."
                     value={customerSearchTerm}
-                    onChange={(e) => { setCustomerSearchTerm(e.target.value); setCustomerDropdownOpen(true); }}
+                    onChange={(e) => { setCustomerSearchTerm(e.target.value); setCustomerDropdownOpen(true); setActiveCustomerIndex(-1); }}
+                    onKeyDown={(e) => {
+                      if (!customerDropdownOpen) return;
+                      const list = customerSearchTerm.trim() ? dialogCustomers.slice(0, 8) : recentCustomers;
+                      if (e.key === 'ArrowDown') { e.preventDefault(); setActiveCustomerIndex((i) => Math.min(i + 1, list.length - 1)); }
+                      else if (e.key === 'ArrowUp') { e.preventDefault(); setActiveCustomerIndex((i) => Math.max(i - 1, 0)); }
+                      else if (e.key === 'Enter' && activeCustomerIndex >= 0 && list[activeCustomerIndex]) { e.preventDefault(); selectCustomer(list[activeCustomerIndex]); }
+                      else if (e.key === 'Escape') { setCustomerDropdownOpen(false); }
+                    }}
                     onFocus={() => setCustomerDropdownOpen(true)}
                     onBlur={() => setTimeout(() => setCustomerDropdownOpen(false), 150)}
                     className="pl-9"
@@ -740,14 +789,14 @@ export default function DeliveriesPage() {
                           </div>
                         ) : (
                           <>
-                            {dialogCustomers.slice(0, 8).map(c => (
+                            {!customerSearchTerm.trim() && recentCustomers.length > 0 && (
+                              <p className="px-4 pt-2.5 pb-1 text-[10px] uppercase tracking-wide text-muted-foreground">Clienti recenti</p>
+                            )}
+                            {(customerSearchTerm.trim() ? dialogCustomers.slice(0, 8) : recentCustomers).map((c, i) => (
                               <button type="button" key={c.customer_id}
-                                className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-accent transition-colors border-b border-border/50 last:border-0"
-                                onMouseDown={() => {
-                                  setForm({...form, customer_id: c.customer_id});
-                                  setCustomerSearchTerm('');
-                                  setCustomerDropdownOpen(false);
-                                }}>
+                                className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors border-b border-border/50 last:border-0 ${i === activeCustomerIndex ? 'bg-accent' : 'hover:bg-accent'}`}
+                                onMouseEnter={() => setActiveCustomerIndex(i)}
+                                onMouseDown={() => selectCustomer(c)}>
                                 <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                                   <User className="w-3.5 h-3.5 text-primary" />
                                 </div>

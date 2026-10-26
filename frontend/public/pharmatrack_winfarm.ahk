@@ -24,7 +24,7 @@
 ; ╚════════════════════════════════════════════════════════════════════════════╝
 
 ; === CONFIGURAZIONE ===
-PharmaTrackURL := "https://pharmatrack.replit.app"
+PharmaTrackURL := "https://pharmatrack-zeta.vercel.app"
 ; ↑ se hai un dominio personalizzato, scrivilo qui (es. https://farmacia-mia.it)
 
 ; === HOTKEY: Alt+C ===
