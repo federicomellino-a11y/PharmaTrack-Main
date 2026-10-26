@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { API } from '@/lib/config';
+import AddressAutocomplete from '../components/AddressAutocomplete';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -102,6 +103,9 @@ export default function QuickAddPage() {
         name: newCustomer.name.trim(),
         phone: newCustomer.phone.trim() || null,
         address: newCustomer.address.trim() || null,
+        customer_lat: newCustomer.lat || null,
+        customer_lng: newCustomer.lng || null,
+        place_id: newCustomer.placeId || null,
       }, { withCredentials: true });
       setNewCustomerOpen(false);
       setNewCustomer({ name: '', phone: '', address: '' });
@@ -236,7 +240,13 @@ export default function QuickAddPage() {
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Nuovo cliente</p>
             <Input placeholder="Nome *" value={newCustomer.name} onChange={(e) => setNewCustomer({ ...newCustomer, name: e.target.value })} />
             <Input placeholder="Telefono" value={newCustomer.phone} onChange={(e) => setNewCustomer({ ...newCustomer, phone: e.target.value })} />
-            <Input placeholder="Indirizzo (opzionale)" value={newCustomer.address} onChange={(e) => setNewCustomer({ ...newCustomer, address: e.target.value })} />
+            <AddressAutocomplete
+                placeholder="Indirizzo (opzionale)"
+                testId="qa-address-input"
+                value={newCustomer.address}
+                onChange={(value) => setNewCustomer((p) => ({ ...p, address: value, lat: null, lng: null, placeId: '' }))}
+                onAddressSelect={(sel) => setNewCustomer((p) => ({ ...p, address: sel.address, lat: sel.lat, lng: sel.lng, placeId: sel.placeId || '' }))}
+              />
             <Button type="button" size="sm" onClick={createCustomer}>Crea e seleziona</Button>
           </div>
         )}
