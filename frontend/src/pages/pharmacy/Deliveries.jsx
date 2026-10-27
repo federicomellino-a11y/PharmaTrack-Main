@@ -901,12 +901,24 @@ export default function DeliveriesPage() {
                   value={form.amount} onChange={e => setForm({...form, amount: e.target.value})} />
               </div>
               <div className="form-group">
+                <Label>Metodo di pagamento</Label>
+                <Select value={form.payment_method} onValueChange={v => setForm({...form, payment_method: v})}>
+                  <SelectTrigger data-testid="create-payment-method"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cash">💵 Contanti</SelectItem>
+                    <SelectItem value="pos">💳 POS</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            {form.payment_method === 'cash' && (
+              <div className="form-group">
                 <Label>Pagato con (€)</Label>
                 <Input type="number" step="0.01" min="0" inputMode="decimal" placeholder="0.00"
                   value={form.amount_given} onChange={e => setForm({...form, amount_given: e.target.value})} />
               </div>
-            </div>
-            {change_due !== null && (
+            )}
+            {form.payment_method === 'cash' && change_due !== null && (
               <p className={`text-lg font-bold text-center py-1 ${change_due >= 0 ? 'text-emerald-600' : 'text-destructive'}`} style={{ fontVariantNumeric: 'tabular-nums' }}>
                 {change_due >= 0 ? `Resto: ${formatCurrency(change_due)}` : 'Il pagato con deve coprire l’importo'}
               </p>

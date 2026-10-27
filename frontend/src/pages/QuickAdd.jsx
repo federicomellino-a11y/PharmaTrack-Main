@@ -254,6 +254,13 @@ export default function QuickAddPage() {
           </div>
         )}
 
+        <div className="flex gap-2">
+          <button type="button" onClick={() => setForm({ ...form, payment_method: 'cash' })}
+            className={`flex-1 py-2.5 rounded-lg text-sm font-semibold border ${form.payment_method === 'cash' ? 'bg-primary text-primary-foreground border-primary' : 'bg-card border-border'}`}>💵 Contanti</button>
+          <button type="button" onClick={() => setForm({ ...form, payment_method: 'pos' })}
+            className={`flex-1 py-2.5 rounded-lg text-sm font-semibold border ${form.payment_method === 'pos' ? 'bg-primary text-primary-foreground border-primary' : 'bg-card border-border'}`}>💳 POS</button>
+        </div>
+
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <Label className="text-sm">Importo (€)</Label>
