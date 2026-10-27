@@ -6,7 +6,7 @@ import { Input } from '../../components/ui/input';
 import { Badge } from '../../components/ui/badge';
 import {
   Plug, Download, Copy, CheckCircle2, Terminal, Keyboard, Workflow,
-  AlertCircle, FileCode, Zap, ExternalLink, Pill,
+  AlertCircle, FileCode, Zap, ExternalLink, Pill, Monitor,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../../contexts/AuthContext';
@@ -152,6 +152,32 @@ export default function IntegrationsPage() {
                 </div>
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* DOCK DI BANCO */}
+        <Card className="border-primary/20">
+          <CardContent className="p-6">
+            <h3 className="font-bold mb-1 flex items-center gap-2">
+              <Monitor className="w-4 h-4 text-primary" />Dock di banco (accanto a Winfarm)
+            </h3>
+            <p className="text-xs text-muted-foreground mb-4">
+              Una mini-finestra sempre in primo piano con la coda da smistare e l&apos;assegnazione in due click.
+              Resta accanto a Winfarm tutto il giorno.
+            </p>
+            <ol className="text-xs text-muted-foreground space-y-2 mb-4 list-decimal ml-4">
+              <li>Copia questo comando:
+                <code className="block mt-1 px-2 py-1 bg-secondary rounded font-mono text-[11px] break-all">
+                  msedge.exe --app=https://pharmatrack-zeta.vercel.app/dock --window-size=380,900
+                </code>
+              </li>
+              <li>Crea sul desktop una scorciatoia &quot;Dock PharmaTrack&quot; con quel comando come destinazione.</li>
+              <li>Avvia la scorciatoia: si apre la finestrella del Dock.</li>
+              <li>Con lo script AHK attivo, <b>ALT+D</b> mostra/nasconde il Dock e lo tiene sempre sopra Winfarm.</li>
+            </ol>
+            <p className="text-[11px] text-muted-foreground">
+              Il Dock si aggiorna da solo ogni 30 secondi: puoi lasciarlo aperto tutto il giorno.
+            </p>
           </CardContent>
         </Card>
 

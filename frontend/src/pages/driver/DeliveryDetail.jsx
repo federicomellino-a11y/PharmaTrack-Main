@@ -10,7 +10,7 @@ import { Badge } from '../../components/ui/badge';
 import { 
   ArrowLeft, MapPin, Phone, Package, Navigation, 
   Clock, CheckCircle2, Truck, Play, MessageSquare, LogOut,
-  Euro, Banknote, CreditCard, Calculator
+  Euro, Banknote, CreditCard, Calculator, Camera, Loader2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import 'leaflet/dist/leaflet.css';
@@ -33,6 +33,9 @@ export default function DriverDeliveryDetail() {
   const [delivery, setDelivery] = useState(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
+  const [photoPreview, setPhotoPreview] = useState(null);
+  const [photoUrl, setPhotoUrl] = useState(null);
+  const [photoUploading, setPhotoUploading] = useState(false);
   const [coordinates, setCoordinates] = useState(null);
 
   useEffect(() => {
@@ -98,6 +101,23 @@ export default function DriverDeliveryDetail() {
     } finally {
       setUpdating(false);
     }
+  };
+
+  const uploadPhoto = async (file) => {
+    if (!file) return;
+    setPhotoPreview(URL.createObjectURL(file));
+    setPhotoUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append('delivery_id', deliveryId);
+      fd.append('file', file);
+      const { data } = await axios.post(`${API}/photos/upload`, fd, { withCredentials: true });
+      setPhotoUrl(data.cloudinary_url || data.secure_url || 'ok');
+      toast.success('Foto di consegna caricata');
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Errore caricamento foto');
+      setPhotoPreview(null);
+    } finally { setPhotoUploading(false); }
   };
 
   const statusLabels = {
@@ -287,6 +307,39 @@ export default function DriverDeliveryDetail() {
               )}
             </div>
 
+            {/* Foto di consegna (POD) */}
+            <div className="mb-6 p-4 rounded-lg bg-zinc-800/50 border border-zinc-700">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-sm text-zinc-400">Foto di consegna</p>
+                {photoUrl && (
+                  <span className="text-xs text-emerald-400 flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5" />Caricata
+                  </span>
+                )}
+              </div>
+              {photoPreview ? (
+                <div className="relative">
+                  <img src={photoPreview} alt="Foto consegna" className="w-full h-40 object-cover rounded-lg border border-zinc-700" />
+                  {photoUploading && (
+                    <div className="absolute inset-0 bg-black/60 rounded-lg flex items-center justify-center">
+                      <Loader2 className="w-6 h-6 text-white animate-spin" />
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <label className="w-full h-24 border-2 border-dashed border-zinc-600 rounded-lg flex flex-col items-center justify-center gap-1 text-zinc-400 cursor-pointer">
+                  <Camera className="w-6 h-6" />
+                  <span className="text-sm">Scatta o scegli una foto</span>
+                  <input type="file" accept="image/*" capture="environment" className="hidden"
+                    onChange={(e) => uploadPhoto(e.target.files && e.target.files[0])} />
+                </label>
+              )}
+              {photoPreview && !photoUrl && !photoUploading && (
+                <button type="button" className="mt-2 text-xs text-teal-400 underline"
+                  onClick={() => setPhotoPreview(null)}>Riprova</button>
+              )}
+            </div>
+
             {/* Actions */}
             <div className="space-y-3">
               {/* Navigate button */}
@@ -309,7 +362,12 @@ export default function DriverDeliveryDetail() {
               {nextAction && (
                 <Button 
                   className="w-full btn-glow bg-teal-500 hover:bg-teal-600 text-black font-semibold py-6"
-                  onClick={() => updateStatus(nextAction.status)}
+                  onClick={() => {
+                    if (nextAction.status === 'delivered' && !photoUrl) {
+                      if (!window.confirm('Nessuna foto caricata. Confermare la consegna senza foto?')) return;
+                    }
+                    updateStatus(nextAction.status);
+                  }}
                   disabled={updating}
                   data-testid={`update-status-${nextAction.status}`}
                 >

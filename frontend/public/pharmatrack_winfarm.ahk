@@ -115,3 +115,38 @@ UrlEncode(text) {
 ; ^F11::
 ;     Run, % PharmaTrackURL . "/deliveries?new=1&customer_name=ROSSI%20MARIO&amount=12.50"
 ; return
+
+; ╔════════════════════════════════════════════════════════════════════════╗
+; ║  DOCK DI BANCO — barra sempre in primo piano accanto a Winfarm         ║
+; ║  ALT + D : apre / mostra / nasconde il Dock, sempre sopra Winfarm      ║
+; ╚════════════════════════════════════════════════════════════════════════╝
+DockURL := PharmaTrackURL . "/dock"
+
+!d::
+DetectHiddenWindows, On
+WinGet, dockId, ID, PharmaTrack Dock ahk_exe msedge.exe
+if (dockId)
+{
+    if DllCall("IsWindowVisible", "Ptr", dockId)
+        WinHide, ahk_id %dockId%
+    else
+    {
+        WinShow, ahk_id %dockId%
+        WinActivate, ahk_id %dockId%
+        WinSet, AlwaysOnTop, On, ahk_id %dockId%
+    }
+}
+else
+{
+    Run, msedge.exe --app=%DockURL% --window-size=380,900
+    Sleep, 3000
+    WinGet, dockId, ID, PharmaTrack Dock ahk_exe msedge.exe
+    if (dockId)
+    {
+        SysGet, wa, MonitorWorkArea
+        WinMove, ahk_id %dockId%,, %waRight% - 390, %waTop%, 380, %waBottom% - %waTop%
+        WinSet, AlwaysOnTop, On, ahk_id %dockId%
+        WinActivate, ahk_id %dockId%
+    }
+}
+return
