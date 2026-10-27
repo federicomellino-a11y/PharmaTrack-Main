@@ -140,7 +140,10 @@ export default function QuickAddPage() {
         resto,
         driver: data?.auto_assigned ? 'assegnata' : 'da smistare',
       });
-      setTimeout(() => { try { window.close(); } catch { /* noop */ } }, 2500);
+      setTimeout(() => {
+        try { window.close(); } catch { /* noop */ }
+        setTimeout(() => { if (!window.closed) window.location.href = '/deliveries'; }, 150);
+      }, 2500);
     } catch { toast.error('Errore creazione consegna'); }
     setCreating(false);
   };

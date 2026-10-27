@@ -214,7 +214,7 @@ export default function PharmacyDashboard() {
         </div>
 
         {/* Quick actions */}
-        <div className="grid grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
             { to: '/deliveries?new=true', icon: Plus, label: 'Consegna', color: 'text-primary', bg: 'bg-primary/10' },
             { to: '/customers?new=true', icon: UserPlus, label: 'Cliente', color: 'text-blue-600', bg: 'bg-blue-500/10' },
