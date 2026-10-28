@@ -195,6 +195,7 @@ export default function DeliveriesPage() {
         payment_method: params.get('payment_method') || params.get('pagamento') || 'cash',
         notes: params.get('notes') || params.get('note') || '',
         priority: params.get('priority') || params.get('priorita') || null,
+        scheduled_time: params.get('time') || params.get('orario') || null,
       };
       const hasPrefill = !!(prefill.customer_name || prefill.customer_phone || prefill.amount);
       if (hasPrefill) setWinfarmPrefill(prefill);
@@ -231,6 +232,7 @@ export default function DeliveriesPage() {
       payment_method: winfarmPrefill.payment_method || prev.payment_method,
       notes: winfarmPrefill.notes || prev.notes,
       priority: ['low', 'normal', 'high', 'urgent'].includes(winfarmPrefill.priority) ? winfarmPrefill.priority : prev.priority,
+      scheduled_time: winfarmPrefill.scheduled_time || prev.scheduled_time,
     }));
     if (!matched && winfarmPrefill.customer_name) {
       // mostra termine di ricerca così il farmacista vede la lista filtrata
@@ -244,7 +246,7 @@ export default function DeliveriesPage() {
   }, [winfarmPrefill, customers]);
 
   const resetForm = () => {
-    setForm({ customer_id: 'none', notes: '', payment_method: 'cash', amount: '', amount_given: '', scheduled_date: '', scheduled_time: '', priority: 'normal' });
+    setForm({ customer_id: 'none', notes: '', payment_method: 'cash', amount: '', amount_given: '', scheduled_date: '', scheduled_time: '', priority: 'normal', nre: '' });
     setCustomerSearchTerm('');
     setCustomerDropdownOpen(false);
   };
@@ -265,6 +267,8 @@ export default function DeliveriesPage() {
     return true;
   };
 
+  const dialogOpenedAtRef = React.useRef(null);
+
   const handleCreate = async (e) => {
     e.preventDefault();
     if (form.customer_id === 'none') { toast.error('Seleziona un cliente'); return; }
@@ -277,7 +281,12 @@ export default function DeliveriesPage() {
         customer_id: form.customer_id,
         driver_id: defaultDriver?.driver_id || null,
         amount: normalizeMoney(form.amount),
-        amount_given: normalizeMoney(form.amount_given)
+        amount_given: normalizeMoney(form.amount_given),
+        nre: form.nre ? String(form.nre).trim() : null,
+        client_meta: {
+          duration_ms: dialogOpenedAtRef.current ? (Date.now() - dialogOpenedAtRef.current) : null,
+          source: new URLSearchParams(window.location.search).get('new') ? 'prefill' : 'dialog',
+        }
       }, { withCredentials: true });
 
       toast.success(defaultDriver ? `Consegna creata e assegnata a ${defaultDriver.name}` : 'Consegna creata');
@@ -395,6 +404,11 @@ export default function DeliveriesPage() {
   const safeCustomers = useMemo(() => ensureArray(customers), [customers]);
   const safeDrivers = useMemo(() => ensureArray(drivers), [drivers]);
 
+  const activeBadgeCount = useMemo(() => ensureArray(deliveries).filter(d => ['da_preparare', 'pronta', 'pending', 'assigned', 'picked_up', 'in_transit'].includes(d.status)).length, [deliveries]);
+  useEffect(() => {
+    document.title = activeBadgeCount > 0 ? `(${activeBadgeCount}) PharmaTrack` : 'PharmaTrack';
+  }, [activeBadgeCount]);
+
   const filtered = useMemo(() => safeDeliveries.filter(d => {
     const matchTab = activeTab === 'active'
       ? ['da_preparare', 'pronta', 'pending', 'assigned', 'picked_up', 'in_transit', 'delivered_pending_confirmation'].includes(d.status)
@@ -492,7 +506,7 @@ export default function DeliveriesPage() {
               <RefreshCw className={`w-4 h-4 mr-1.5 ${refreshing ? 'animate-spin' : ''}`} />
               Aggiorna
             </Button>
-            <Button className="btn-primary hidden sm:inline-flex" size="sm" onClick={() => { resetForm(); setDialogOpen(true); }}>
+            <Button className="btn-primary hidden sm:inline-flex" size="sm" onClick={() => { resetForm(); dialogOpenedAtRef.current = Date.now(); setDialogOpen(true); }}>
               <Plus className="w-4 h-4 mr-1.5" />Nuova Consegna
             </Button>
           </div>
@@ -539,7 +553,7 @@ export default function DeliveriesPage() {
                 {searchTerm ? 'Nessuna consegna trovata' : activeTab === 'active' ? 'Nessuna consegna attiva' : 'Archivio vuoto'}
               </p>
               {!searchTerm && activeTab === 'active' && (
-                <Button className="btn-primary mt-4" size="sm" onClick={() => { resetForm(); setDialogOpen(true); }}>
+                <Button className="btn-primary mt-4" size="sm" onClick={() => { resetForm(); dialogOpenedAtRef.current = Date.now(); setDialogOpen(true); }}>
                   <Plus className="w-4 h-4 mr-1.5" />Crea la prima consegna
                 </Button>
               )}
@@ -606,6 +620,9 @@ export default function DeliveriesPage() {
                             <Clock className="w-3 h-3" />{formatDate(d.created_at)}
                           </span>
                         </div>
+                        {d.nre && (
+                          <p className="text-xs text-muted-foreground mt-0.5">🧾 NRE: {d.nre}</p>
+                        )}
                         {d.notes && (
                           <p className="text-xs text-muted-foreground mt-1.5 bg-secondary/40 rounded-lg px-2.5 py-1.5 italic">
                             📝 {d.notes}
@@ -728,7 +745,7 @@ export default function DeliveriesPage() {
       {/* FAB mobile: Nuova Consegna */}
       <button
         className="lg:hidden fixed bottom-24 right-4 z-30 w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-xl flex items-center justify-center active:scale-95 transition-transform"
-        onClick={() => { resetForm(); setDialogOpen(true); }}
+        onClick={() => { resetForm(); dialogOpenedAtRef.current = Date.now(); setDialogOpen(true); }}
         aria-label="Nuova Consegna">
         <Plus className="w-6 h-6" />
       </button>
@@ -892,6 +909,12 @@ export default function DeliveriesPage() {
                   </button>
                 ))}
               </div>
+            </div>
+
+            <div className="form-group">
+              <Label>NRE (ricetta elettronica) — opzionale</Label>
+              <Input placeholder="Numero ricetta" value={form.nre || ''}
+                onChange={e => setForm({ ...form, nre: e.target.value })} maxLength={40} />
             </div>
 
             <div className="grid grid-cols-2 gap-3">

@@ -69,6 +69,22 @@ async def create_delivery(delivery: DeliveryCreate, user: dict = Depends(get_cur
         if not delivery.driver_id and not assigned_driver:
             selected_driver_id = None
 
+    # V19: se non c'è fattorino (nè scelto nè predefinito) e la modalità non è manuale,
+    # assegna al fattorino in turno con meno consegne attive; altrimenti al meno carico
+    if not selected_driver_id and (user.get("settings") or {}).get("assignment_mode", "least_loaded") != "manual":
+        candidates = await db.drivers.find({"pharmacy_id": user["user_id"], "is_active": True}, {"_id": 0, "driver_id": 1, "name": 1}).to_list(50)
+        if candidates:
+            open_shift_ids = set()
+            async for sh in db.shifts.find({"pharmacy_id": user["user_id"], "status": "open"}, {"_id": 0, "driver_id": 1}):
+                open_shift_ids.add(sh.get("driver_id"))
+            pool = [c for c in candidates if c["driver_id"] in open_shift_ids] or candidates
+            best, best_load = None, None
+            for c in pool:
+                load = await db.deliveries.count_documents({"driver_id": c["driver_id"], "status": {"$in": ["assigned", "picked_up", "in_transit", "da_preparare", "pronta"]}})
+                if best is None or load < best_load:
+                    best, best_load = c, load
+            selected_driver_id, assigned_driver = best["driver_id"], best
+
     change_due = None
     if delivery.payment_method == "cash" and delivery.amount is not None and delivery.amount_given is not None:
         change_due = delivery.amount_given - delivery.amount
@@ -89,8 +105,19 @@ async def create_delivery(delivery: DeliveryCreate, user: dict = Depends(get_cur
         "estimated_delivery": None, "actual_delivery": None,
         "created_at": datetime.now(timezone.utc).isoformat(), "updated_at": datetime.now(timezone.utc).isoformat(),
         "auto_assigned": bool(assigned_driver and not delivery.driver_id),
+        "nre": (getattr(delivery, "nre", None) or None),
+        "client_meta": (getattr(delivery, "client_meta", None) or None),
     }
     await db.deliveries.insert_one(delivery_data)
+    # Log audit NRE (tracciabilità legale, Garante 2025)
+    if delivery_data.get("nre"):
+        await db.audit_log.insert_one({
+            "audit_id": f"aud_{uuid.uuid4().hex[:12]}",
+            "entity": "delivery", "entity_id": delivery_data["delivery_id"],
+            "action": "nre_set", "actor": user["user_id"], "actor_role": "pharmacy",
+            "detail": {"nre_prefix": str(delivery_data["nre"])[:4] + "***"},
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        })
     if assigned_driver:
         await _attach_delivery_to_open_shift(assigned_driver["driver_id"], delivery_data["delivery_id"])
         await manager.send_personal_message({"type": "new_delivery", "delivery_id": delivery_data["delivery_id"]}, assigned_driver["driver_id"], "driver")

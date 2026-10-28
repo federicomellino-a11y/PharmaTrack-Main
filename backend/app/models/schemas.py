@@ -90,6 +90,8 @@ class DriverCreate(BaseModel):
 class DeliveryCreate(BaseModel):
     customer_id: str
     driver_id: Optional[str] = None
+    nre: Optional[str] = None
+    client_meta: Optional[dict] = None
     notes: Optional[str] = None
     payment_method: str = "cash"
     amount: Optional[float] = Field(default=None, ge=0)
@@ -101,6 +103,7 @@ class DeliveryCreate(BaseModel):
 class DeliveryUpdate(BaseModel):
     driver_id: Optional[str] = None
     status: Optional[str] = None
+    nre: Optional[str] = None
     notes: Optional[str] = None
     payment_method: Optional[str] = None
     amount: Optional[float] = Field(default=None, ge=0)
