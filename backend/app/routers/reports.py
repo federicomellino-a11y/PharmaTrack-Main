@@ -36,7 +36,7 @@ async def get_reports(period: str = "month", user: dict = Depends(get_current_us
     if period == "week": start_date = now - timedelta(days=7)
     elif period == "year": start_date = now - timedelta(days=365)
     else: start_date = now - timedelta(days=30)
-    deliveries = await db.deliveries.find({"pharmacy_id": pharmacy_id, "status": "delivered", "actual_delivery": {"$gte": start_date.isoformat()}}, {"_id": 0, "amount": 1, "customer_id": 1, "driver_id": 1, "payment_method": 1}).to_list(10000)
+    deliveries = await db.deliveries.find({"pharmacy_id": pharmacy_id, "status": "delivered", "actual_delivery": {"$gte": start_date.isoformat()}}, {"_id": 0, "amount": 1, "customer_id": 1, "driver_id": 1, "payment_method": 1, "actual_delivery": 1, "created_at": 1, "updated_at": 1}).to_list(10000)
     total_revenue = sum(d.get("amount", 0) or 0 for d in deliveries)
     total_deliveries = len(deliveries)
     customer_counts = {}
@@ -64,5 +64,50 @@ async def get_reports(period: str = "month", user: dict = Depends(get_current_us
         driver = await db.drivers.find_one({"driver_id": did}, {"_id": 0, "name": 1})
         if driver:
             top_drivers.append({"driver_id": did, "name": driver["name"], "deliveries": driver_counts[did], "revenue": driver_revenue.get(did, 0)})
-    cash_count = sum(1 for d in deliveries if d.get("payment_method") == "cash")
-    return {"period": period, "total_revenue": total_revenue, "total_deliveries": total_deliveries, "avg_order_value": total_revenue / total_deliveries if total_deliveries > 0 else 0, "top_customers": top_customers, "top_drivers": top_drivers, "payment_breakdown": {"cash": cash_count, "pos": total_deliveries - cash_count}}
+    # --- Ripartizione pagamenti: CONTANTI / POS con incasso e numero consegne ---
+    payment_split = {
+        "cash": {"revenue": 0.0, "count": 0},
+        "pos": {"revenue": 0.0, "count": 0},
+        "other": {"revenue": 0.0, "count": 0},
+    }
+    for d in deliveries:
+        method = d.get("payment_method") if d.get("payment_method") in ("cash", "pos") else "other"
+        payment_split[method]["revenue"] = round(payment_split[method]["revenue"] + (d.get("amount") or 0), 2)
+        payment_split[method]["count"] += 1
+
+    # --- Serie giornaliera incassi ---
+    daily_map = {}
+    for d in deliveries:
+        ref = d.get("actual_delivery") or d.get("updated_at") or d.get("created_at")
+        if not ref:
+            continue
+        day = str(ref)[:10]
+        bucket = daily_map.setdefault(day, {"revenue": 0.0, "count": 0})
+        bucket["revenue"] = round(bucket["revenue"] + (d.get("amount") or 0), 2)
+        bucket["count"] += 1
+    daily_revenue = [{"date": k, **v} for k, v in sorted(daily_map.items())]
+
+    driver_performance = [
+        {"driver_id": d.get("driver_id"), "name": d.get("name"), "deliveries": d.get("deliveries", 0), "revenue": d.get("revenue", 0)}
+        for d in top_drivers
+    ]
+
+    return {
+        "period": period,
+        "total_revenue": total_revenue,
+        "total_deliveries": total_deliveries,
+        "avg_order_value": round(total_revenue / total_deliveries, 2) if total_deliveries > 0 else 0,
+        "top_customers": top_customers,
+        "top_drivers": top_drivers,
+        "payment_breakdown": {"cash": payment_split["cash"]["count"], "pos": payment_split["pos"]["count"]},
+        "summary": {
+            "total_revenue": round(total_revenue, 2),
+            "total_deliveries": total_deliveries,
+            "avg_order_value": round(total_revenue / total_deliveries, 2) if total_deliveries > 0 else 0,
+            "cash_revenue": payment_split["cash"]["revenue"],
+            "pos_revenue": payment_split["pos"]["revenue"],
+        },
+        "payment_split": payment_split,
+        "daily_revenue": daily_revenue,
+        "driver_performance": driver_performance,
+    }

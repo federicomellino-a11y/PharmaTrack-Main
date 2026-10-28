@@ -492,7 +492,7 @@ export default function DeliveriesPage() {
               <RefreshCw className={`w-4 h-4 mr-1.5 ${refreshing ? 'animate-spin' : ''}`} />
               Aggiorna
             </Button>
-            <Button className="btn-primary" size="sm" onClick={() => { resetForm(); setDialogOpen(true); }}>
+            <Button className="btn-primary hidden sm:inline-flex" size="sm" onClick={() => { resetForm(); setDialogOpen(true); }}>
               <Plus className="w-4 h-4 mr-1.5" />Nuova Consegna
             </Button>
           </div>
@@ -519,13 +519,13 @@ export default function DeliveriesPage() {
             </SelectContent>
           </Select>
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full sm:w-auto">
-            <TabsList className="h-9">
-              <TabsTrigger value="active" className="text-xs px-3">Attive {activeCount > 0 && <span className="ml-1 px-1.5 py-0 text-[10px] rounded-full bg-primary/15 text-primary font-bold">{activeCount}</span>}</TabsTrigger>
-              <TabsTrigger value="pending_confirmation" className="text-xs px-3">
+            <TabsList className="h-10 sm:h-9 w-full sm:w-auto">
+              <TabsTrigger value="active" className="flex-1 sm:flex-none text-[11px] sm:text-xs px-2 sm:px-3">Attive {activeCount > 0 && <span className="ml-1 px-1.5 py-0 text-[10px] rounded-full bg-primary/15 text-primary font-bold">{activeCount}</span>}</TabsTrigger>
+              <TabsTrigger value="pending_confirmation" className="flex-1 sm:flex-none text-[11px] sm:text-xs px-2 sm:px-3">
                 <Euro className="w-3 h-3 mr-1" />Da incassare
                 {pendingConfirmCount > 0 && <span className="ml-1 px-1.5 py-0 text-[10px] rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 font-bold">{pendingConfirmCount}</span>}
               </TabsTrigger>
-              <TabsTrigger value="completed" className="text-xs px-3">Completate</TabsTrigger>
+              <TabsTrigger value="completed" className="flex-1 sm:flex-none text-[11px] sm:text-xs px-2 sm:px-3">Completate</TabsTrigger>
             </TabsList>
           </Tabs>
         </div>
@@ -643,7 +643,7 @@ export default function DeliveriesPage() {
                           </div>
                         )}
                         {['da_preparare', 'pronta', 'pending', 'assigned', 'picked_up', 'in_transit', 'delivered_pending_confirmation'].includes(d.status) && (
-                          <div className="flex gap-1.5 flex-wrap justify-end">
+                          <div className="delivery-card-actions flex gap-1.5 flex-wrap justify-end">
                             {d.status === 'delivered_pending_confirmation' && (
                               <>
                                 <Button size="sm" className="h-8 px-3 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-md"
@@ -901,12 +901,24 @@ export default function DeliveriesPage() {
                   value={form.amount} onChange={e => setForm({...form, amount: e.target.value})} />
               </div>
               <div className="form-group">
+                <Label>Metodo di pagamento</Label>
+                <Select value={form.payment_method} onValueChange={v => setForm({...form, payment_method: v})}>
+                  <SelectTrigger data-testid="create-payment-method"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cash">💵 Contanti</SelectItem>
+                    <SelectItem value="pos">💳 POS</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            {form.payment_method === 'cash' && (
+              <div className="form-group">
                 <Label>Pagato con (€)</Label>
                 <Input type="number" step="0.01" min="0" inputMode="decimal" placeholder="0.00"
                   value={form.amount_given} onChange={e => setForm({...form, amount_given: e.target.value})} />
               </div>
-            </div>
-            {change_due !== null && (
+            )}
+            {form.payment_method === 'cash' && change_due !== null && (
               <p className={`text-lg font-bold text-center py-1 ${change_due >= 0 ? 'text-emerald-600' : 'text-destructive'}`} style={{ fontVariantNumeric: 'tabular-nums' }}>
                 {change_due >= 0 ? `Resto: ${formatCurrency(change_due)}` : 'Il pagato con deve coprire l’importo'}
               </p>

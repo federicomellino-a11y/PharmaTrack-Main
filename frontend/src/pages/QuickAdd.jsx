@@ -140,7 +140,10 @@ export default function QuickAddPage() {
         resto,
         driver: data?.auto_assigned ? 'assegnata' : 'da smistare',
       });
-      setTimeout(() => { try { window.close(); } catch { /* noop */ } }, 2500);
+      setTimeout(() => {
+        try { window.close(); } catch { /* noop */ }
+        setTimeout(() => { if (!window.closed) window.location.href = '/deliveries'; }, 150);
+      }, 2500);
     } catch { toast.error('Errore creazione consegna'); }
     setCreating(false);
   };
@@ -250,6 +253,13 @@ export default function QuickAddPage() {
             <Button type="button" size="sm" onClick={createCustomer}>Crea e seleziona</Button>
           </div>
         )}
+
+        <div className="flex gap-2">
+          <button type="button" onClick={() => setForm({ ...form, payment_method: 'cash' })}
+            className={`flex-1 py-2.5 rounded-lg text-sm font-semibold border ${form.payment_method === 'cash' ? 'bg-primary text-primary-foreground border-primary' : 'bg-card border-border'}`}>💵 Contanti</button>
+          <button type="button" onClick={() => setForm({ ...form, payment_method: 'pos' })}
+            className={`flex-1 py-2.5 rounded-lg text-sm font-semibold border ${form.payment_method === 'pos' ? 'bg-primary text-primary-foreground border-primary' : 'bg-card border-border'}`}>💳 POS</button>
+        </div>
 
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">

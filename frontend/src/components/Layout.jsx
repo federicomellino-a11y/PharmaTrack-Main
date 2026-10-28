@@ -23,7 +23,7 @@ const navItems = [
   { path: '/dashboard',     icon: LayoutDashboard, label: 'Home',          mobile: true },
   { path: '/deliveries',    icon: Package,         label: 'Consegne',      mobile: true },
   { path: '/customers',     icon: Users,           label: 'Clienti',       mobile: true },
-  { path: '/drivers',       icon: Truck,           label: 'Fattorini',     mobile: true },
+  { path: '/drivers',        icon: Truck,           label: 'Fattorini' },
   { path: '/chat',          icon: MessageSquare,   label: 'Chat',          mobile: true, badge: true },
   { divider: true },
   { path: '/shifts',        icon: Wallet,          label: 'Turni & Cassa' },
@@ -348,7 +348,29 @@ export const Layout = ({ children, title }) => {
 
         {/* Mobile bottom navigation */}
         <nav className="pharmacy-bottom-nav">
-          {mobileNavItems.map((item) => {
+          {mobileNavItems.slice(0, 2).map((item) => {
+            const active = isActive(item.path);
+            return (
+              <Link key={item.path} to={item.path}
+                className={active ? 'active' : ''}
+                onClick={() => setSidebarOpen(false)}>
+                <div className="relative">
+                  <item.icon className="w-5 h-5" />
+                  {item.badge && unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-destructive rounded-full text-[9px] font-bold text-white flex items-center justify-center">
+                      {unreadCount > 9 ? '9' : unreadCount}
+                    </span>
+                  )}
+                </div>
+                <span>{item.label}</span>
+              </Link>
+            );
+          })}
+          <Link to="/quick" className={`dock-add ${isActive('/quick') ? 'active' : ''}`} aria-label="Nuova consegna">
+            <span className="dock-add-btn"><Plus className="w-6 h-6" /></span>
+            <span>Nuova</span>
+          </Link>
+          {mobileNavItems.slice(2).map((item) => {
             const active = isActive(item.path);
             return (
               <Link key={item.path} to={item.path}
