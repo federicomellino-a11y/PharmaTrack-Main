@@ -1,256 +1,257 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useState } from 'react';
+import axios from 'axios';
 import { Layout } from '../../components/Layout';
 import { Card, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
-import { Input } from '../../components/ui/input';
 import { Badge } from '../../components/ui/badge';
 import {
-  Plug, Download, Copy, CheckCircle2, Terminal, Keyboard, Workflow,
-  AlertCircle, FileCode, Zap, ExternalLink, Pill, Monitor,
+  Pill, Download, CheckCircle2, Keyboard, Monitor, Zap, Loader2,
+  RefreshCw, CircleDot, ArrowRight, ExternalLink, FlaskConical, Code2,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { useAuth } from '../../contexts/AuthContext';
+import { API } from '@/lib/config';
+
+const formatWhen = (iso) => {
+  if (!iso) return 'mai';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return 'mai';
+  const now = new Date();
+  const sameDay = d.toDateString() === now.toDateString();
+  const time = d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+  return sameDay ? `oggi alle ${time}` : `${d.toLocaleDateString('it-IT')} alle ${time}`;
+};
+
+function Step({ n, title, children }) {
+  return (
+    <div className="flex gap-3 rounded-xl border border-border bg-card p-4">
+      <div className="w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-sm shrink-0">{n}</div>
+      <div className="flex-1 min-w-0">
+        <h3 className="font-semibold text-sm mb-1.5">{title}</h3>
+        <div className="text-xs text-muted-foreground space-y-2">{children}</div>
+      </div>
+    </div>
+  );
+}
 
 export default function IntegrationsPage() {
-  const { user } = useAuth();
-  const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
-  const [previewUrl, setPreviewUrl] = useState(`${baseUrl}/deliveries?new=1&customer_name=ROSSI%20MARIO&customer_phone=3331234567&amount=18.50&payment_method=cash&notes=Antibiotico`);
-  const [copied, setCopied] = useState(false);
+  const [status, setStatus] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [downloading, setDownloading] = useState(false);
+  const [testing, setTesting] = useState(false);
 
-  const ahkUrl = `${baseUrl}/pharmatrack_winfarm.ahk`;
-
-  const exampleParams = [
-    { key: 'customer_name', label: 'Nome cliente', example: 'ROSSI MARIO' },
-    { key: 'customer_phone', label: 'Telefono', example: '3331234567' },
-    { key: 'customer_address', label: 'Indirizzo', example: 'Via Roma 5' },
-    { key: 'amount', label: 'Importo €', example: '18.50' },
-    { key: 'payment_method', label: 'Pagamento', example: 'cash | pos' },
-    { key: 'notes', label: 'Note', example: 'Antibiotico + ricetta' },
-  ];
-
-  const copyToClipboard = (text) => {
-    navigator.clipboard?.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1800);
-    toast.success('Copiato negli appunti');
+  const loadStatus = async () => {
+    try {
+      const { data } = await axios.get(`${API}/integrations/winfarm/status`, { withCredentials: true });
+      setStatus(data);
+    } catch {
+      setStatus(null);
+    } finally {
+      setLoading(false);
+    }
   };
+
+  useEffect(() => { loadStatus(); }, []);
+
+  const downloadBridge = async () => {
+    setDownloading(true);
+    try {
+      const base = window.location.origin;
+      const res = await axios.get(`${API}/integrations/winfarm/bridge/download?base=${encodeURIComponent(base)}`, {
+        withCredentials: true, responseType: 'blob',
+      });
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'text/plain;charset=utf-8' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'pharmatrack-bridge-winfarm.ahk';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success('Bridge scaricato: avvialo con doppio click');
+    } catch {
+      toast.error('Download non riuscito, riprova');
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  const runTest = async () => {
+    setTesting(true);
+    try {
+      const { data } = await axios.post(`${API}/integrations/winfarm/import`, {
+        cliente: 'CLIENTE DI PROVA',
+        telefono: '3330000000',
+        importo: 12.5,
+        note: 'Prova bridge Winfarm',
+        pagamento: 'cash',
+      }, { withCredentials: true });
+      toast.success(`Prova ok: consegna creata da ${data?.customer?.name || 'cliente di prova'}`);
+      loadStatus();
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || 'Prova non riuscita');
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const active = !!status?.last_import;
 
   return (
     <Layout title="Integrazioni">
-      <div className="space-y-6 animate-fade-in-up max-w-4xl" data-testid="integrations-page">
+      <div className="space-y-5 animate-fade-in-up max-w-3xl" data-testid="integrations-page">
         <div>
-          <h1 className="text-xl font-bold flex items-center gap-2">
-            <Plug className="w-5 h-5 text-primary" />Integrazioni
-          </h1>
+          <h1 className="text-xl font-bold">Collega Winfarm</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Collega PharmaTrack ai gestionali e alle utility che già usi in farmacia.
+            Un file, un doppio click, una scorciatoia. Da lì in poi le vendite finiscono in PharmaTrack da sole.
           </p>
         </div>
 
-        {/* WINFARM */}
-        <Card className="border-primary/20 bg-primary/[0.03]">
-          <CardContent className="p-6">
-            <div className="flex items-start gap-4 mb-5">
-              <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
-                <Pill className="w-6 h-6" />
+        {/* Stato */}
+        <Card className={active ? 'border-emerald-500/30 bg-emerald-500/[0.04]' : 'border-primary/20 bg-primary/[0.03]'}>
+          <CardContent className="p-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${active ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : 'bg-primary/10 text-primary'}`}>
+                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <CircleDot className="w-5 h-5" />}
               </div>
-              <div className="flex-1">
-                <div className="flex flex-wrap items-center gap-2 mb-1">
-                  <h2 className="font-bold text-lg">Winfarm (Pharmaservice)</h2>
-                  <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 text-xs">Beta</Badge>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  Winfarm non espone API. Il "ponte" funziona via <strong>hotkey + clipboard</strong>: dopo la vendita, premi una combinazione e PharmaTrack si apre con il modulo "Nuova Consegna" già pre-compilato.
+              <div>
+                <p className="font-semibold text-sm">
+                  {loading ? 'Controllo stato…' : active ? 'Bridge attivo' : 'Pronto da configurare'}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {active
+                    ? `${status.imports_today} import oggi · ultima ${formatWhen(status.last_import)}`
+                    : 'Ti servono 60 secondi, qui sotto'}
                 </p>
               </div>
             </div>
-
-            {/* Step 1: Download */}
-            <div className="rounded-xl border border-border bg-card p-4 mb-3">
-              <div className="flex items-start gap-3">
-                <div className="w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-sm shrink-0">1</div>
-                <div className="flex-1">
-                  <h3 className="font-semibold text-sm mb-1">Scarica AutoHotkey + lo script</h3>
-                  <p className="text-xs text-muted-foreground mb-3">
-                    AutoHotkey è gratuito, leggero (~3 MB) e funziona su qualsiasi PC Windows della farmacia. Va installato una sola volta.
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    <Button size="sm" variant="outline" className="gap-2" asChild>
-                      <a href="https://www.autohotkey.com/download/ahk-install.exe" target="_blank" rel="noopener noreferrer">
-                        <ExternalLink className="w-3.5 h-3.5" />Installa AutoHotkey
-                      </a>
-                    </Button>
-                    <Button size="sm" className="btn-primary gap-2" asChild>
-                      <a href={ahkUrl} download="pharmatrack_winfarm.ahk">
-                        <Download className="w-3.5 h-3.5" />Scarica script bridge
-                      </a>
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Step 2: Configure */}
-            <div className="rounded-xl border border-border bg-card p-4 mb-3">
-              <div className="flex items-start gap-3">
-                <div className="w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-sm shrink-0">2</div>
-                <div className="flex-1">
-                  <h3 className="font-semibold text-sm mb-1">Configura l'URL della tua farmacia nello script</h3>
-                  <p className="text-xs text-muted-foreground mb-2">Apri il file <code className="px-1.5 py-0.5 bg-secondary rounded">pharmatrack_winfarm.ahk</code> con Blocco Note e cambia la riga:</p>
-                  <div className="bg-secondary rounded-lg px-3 py-2 font-mono text-xs flex items-center justify-between gap-2">
-                    <code className="truncate">PharmaTrackURL := "{baseUrl}"</code>
-                    <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => copyToClipboard(`PharmaTrackURL := "${baseUrl}"`)}>
-                      {copied ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                    </Button>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Salva e fai doppio-click sul file per avviarlo: in basso a destra apparirà un'icona verde "H".
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Step 3: Use */}
-            <div className="rounded-xl border border-border bg-card p-4 mb-3">
-              <div className="flex items-start gap-3">
-                <div className="w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-sm shrink-0">3</div>
-                <div className="flex-1">
-                  <h3 className="font-semibold text-sm mb-1 flex items-center gap-2">
-                    <Keyboard className="w-4 h-4 text-primary" />Usa l'hotkey <kbd className="px-2 py-0.5 bg-secondary rounded text-xs font-mono">Alt + C</kbd>
-                  </h3>
-                  <ol className="text-xs text-muted-foreground space-y-1.5 list-decimal list-inside">
-                    <li>Su Winfarm, dopo aver chiuso la vendita, <strong>seleziona col mouse</strong> la riga/blocco con cliente e importo</li>
-                    <li>Premi <kbd className="px-1.5 py-0.5 bg-secondary rounded text-[10px] font-mono">Alt + C</kbd></li>
-                    <li>Si apre PharmaTrack con il modulo "Nuova Consegna" già compilato</li>
-                    <li>Completa metodo di pagamento, eventuale resto, e clic su Crea</li>
-                  </ol>
-                </div>
-              </div>
-            </div>
-
-            {/* Test deep link */}
-            <div className="rounded-xl border border-dashed border-primary/30 bg-primary/[0.04] p-4">
-              <div className="flex items-start gap-3">
-                <Zap className="w-4 h-4 text-primary mt-0.5" />
-                <div className="flex-1">
-                  <h3 className="font-semibold text-sm mb-2">Prova subito un deep-link di esempio</h3>
-                  <Input
-                    value={previewUrl}
-                    onChange={(e) => setPreviewUrl(e.target.value)}
-                    className="font-mono text-xs mb-2"
-                  />
-                  <div className="flex gap-2">
-                    <Button size="sm" variant="outline" onClick={() => copyToClipboard(previewUrl)}>
-                      <Copy className="w-3.5 h-3.5 mr-1.5" />Copia
-                    </Button>
-                    <Button size="sm" className="btn-primary" asChild>
-                      <a href={previewUrl} target="_blank" rel="noopener noreferrer">
-                        <ExternalLink className="w-3.5 h-3.5 mr-1.5" />Prova ora
-                      </a>
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* DOCK DI BANCO */}
-        <Card className="border-primary/20">
-          <CardContent className="p-6">
-            <h3 className="font-bold mb-1 flex items-center gap-2">
-              <Monitor className="w-4 h-4 text-primary" />Dock di banco (accanto a Winfarm)
-            </h3>
-            <p className="text-xs text-muted-foreground mb-4">
-              Una mini-finestra sempre in primo piano con la coda da smistare e l&apos;assegnazione in due click.
-              Resta accanto a Winfarm tutto il giorno.
-            </p>
-            <ol className="text-xs text-muted-foreground space-y-2 mb-4 list-decimal ml-4">
-              <li>Copia questo comando:
-                <code className="block mt-1 px-2 py-1 bg-secondary rounded font-mono text-[11px] break-all">
-                  msedge.exe --app=https://pharmatrack-zeta.vercel.app/dock --window-size=380,900
-                </code>
-              </li>
-              <li>Crea sul desktop una scorciatoia &quot;Dock PharmaTrack&quot; con quel comando come destinazione.</li>
-              <li>Avvia la scorciatoia: si apre la finestrella del Dock.</li>
-              <li>Con lo script AHK attivo, <b>ALT+D</b> mostra/nasconde il Dock e lo tiene sempre sopra Winfarm.</li>
-            </ol>
-            <p className="text-[11px] text-muted-foreground">
-              Il Dock si aggiorna da solo ogni 30 secondi: puoi lasciarlo aperto tutto il giorno.
-            </p>
-          </CardContent>
-        </Card>
-
-        {/* PARAMETERS reference */}
-        <Card>
-          <CardContent className="p-6">
-            <h3 className="font-bold mb-1 flex items-center gap-2">
-              <FileCode className="w-4 h-4 text-primary" />Parametri supportati nell'URL
-            </h3>
-            <p className="text-xs text-muted-foreground mb-4">
-              Puoi costruire i tuoi link verso <code className="px-1.5 py-0.5 bg-secondary rounded text-xs">/deliveries?new=1&amp;…</code> con questi parametri. Se il <em>nome</em> o <em>telefono</em> coincidono con un cliente esistente, viene selezionato automaticamente; altrimenti vedi la barra di ricerca pre-filtrata.
-            </p>
-            <div className="grid sm:grid-cols-2 gap-2">
-              {exampleParams.map((p) => (
-                <div key={p.key} className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-secondary/50">
-                  <div>
-                    <code className="text-xs font-mono font-semibold text-primary">{p.key}</code>
-                    <p className="text-xs text-muted-foreground">{p.label}</p>
-                  </div>
-                  <code className="text-xs font-mono text-foreground/70">{p.example}</code>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* API direct */}
-        <Card>
-          <CardContent className="p-6">
-            <h3 className="font-bold mb-1 flex items-center gap-2">
-              <Terminal className="w-4 h-4 text-primary" />Integrazione via API (avanzato)
-            </h3>
-            <p className="text-xs text-muted-foreground mb-3">
-              Se preferisci chiamare un endpoint REST direttamente dal tuo bridge (Python, PowerShell, Node, ecc.), invia un POST a:
-            </p>
-            <div className="bg-secondary rounded-lg px-3 py-2 font-mono text-xs flex items-center justify-between gap-2 mb-3">
-              <code className="truncate">POST {baseUrl}/api/integrations/winfarm/import</code>
-              <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => copyToClipboard(`${baseUrl}/api/integrations/winfarm/import`)}>
-                <Copy className="w-3.5 h-3.5" />
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className={active ? 'border-emerald-500/40 text-emerald-600 dark:text-emerald-400' : ''}>
+                {active ? 'Collegato' : 'Non collegato'}
+              </Badge>
+              <Button variant="ghost" size="sm" onClick={loadStatus} aria-label="Aggiorna stato">
+                <RefreshCw className="w-4 h-4" />
               </Button>
             </div>
-            <p className="text-xs text-muted-foreground mb-2">Body JSON di esempio:</p>
-            <pre className="bg-zinc-950 text-zinc-100 rounded-lg p-3 text-xs font-mono overflow-x-auto">{`{
-  "customer_name": "ROSSI MARIO",
-  "customer_phone": "3331234567",
-  "customer_address": "Via Roma 5, Roma",
-  "amount": 18.50,
-  "payment_method": "cash",
-  "notes": "Antibiotico + ricetta",
-  "external_ref": "SCONTRINO-2026-04-30-0042"
-}`}</pre>
-            <p className="text-xs text-muted-foreground mt-2">
-              Richiede autenticazione cookie session (oppure header <code>Authorization: Bearer &lt;token&gt;</code>) della farmacia. Se il cliente non esiste con il nome/telefono inviato, viene creato in automatico.
-            </p>
           </CardContent>
         </Card>
 
-        {/* Note legali */}
-        <Card className="border-amber-500/30 bg-amber-500/[0.04]">
-          <CardContent className="p-5">
-            <div className="flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+        {/* 3 passi */}
+        <div className="space-y-2">
+          <Step n="1" title="Scarica il bridge già configurato">
+            <p>
+              Contiene già l'indirizzo della tua farmacia e la tua chiave: non devi modificare niente.
+            </p>
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <Button size="sm" className="btn-primary gap-2" onClick={downloadBridge} disabled={downloading}>
+                {downloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                Scarica bridge
+              </Button>
+              <a
+                href="https://www.autohotkey.com/download/ahk-install.exe"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs underline underline-offset-2 inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
+              >
+                Serve AutoHotkey? Installalo una volta sola <ExternalLink className="w-3 h-3" />
+              </a>
+            </div>
+          </Step>
+
+          <Step n="2" title="Doppio click sul file">
+            <p>
+              Compare l'icona verde <strong>H</strong> vicino all'orologio: il bridge è in ascolto. Per averlo sempre attivo
+              metti il file nella cartella <code className="px-1 py-0.5 bg-secondary rounded">Esecuzione automatica</code> di Windows
+              (<span className="whitespace-nowrap">Win+R</span> → <code className="px-1 py-0.5 bg-secondary rounded">shell:startup</code>).
+            </p>
+          </Step>
+
+          <Step n="3" title="In Winfarm: seleziona la vendita e premi Alt+C">
+            <p className="flex flex-wrap items-center gap-1.5">
+              <kbd className="px-2 py-0.5 bg-secondary rounded text-xs font-mono inline-flex items-center gap-1"><Keyboard className="w-3 h-3" />Alt + C</kbd>
+              importa la consegna ·
+              <kbd className="px-2 py-0.5 bg-secondary rounded text-xs font-mono">Alt + D</kbd>
+              apre il Dock di banco
+            </p>
+            <p>La consegna arriva in coda “Da preparare” e il Dock si aggiorna in tempo reale. Se la selezione non viene riconosciuta, si apre il modulo già compilato.</p>
+          </Step>
+        </div>
+
+        {/* Prova */}
+        <Card>
+          <CardContent className="p-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                <FlaskConical className="w-4 h-4" />
+              </div>
               <div>
-                <h3 className="font-semibold text-sm mb-1">Note sull'integrazione Winfarm</h3>
-                <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
-                  <li>L'integrazione non legge il database Winfarm né si interfaccia con il software in modo invasivo: usa solo la clipboard di Windows e l'apertura di un URL nel browser predefinito.</li>
-                  <li>Il riconoscimento di cliente e importo dipende dal layout della tua schermata Winfarm: se i pattern non funzionano, le regex sono modificabili nel file <code>.ahk</code> con un editor di testo.</li>
-                  <li>PharmaTrack non è un prodotto Pharmaservice: marchio Winfarm e relative funzionalità appartengono ai rispettivi proprietari.</li>
-                </ul>
+                <p className="font-medium text-sm">Prova che tutto funzioni</p>
+                <p className="text-xs text-muted-foreground">Crea una consegna di prova: la trovi in Consegne, la cancelli in un click.</p>
+              </div>
+            </div>
+            <Button size="sm" variant="outline" className="gap-2" onClick={runTest} disabled={testing}>
+              {testing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
+              Crea consegna di prova
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Senza installare nulla */}
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-start gap-3">
+              <div className="w-9 h-9 rounded-lg bg-secondary flex items-center justify-center shrink-0">
+                <Monitor className="w-4 h-4" />
+              </div>
+              <div className="flex-1">
+                <p className="font-medium text-sm">Non vuoi installare niente?</p>
+                <p className="text-xs text-muted-foreground mt-1 mb-2">
+                  Apri il Dock accanto a Winfarm e inserisci le consegne a mano: stessa coda, stesso flusso, zero installazioni.
+                </p>
+                <Button size="sm" variant="outline" className="gap-2" asChild>
+                  <a href="/dock">
+                    Apri il Dock <ArrowRight className="w-3.5 h-3.5" />
+                  </a>
+                </Button>
               </div>
             </div>
           </CardContent>
         </Card>
+
+        {/* Avanzate */}
+        <details className="rounded-xl border border-border bg-card">
+          <summary className="px-4 py-3 cursor-pointer text-sm font-medium flex items-center gap-2">
+            <Code2 className="w-4 h-4 text-muted-foreground" /> Per sviluppatori / altri gestionali
+          </summary>
+          <div className="px-4 pb-4 space-y-3 text-xs text-muted-foreground">
+            <p>
+              Qualsiasi software può creare una consegna con una chiamata REST autenticata dalla sessione farmacia:
+            </p>
+            <pre className="bg-secondary rounded-lg p-3 overflow-x-auto text-[11px] leading-relaxed">
+{`POST ${API}/integrations/winfarm/import
+
+{
+  "cliente": "ROSSI MARIO",
+  "telefono": "3331234567",
+  "indirizzo": "Via Roma 5, Milano",
+  "importo": 18.50,
+  "pagamento": "cash",      // cash | pos
+  "note": "Antibiotico",
+  "ricevuta": "1234"
+}`}
+            </pre>
+            <p>
+              Alias accettati: <code>cliente/customer_name</code>, <code>telefono/customer_phone</code>,
+              <code>importo/amount</code>, <code>pagamento/payment_method</code>, <code>note/notes</code>.
+              La consegna nasce in stato “Da preparare” e il cliente viene creato se non esiste.
+            </p>
+          </div>
+        </details>
+
+        <p className="text-[11px] text-muted-foreground flex items-center gap-1.5">
+          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+          Chiave bridge: <code className="px-1 bg-secondary rounded">{status?.token_preview || '—'}</code>
+          {status?.pharmacy_name ? ` · ${status.pharmacy_name}` : ''}
+        </p>
       </div>
     </Layout>
   );

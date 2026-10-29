@@ -119,11 +119,11 @@ Genera:
 
 Winfarm non espone API. Il bridge funziona via **hotkey AutoHotkey + clipboard**:
 
-1. Dalla farmacia in produzione, vai su **Integrazioni** → scarica `pharmatrack_winfarm.ahk`
-2. Installa [AutoHotkey 1.1](https://www.autohotkey.com/)
-3. Configura nello script l'URL della tua farmacia
-4. Doppio-click per avviare → icona verde "H" in tray
-5. Su Winfarm seleziona il blocco di vendita → premi **Alt+C** → si apre PharmaTrack con modulo pre-compilato
+1. Su [AutoHotkey 1.1](https://www.autohotkey.com/) fai l'installazione (una volta sola)
+2. Vai su **Integrazioni** → **Scarica bridge**: il file contiene già URL e chiave della farmacia
+3. Doppio-click sul file → icona verde "H" in tray (per l'autostart: `shell:startup`)
+4. Su Winfarm seleziona il blocco di vendita → **Alt+C** → la consegna entra in coda "Da preparare"
+   (se la selezione non è riconosciuta si apre il modulo pre-compilato). **Alt+D** apre il Dock.
 
 Endpoint REST anche disponibile: `POST /api/integrations/winfarm/import` (dettagli nella pagina `/integrations`).
 
