@@ -136,11 +136,11 @@ export default function DeliveriesPage() {
 
   // Dialog "Crea cliente al volo" dentro Nuova Consegna
   const [createCustomerOpen, setCreateCustomerOpen] = useState(false);
-  const [newCustomer, setNewCustomer] = useState({ name: '', phone: '', phone2: '', address: '', notes: '' });
+  const [newCustomer, setNewCustomer] = useState({ name: '', phone: '', extraPhones: [], address: '', notes: '' });
   const [creatingCustomer, setCreatingCustomer] = useState(false);
 
   const openCreateCustomer = (prefilledName) => {
-    setNewCustomer({ name: prefilledName || '', phone: '', phone2: '', address: '', notes: '' });
+    setNewCustomer({ name: prefilledName || '', phone: '', extraPhones: [], address: '', notes: '' });
     setCreateCustomerOpen(true);
   };
 
@@ -156,7 +156,7 @@ export default function DeliveriesPage() {
         customer_lat: newCustomer.lat || null,
         customer_lng: newCustomer.lng || null,
         place_id: newCustomer.placeId || null,
-        extra_phones: [newCustomer.phone2 || ''].map(p => p.trim()).filter(Boolean),
+        extra_phones: (newCustomer.extraPhones || []).map(p => (p || '').trim()).filter(Boolean),
         notes: newCustomer.notes.trim() || null,
       }, { withCredentials: true });
       const created = res.data;
@@ -167,7 +167,7 @@ export default function DeliveriesPage() {
       setCustomerSearchTerm('');
       setCustomerDropdownOpen(false);
       setCreateCustomerOpen(false);
-      setNewCustomer({ name: '', phone: '', phone2: '', address: '', notes: '' });
+      setNewCustomer({ name: '', phone: '', extraPhones: [], address: '', notes: '' });
     } catch (err) {
       console.error('Errore creazione cliente:', err);
       toast.error(err.response?.data?.detail || 'Errore creazione cliente');
@@ -1134,11 +1134,32 @@ export default function DeliveriesPage() {
               </div>
             </div>
             <div>
-              <Label htmlFor="qc-phone2">Secondo telefono (opzionale)</Label>
-              <Input id="qc-phone2" type="tel" inputMode="tel" placeholder="Altro recapito"
-                data-testid="create-customer-phone2"
-                value={newCustomer.phone2 || ''}
-                onChange={(e) => setNewCustomer({ ...newCustomer, phone2: e.target.value })} />
+              {(newCustomer.extraPhones || []).map((phone, index) => (
+                <div key={index} className="flex gap-2 items-center">
+                  <Input type="tel" inputMode="tel" placeholder="Altro recapito"
+                    data-testid={`create-customer-extra-phone-${index}`}
+                    value={phone}
+                    onChange={(e) => setNewCustomer({
+                      ...newCustomer,
+                      extraPhones: (newCustomer.extraPhones || []).map((p, i) => (i === index ? e.target.value : p)),
+                    })} />
+                  <Button type="button" variant="ghost" size="sm" className="h-9 w-9 p-0 text-muted-foreground hover:text-destructive"
+                    onClick={() => setNewCustomer({
+                      ...newCustomer,
+                      extraPhones: (newCustomer.extraPhones || []).filter((_, i) => i !== index),
+                    })}>
+                    <XCircle className="w-4 h-4" />
+                  </Button>
+                </div>
+              ))}
+              <Button type="button" variant="outline" size="sm" className="w-fit h-8 text-xs"
+                data-testid="add-customer-phone"
+                onClick={() => setNewCustomer({
+                  ...newCustomer,
+                  extraPhones: [...(newCustomer.extraPhones || []), ''],
+                })}>
+                <Plus className="w-3 h-3 mr-1" />Aggiungi numero
+              </Button>
               <Label htmlFor="qc-notes">Note (opzionale)</Label>
               <Input id="qc-notes"
                 placeholder="Es: anziano, citofonare al cancello"

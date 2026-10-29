@@ -3,6 +3,7 @@ import { MapPin, Loader2 } from 'lucide-react';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { ensureArray } from '@/lib/collections';
+import { API } from '@/lib/config';
 
 const GOOGLE_KEY = import.meta.env.VITE_GOOGLE_MAPS_KEY || '';
 const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/search';
@@ -150,26 +151,17 @@ async function fetchGoogleDetails(prediction) {
 }
 
 async function fetchNominatim(val) {
-  const params = new URLSearchParams({ format: 'json', limit: '6', addressdetails: '1', countrycodes: 'it', q: val });
-  const res = await fetch(`${NOMINATIM_URL}?${params}`, {
-    headers: { 'Accept-Language': 'it', Accept: 'application/json' },
-  });
-  const data = await res.json();
-  return (Array.isArray(data) ? data : []).map((item) => {
-    const road = item.address?.road || '';
-    const num = item.address?.house_number || '';
-    const city = item.address?.city || item.address?.town || item.address?.village || item.address?.municipality || '';
-    const postcode = item.address?.postcode || '';
-    const mainText = road ? `${road}${num ? ' ' + num : ''}` : item.display_name.split(',')[0];
-    return {
-      place_id: String(item.place_id),
-      description: item.display_name,
-      structured_formatting: { main_text: mainText, secondary_text: [city, postcode].filter(Boolean).join(', ') },
-      lat: parseFloat(item.lat),
-      lng: parseFloat(item.lon),
-      _nominatim: true,
-    };
-  });
+  // Backend unico: unisce OpenStreetMap e Photon, che trova più civici in Italia
+  try {
+    const res = await fetch(`${API}/geocode/search?q=${encodeURIComponent(val)}&limit=6`, {
+      headers: { Accept: 'application/json' },
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return ensureArray(data).map((item) => ({ ...item, _nominatim: true }));
+  } catch {
+    return [];
+  }
 }
 
 export default function AddressAutocomplete({
