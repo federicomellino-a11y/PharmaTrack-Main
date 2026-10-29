@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import { API } from '@/lib/config';
 import { requestWithOfflineQueue } from '@/lib/offlineQueue';
+import { queuePhoto, flushQueuedPhotos } from '@/lib/offlinePhotos';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import { Card, CardContent } from '../../components/ui/card';
@@ -76,6 +77,16 @@ export default function DriverDeliveryDetail() {
     }
   };
 
+  useEffect(() => {
+    let cancelled = false;
+    flushQueuedPhotos(API).then((res) => {
+      if (cancelled || res.uploaded === 0) return;
+      toast.success(`${res.uploaded} foto in coda caricate`);
+      fetchDelivery();
+    });
+    return () => { cancelled = true; };
+  }, []);
+
   const updateStatus = async (newStatus) => {
     setUpdating(true);
     try {
@@ -122,8 +133,19 @@ export default function DriverDeliveryDetail() {
       setPhotoUrl(data.cloudinary_url || data.secure_url || 'ok');
       toast.success('Foto di consegna caricata');
     } catch (err) {
-      toast.error(err.response?.data?.detail || 'Errore caricamento foto');
-      setPhotoPreview(null);
+      if (!err.response) {
+        try {
+          await queuePhoto(file, deliveryId);
+          setPhotoUrl('queued');
+          toast.success('Foto salvata sul telefono: si carica appena torna la rete');
+        } catch {
+          toast.error('Rete assente e memoria non disponibile: riprova con connessione');
+          setPhotoPreview(null);
+        }
+      } else {
+        toast.error(err.response?.data?.detail || 'Errore caricamento foto');
+        setPhotoPreview(null);
+      }
     } finally { setPhotoUploading(false); }
   };
 

@@ -52,3 +52,9 @@ async def get_push_config():
         "public_key": VAPID_PUBLIC_KEY if push_notifications_enabled() else None,
         "subject": VAPID_SUBJECT if push_notifications_enabled() else None,
     }
+
+@router.get("/monitoring/config")
+async def monitoring_config():
+    """DSN pubblico per gli errori del browser (Sentry lo considera non segreto)."""
+    dsn = (os.getenv("SENTRY_DSN") or "").strip()
+    return {"sentry_dsn": dsn or None, "enabled": bool(dsn)}

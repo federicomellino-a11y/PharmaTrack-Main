@@ -187,6 +187,78 @@ async def create_delivery(delivery: DeliveryCreate, user: dict = Depends(get_cur
         await create_notification_internal(assigned_driver["driver_id"], "driver", "Nuova consegna assegnata", f"Hai una nuova consegna per {delivery_data['customer_name']}", "delivery", {"delivery_id": delivery_data["delivery_id"]})
     return {k: v for k, v in delivery_data.items() if k != "_id"}
 
+ROME_CENTROID = (41.9028, 12.4964)
+
+
+def _coords_need_repair(lat, lng) -> bool:
+    """True se mancano o sono il centro citta' usato come ripiego."""
+    if lat is None or lng is None:
+        return True
+    try:
+        return abs(float(lat) - ROME_CENTROID[0]) < 0.001 and abs(float(lng) - ROME_CENTROID[1]) < 0.001
+    except (TypeError, ValueError):
+        return True
+
+
+@router.post("/deliveries/repair-coordinates")
+async def repair_delivery_coordinates(user: dict = Depends(get_current_user)):
+    """Ricalcola le coordinate delle consegne ancora aperte, una per una.
+
+    Serve dopo aver corretto l'indirizzo di un cliente: le consegne gia' create
+    conservano le coordinate copiate al momento dell'inserimento.
+    """
+    from app.routers.geocode import geocode_resolve
+
+    query = {"pharmacy_id": user["user_id"], "status": {"$nin": ["delivered", "cancelled"]}}
+    cursor = db.deliveries.find(
+        query,
+        {"_id": 0, "delivery_id": 1, "customer_address": 1, "customer_lat": 1, "customer_lng": 1},
+    )
+
+    checked = 0
+    fixed = 0
+    failed: List[str] = []
+
+    async for delivery in cursor:
+        address = (delivery.get("customer_address") or "").strip()
+        if not address:
+            continue
+        if not _coords_need_repair(delivery.get("customer_lat"), delivery.get("customer_lng")):
+            continue
+
+        checked += 1
+        try:
+            resolved = await geocode_resolve(address=address)
+        except Exception:
+            logger.exception("Riparazione coordinate fallita per %s", address)
+            failed.append(address)
+            continue
+
+        new_lat = resolved.get("lat") if isinstance(resolved, dict) else None
+        new_lng = resolved.get("lng") if isinstance(resolved, dict) else None
+        if new_lat is None or new_lng is None:
+            failed.append(address)
+            continue
+
+        await db.deliveries.update_one(
+            {"delivery_id": delivery["delivery_id"], "pharmacy_id": user["user_id"]},
+            {"$set": {
+                "customer_lat": new_lat,
+                "customer_lng": new_lng,
+                "coordinates_repaired_at": datetime.now(timezone.utc).isoformat(),
+            }},
+        )
+        fixed += 1
+
+    logger.info("Riparazione coordinate: controllate %s, corrette %s, fallite %s", checked, fixed, len(failed))
+    return {
+        "checked": checked,
+        "fixed": fixed,
+        "failed_count": len(failed),
+        "failed_addresses": failed[:10],
+    }
+
+
 @router.get("/deliveries/{delivery_id}")
 async def get_delivery(delivery_id: str, user: dict = Depends(get_current_user)):
     delivery = await db.deliveries.find_one({"delivery_id": delivery_id, "pharmacy_id": user["user_id"]}, {"_id": 0})
