@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ensureArray } from '@/lib/collections';
+import { flushOfflineQueue, getPendingCount } from '@/lib/offlineQueue';
 
 const LOCATION_DISTANCE_THRESHOLD = 0.00005;
 const LOCATION_MIN_INTERVAL = 15000;
@@ -28,6 +29,48 @@ export default function DriverDashboard() {
   const [shiftLoading, setShiftLoading] = useState(false);
   const watchIdRef = useRef(null);
   const lastSentLocationRef = useRef(null);
+  const [pendingSync, setPendingSync] = useState(getPendingCount());
+  const [online, setOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
+
+  const syncPending = useCallback(async () => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      setPendingSync(getPendingCount());
+      return { synced: 0, dropped: 0, remaining: getPendingCount() };
+    }
+    const result = await flushOfflineQueue(axios);
+    setPendingSync(result.remaining);
+    if (result.synced > 0) {
+      toast.success(`${result.synced} aggiornament${result.synced === 1 ? 'o' : 'i'} sincronizzat${result.synced === 1 ? 'o' : 'i'}`);
+      fetchDeliveries();
+    }
+    return result;
+  }, []);
+
+  useEffect(() => {
+    syncPending();
+
+    const handleOnline = () => {
+      setOnline(true);
+      syncPending();
+    };
+    const handleOffline = () => {
+      setOnline(false);
+      setPendingSync(getPendingCount());
+      toast.info('Sei offline: le operazioni restano in coda e partono al ritorno della rete');
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    const timer = setInterval(() => {
+      if (navigator.onLine) syncPending();
+    }, 60000);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+      clearInterval(timer);
+    };
+  }, [syncPending]);
 
   useEffect(() => {
     fetchDeliveries();

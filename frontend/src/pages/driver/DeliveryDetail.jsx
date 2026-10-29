@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import { API } from '@/lib/config';
+import { requestWithOfflineQueue } from '@/lib/offlineQueue';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import { Card, CardContent } from '../../components/ui/card';
@@ -78,18 +79,24 @@ export default function DriverDeliveryDetail() {
   const updateStatus = async (newStatus) => {
     setUpdating(true);
     try {
-      await axios.put(`${API}/driver/deliveries/${deliveryId}/status`, 
-        { status: newStatus },
-        { withCredentials: true }
-      );
-      
+      const result = await requestWithOfflineQueue(axios, {
+        method: 'put',
+        url: `${API}/driver/deliveries/${deliveryId}/status`,
+        data: { status: newStatus },
+        label: `Stato consegna: ${newStatus}`,
+      });
+
       const statusMessages = {
         picked_up: 'Consegna ritirata',
         in_transit: 'In consegna',
         delivered: 'Consegna completata!'
       };
-      
-      toast.success(statusMessages[newStatus]);
+
+      if (result.queued) {
+        toast.success('Sei offline: aggiornamento salvato, sincronizzo appena torna la rete');
+      } else {
+        toast.success(statusMessages[newStatus]);
+      }
       
       if (newStatus === 'delivered') {
         navigate('/driver');
