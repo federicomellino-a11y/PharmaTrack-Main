@@ -235,6 +235,13 @@ async def resend_verification(request: Request, user: dict = Depends(get_current
     return {"message": "Email di verifica inviata"}
 
 
+@router.get("/auth/google/config")
+async def google_config():
+    """Client ID pubblico: il frontend lo usa per 'Continua con Google'."""
+    client_id = os.environ.get("GOOGLE_CLIENT_ID") or os.environ.get("VITE_GOOGLE_CLIENT_ID") or ""
+    return {"client_id": client_id, "enabled": bool(client_id)}
+
+
 @router.post("/auth/google")
 async def google_auth(data: GoogleAuthRequest, response: Response):
     import urllib.request

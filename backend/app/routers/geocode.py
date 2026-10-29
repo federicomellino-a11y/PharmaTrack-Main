@@ -261,13 +261,14 @@ async def geocode_resolve(address: str = Query(..., min_length=3)) -> Dict[str, 
                 google_attempts.append(f"{street}, {city}")
             if city:
                 google_attempts.append(city)
+            best_google = None
             for candidate in google_attempts:
                 found = await _google_geocode(client, candidate)
                 if found and (found.get("precision") == "civico" or candidate == google_attempts[-1]):
                     return found
                 if found:
                     best_google = found  # memorizza il fallback migliore
-            if 'best_google' in dir() and best_google:
+            if best_google:
                 return best_google
 
         for precision, provider, params in attempts:

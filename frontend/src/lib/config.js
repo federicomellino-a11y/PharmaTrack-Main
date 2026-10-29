@@ -31,3 +31,8 @@ axios.interceptors.response.use(
   }
 );
 
+
+// Warm-up: sveglia il backend mentre l'utente e' ancora su landing/login
+if (typeof window !== 'undefined') {
+  setTimeout(() => { fetch(`${API}/health`).catch(() => {}); }, 0);
+}
