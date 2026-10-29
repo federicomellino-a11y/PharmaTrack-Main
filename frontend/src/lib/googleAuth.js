@@ -90,11 +90,26 @@ export function setGoogleCredentialCallback(cb) {
   }
 }
 
-export function promptGoogleSignIn(onNotDisplayed) {
+export function promptGoogleSignIn(onNotDisplayed, onIssue) {
   if (!window.google?.accounts?.id) return;
   window.google.accounts.id.prompt((notification) => {
-    if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-      if (onNotDisplayed) onNotDisplayed();
-    }
+    const notDisplayed = notification.isNotDisplayed?.() || false;
+    const skipped = notification.isSkippedMoment?.() || false;
+    if (!notDisplayed && !skipped) return;
+
+    const reason = String(
+      notification.getNotDisplayedReason?.() || notification.getSkippedMomentReason?.() || ''
+    );
+    if (onNotDisplayed) onNotDisplayed(reason);
+    if (onIssue && /origin|client|invalid|unregistered|mismatch/i.test(reason)) onIssue(reason);
   });
+}
+
+/**
+ * Google blocca il popup se l'origine corrente non è registrata sul client OAuth
+ * (errore 400 origin_mismatch). Esponiamo l'origine da copiare nelle istruzioni.
+ */
+export function currentOrigin() {
+  if (typeof window === 'undefined') return '';
+  return window.location.origin;
 }

@@ -7,9 +7,9 @@ import { Label } from '../components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { isGoogleConfigured, loadGoogleSignIn, setGoogleCredentialCallback, promptGoogleSignIn } from '@/lib/googleAuth';
+import { isGoogleConfigured, loadGoogleSignIn, setGoogleCredentialCallback, promptGoogleSignIn, currentOrigin } from '@/lib/googleAuth';
 
-function GoogleSignInButton({ onCredential, label = 'Continua con Google' }) {
+function GoogleSignInButton({ onCredential, onIssue, label = 'Continua con Google' }) {
   const [loading, setLoading] = useState(false);
   const [ready, setReady] = useState(false);
 
@@ -31,7 +31,13 @@ function GoogleSignInButton({ onCredential, label = 'Continua con Google' }) {
       onClick={() => {
         if (!ready) { toast.error('Libreria Google non ancora pronta. Riprova.'); return; }
         setLoading(true);
-        promptGoogleSignIn(() => setLoading(false));
+        promptGoogleSignIn(
+          () => setLoading(false),
+          (reason) => {
+            setLoading(false);
+            if (onIssue) onIssue(reason);
+          },
+        );
       }}
       disabled={loading}
     >
@@ -48,6 +54,7 @@ function GoogleSignInButton({ onCredential, label = 'Continua con Google' }) {
 
 export default function LoginPage() {
   const { user, login, loginWithGoogle } = useAuth();
+  const [showGoogleHelp, setShowGoogleHelp] = useState(false);
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -105,7 +112,52 @@ export default function LoginPage() {
           <CardContent className="space-y-4">
             {isGoogleConfigured() && (
               <>
-                <GoogleSignInButton onCredential={handleGoogleCredential} label="Accedi con Google" />
+                <GoogleSignInButton
+                  onCredential={handleGoogleCredential}
+                  onIssue={() => setShowGoogleHelp(true)}
+                  label="Accedi con Google"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowGoogleHelp((prev) => !prev)}
+                  className="w-full text-center text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
+                >
+                  Problemi con il login Google?
+                </button>
+                {showGoogleHelp && (
+                  <div
+                    data-testid="google-origin-help"
+                    className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-900 dark:text-amber-200 space-y-2"
+                  >
+                    <p className="font-semibold">Errore 400 origin_mismatch</p>
+                    <p>
+                      Google accetta il popup solo se l'indirizzo del sito è fra le
+                      <b> Origini JavaScript autorizzate</b> del client OAuth. Aggiungi:
+                    </p>
+                    <code className="block break-all rounded-md bg-background/70 px-2 py-1 font-mono text-[11px]">{currentOrigin()}</code>
+                    <p>
+                      Google Cloud Console → API e servizi → Credenziali → il tuo client OAuth →
+                      Origini JavaScript autorizzate → incolla l'indirizzo → Salva. Le modifiche
+                      possono richiedere qualche minuto.
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs"
+                      onClick={async () => {
+                        try {
+                          await navigator.clipboard.writeText(currentOrigin());
+                          toast.success('Origine copiata: incollala su Google Cloud');
+                        } catch {
+                          window.prompt('Copia questa origine', currentOrigin());
+                        }
+                      }}
+                    >
+                      Copia origine
+                    </Button>
+                  </div>
+                )}
                 <div className="relative">
                   <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-border" /></div>
                   <div className="relative flex justify-center text-xs uppercase">
