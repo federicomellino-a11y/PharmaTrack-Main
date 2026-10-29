@@ -1,81 +1,77 @@
-"""Geocodifica con fallback progressivo per indirizzi italiani.
+"""Geocodifica di riserva con fallback progressivo (Nominatim + Photon).
 
-Google Places a volte non restituisce coordinate per civici in comuni piccoli
-(es. Volla, NA). Qui si prova prima l'indirizzo completo, poi senza civico,
-poi solo comune: si ottiene comunque un punto utile per la mappa e il tracking.
+Usata quando il client non ha coordinate: OSM in Italia spesso non ha il
+civico, quindi si prova il civico strutturato, poi Photon, poi la via, poi il
+comune. Non solleva mai eccezioni: al massimo ritorna (None, None).
 """
 import logging
 import re
-from typing import List, Optional, Tuple
+from typing import Optional, Tuple
 
 import httpx
 
 logger = logging.getLogger(__name__)
 
 NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
+PHOTON_URL = "https://photon.komoot.io/api/"
 HEADERS = {
     "User-Agent": "PharmaTrack/1.0 (gestionale consegne farmacie)",
     "Accept-Language": "it",
 }
-TIMEOUT = 6.0
+TIMEOUT = 8.0
 
 
-def _variants(address: str) -> List[str]:
-    """Indirizzo completo, poi senza civico, poi solo comune."""
-    addr = (address or "").strip()
+def _split(address: str):
+    addr = re.sub(r"\s{2,}", " ", (address or "").strip())
     if not addr:
-        return []
-
-    out: List[str] = [addr]
-
-    # 1) senza civico: rimuove numeri isolati (es. "Via Roma 5, Volla" -> "Via Roma, Volla")
-    no_civic = re.sub(r"\b\d{1,4}\s?[a-zA-Z]?\b", " ", addr)
-    no_civic = re.sub(r"\s{2,}", " ", no_civic)
-    no_civic = re.sub(r"\s+,", ",", no_civic).strip(" ,")
-    if no_civic and no_civic not in out:
-        out.append(no_civic)
-
-    # 2) solo comune: ultimo segmento utile ("Volla, NA" / "Volla")
-    parts = [p.strip() for p in re.split(r"[,\-]", addr) if p.strip()]
-    for candidate in reversed(parts):
-        if candidate and not re.fullmatch(r"[\d\s/]+", candidate) and len(candidate) > 2:
-            if candidate not in out:
-                out.append(candidate)
-            break
-
-    return out
+        return None, None, None
+    parts = [p.strip() for p in addr.split(",") if p.strip()]
+    street_part = parts[0] if parts else addr
+    city_part = parts[-1] if len(parts) > 1 else ""
+    m = re.match(r"^(.*?)[,\s]+(\d{1,4}[a-zA-Z]?)$", street_part)
+    if m:
+        street, civic = m.group(1).strip(), m.group(2)
+    else:
+        street, civic = street_part, None
+    city = re.sub(r"\(?\b[A-Z]{2}\b\)?", "", city_part).strip(" ,()")
+    return (street or None), civic, (city or None)
 
 
 async def ensure_coords(address: Optional[str]) -> Tuple[Optional[float], Optional[float]]:
-    """Ritorna (lat, lng) per l'indirizzo, oppure (None, None) senza sollevare errori."""
-    queries = _variants(address or "")
-    if not queries:
+    """(lat, lng) per l'indirizzo, con la miglior precisione disponibile."""
+    street, civic, city = _split(address or "")
+    if not (street or city):
         return None, None
 
+    attempts = []
+    if street and civic and city:
+        attempts.append(("civico", NOMINATIM_URL, {"street": f"{civic} {street}", "city": city, "format": "json", "limit": 1, "countrycodes": "it"}))
+    attempts.append(("indirizzo", NOMINATIM_URL, {"q": address, "format": "json", "limit": 1, "countrycodes": "it"}))
+    if street and city:
+        attempts.append(("via", NOMINATIM_URL, {"street": street, "city": city, "format": "json", "limit": 1, "countrycodes": "it"}))
+    attempts.append(("indirizzo", PHOTON_URL, {"q": address, "limit": 1, "lang": "it"}))
+    if street and city:
+        attempts.append(("via", PHOTON_URL, {"q": f"{street} {city}", "limit": 1, "lang": "it"}))
+    if city:
+        attempts.append(("comune", NOMINATIM_URL, {"q": city, "format": "json", "limit": 1, "countrycodes": "it"}))
+
     async with httpx.AsyncClient(timeout=TIMEOUT, headers=HEADERS) as client:
-        for i, query in enumerate(queries):
+        for precision, url, params in attempts:
             try:
-                res = await client.get(NOMINATIM_URL, params={
-                    "q": query, "format": "json", "limit": 1,
-                    "addressdetails": 0, "countrycodes": "it",
-                })
+                res = await client.get(url, params=params)
                 if res.status_code != 200:
                     continue
                 data = res.json()
-                if not data:
-                    continue
-                lat = float(data[0]["lat"])
-                lng = float(data[0]["lon"])
-                logger.info("Geocode '%s' -> %.5f, %.5f (variante %d)", query, lat, lng, i)
-                return lat, lng
-            except Exception as exc:  # noqa: BLE001 — la geocodifica non deve mai bloccare
-                logger.warning("Geocode fallito per '%s': %s", query, exc)
-            # rispetto del rate limit pubblico Nominatim (1 req/s)
-            await _sleep()
-    logger.info("Nessuna coordinata trovata per '%s'", address)
+                if url == NOMINATIM_URL:
+                    if data:
+                        return float(data[0]["lat"]), float(data[0]["lon"])
+                else:
+                    features = (data or {}).get("features") or []
+                    if features:
+                        coords = (features[0].get("geometry") or {}).get("coordinates") or []
+                        if len(coords) >= 2:
+                            return float(coords[1]), float(coords[0])
+            except Exception as exc:  # noqa: BLE001 — non bloccare mai il salvataggio
+                logger.warning("Geocode %s fallito per '%s': %s", precision, address, exc)
+    logger.info("Nessuna coordinata per '%s'", address)
     return None, None
-
-
-async def _sleep() -> None:
-    import asyncio
-    await asyncio.sleep(1.0)

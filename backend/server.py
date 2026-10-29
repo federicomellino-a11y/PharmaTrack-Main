@@ -1,5 +1,6 @@
 import os
 import logging
+import uuid
 from datetime import datetime, timezone
 
 from fastapi import FastAPI, APIRouter, WebSocket, WebSocketDisconnect
@@ -85,11 +86,12 @@ _ROUTER_TAGS = {
     "analytics": "analytics",
 }
 api_router = APIRouter(prefix="/api")
+from app.routers import geocode as geocode_router  # noqa: E402
 for module in [
     health, pharmacy_auth, admin, driver_auth, customers, drivers,
     deliveries, driver_deliveries, messages, notifications, statistics,
     archive, doctors, useful_numbers, notes, reports, integrations, shifts,
-    analytics, photos,
+    analytics, photos, geocode_router,
 ]:
     tag = _ROUTER_TAGS.get(module.__name__.split(".")[-1])
     api_router.include_router(module.router, tags=[tag] if tag else None)
@@ -188,6 +190,51 @@ async def setup_indexes():
 
         await collection.delete_many({"expires_at": {"$lt": now}})
         await safe_create_index(collection, [("expires_at", pymongo.ASCENDING)], expireAfterSeconds=0, name=f"{collection.name}_expires_ttl", background=True)
+
+    # ── Chat: thread multipli per farmacia/fattorino ──
+    await safe_create_index(db.chat_threads, [("pharmacy_id", pymongo.ASCENDING), ("driver_id", pymongo.ASCENDING), ("status", pymongo.ASCENDING), ("created_at", pymongo.DESCENDING)], name="chat_threads_pair_idx", background=True)
+    await safe_create_index(db.chat_threads, [("conversation_id", pymongo.ASCENDING)], unique=True, name="chat_threads_id_idx", background=True)
+    await safe_create_index(db.messages, [("pharmacy_id", pymongo.ASCENDING), ("driver_id", pymongo.ASCENDING), ("conversation_id", pymongo.ASCENDING), ("created_at", pymongo.ASCENDING)], name="messages_thread_idx", background=True)
+    await safe_create_index(db.messages, [("conversation_id", pymongo.ASCENDING)], name="messages_conv_idx", background=True)
+    await safe_create_index(db.photo_files, [("photo_id", pymongo.ASCENDING)], unique=True, name="photo_files_id_idx", background=True)
+
+    # Migrazione: i messaggi vecchi senza thread vengono agganciati a una chat
+    # aperta per la loro coppia farmacia/fattorino (idempotente).
+    try:
+        pairs = await db.messages.distinct("pharmacy_id", {"conversation_id": {"$exists": False}})
+        fixed = 0
+        for pharmacy_id in pairs:
+            driver_ids = await db.messages.distinct("driver_id", {"pharmacy_id": pharmacy_id, "conversation_id": {"$exists": False}})
+            for driver_id in driver_ids:
+                if not driver_id:
+                    continue
+                thread = await db.chat_threads.find_one(
+                    {"pharmacy_id": pharmacy_id, "driver_id": driver_id, "status": "open"},
+                    {"_id": 0}, sort=[("created_at", -1)],
+                )
+                if not thread:
+                    now = datetime.now(timezone.utc).isoformat()
+                    thread = {
+                        "conversation_id": f"chat_{uuid.uuid4().hex[:12]}",
+                        "pharmacy_id": pharmacy_id, "driver_id": driver_id,
+                        "number": 1, "title": None, "status": "open",
+                        "created_at": now, "last_message_at": None, "last_message": None,
+                    }
+                    await db.chat_threads.insert_one(dict(thread))
+                result = await db.messages.update_many(
+                    {"pharmacy_id": pharmacy_id, "driver_id": driver_id, "conversation_id": {"$exists": False}},
+                    {"$set": {"conversation_id": thread["conversation_id"]}},
+                )
+                fixed += result.modified_count
+        if fixed:
+            logger.info("Migrazione chat: %d messaggi agganciati a un thread", fixed)
+        # pulizia: thread vuoti e chiusi
+        async for thread in db.chat_threads.find({"status": "closed"}, {"_id": 1, "conversation_id": 1}):
+            has_message = await db.messages.count_documents({"conversation_id": thread["conversation_id"]}, limit=1)
+            if not has_message:
+                await db.chat_threads.delete_one({"_id": thread["_id"]})
+    except Exception as exc:  # noqa: BLE001 — la migrazione non deve impedire l'avvio
+        logger.warning("Migrazione chat non completata: %s", exc)
 
     # ── Sessions ──
     await safe_create_index(db.user_sessions, [("session_token", pymongo.ASCENDING)], unique=True, name="session_token_idx", background=True)

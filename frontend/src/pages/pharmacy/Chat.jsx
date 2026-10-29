@@ -70,6 +70,7 @@ export default function ChatPage() {
   const [loadingList, setLoadingList] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [sending, setSending] = useState(false);
+  const [threadClosed, setThreadClosed] = useState(false);
   const messagesEndRef = useRef(null);
   const processedMessageIdsRef = useRef(new Set());
 
@@ -247,6 +248,10 @@ export default function ChatPage() {
         return [nextConversation, ...safePrev];
       });
       setNewMessage('');
+      if (threadClosed) {
+        setMessages([]);
+        setThreadClosed(false);
+      }
     } catch {
       toast.error('Errore invio messaggio');
     } finally {
@@ -260,6 +265,7 @@ export default function ChatPage() {
       await axios.post(`${API}/messages/${driverId}/new-chat`, {}, { withCredentials: true });
       setMessages([]);
       setNewMessage('');
+      setThreadClosed(false);
       toast.success('Nuova chat aperta');
       fetchMessages(driverId);
     } catch {
@@ -271,9 +277,9 @@ export default function ChatPage() {
     if (!driverId) return;
     try {
       await axios.put(`${API}/messages/${driverId}/close-chat`, {}, { withCredentials: true });
-      setMessages([]);
       setNewMessage('');
-      toast.success('Chat chiusa. Il prossimo messaggio ne apre una nuova.');
+      setThreadClosed(true);
+      toast.success('Chat chiusa: la conversazione resta leggibile. Il prossimo messaggio apre una chat nuova.');
     } catch {
       toast.error('Impossibile chiudere la chat');
     }
@@ -308,6 +314,11 @@ export default function ChatPage() {
               <button type="button" onClick={handleCloseChat}
                 className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-secondary transition-colors"
                 data-testid="chat-close-button">Chiudi chat</button>
+              {threadClosed && (
+                <span className="self-center rounded-lg bg-amber-500/10 px-2 py-1 text-[11px] font-medium text-amber-700">
+                  Chiusa
+                </span>
+              )}
             </div>
           )}
           <Badge variant={connected ? 'secondary' : 'outline'} className="w-fit gap-2 px-3 py-1">
