@@ -1,11 +1,38 @@
-const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
+import { API } from '@/lib/config';
+
+// La chiave pubblica arriva dal backend (/api/auth/google/config): cosi' non
+// serve ricostruire il frontend quando cambia il Client ID OAuth.
+const STORAGE_KEY = 'pt_google_client_id';
+let GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
 
 let _initialized = false;
 let _callback = null;
 let _loadPromise = null;
 
+async function fetchGoogleClientId() {
+  if (GOOGLE_CLIENT_ID) return GOOGLE_CLIENT_ID;
+  try {
+    const cached = window.localStorage?.getItem(STORAGE_KEY);
+    if (cached) {
+      GOOGLE_CLIENT_ID = cached;
+      return GOOGLE_CLIENT_ID;
+    }
+  } catch { /* storage non disponibile */ }
+  try {
+    const res = await fetch(`${API}/auth/google/config`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data?.client_id) {
+        GOOGLE_CLIENT_ID = data.client_id;
+        try { window.localStorage?.setItem(STORAGE_KEY, data.client_id); } catch { /* ignora */ }
+      }
+    }
+  } catch { /* backend non raggiungibile */ }
+  return GOOGLE_CLIENT_ID;
+}
+
 function _runInitialize() {
-  if (!window.google?.accounts?.id) return;
+  if (!window.google?.accounts?.id || !GOOGLE_CLIENT_ID) return;
   window.google.accounts.id.initialize({
     client_id: GOOGLE_CLIENT_ID,
     callback: (res) => {
@@ -22,27 +49,31 @@ export function isGoogleConfigured() {
 }
 
 export function loadGoogleSignIn() {
-  if (!GOOGLE_CLIENT_ID) return Promise.resolve(false);
   if (_loadPromise) return _loadPromise;
 
-  _loadPromise = new Promise((resolve) => {
+  _loadPromise = (async () => {
+    if (!(await fetchGoogleClientId())) return false;
     if (window.google?.accounts?.id) {
       _runInitialize();
-      return resolve(true);
+      return true;
     }
     const existing = document.querySelector('script[src*="accounts.google.com/gsi/client"]');
     if (existing) {
-      existing.addEventListener('load', () => { _runInitialize(); resolve(true); });
-      return;
+      return new Promise((resolve) => {
+        existing.addEventListener('load', () => { _runInitialize(); resolve(true); });
+        if (window.google?.accounts?.id) { _runInitialize(); resolve(true); }
+      });
     }
-    const s = document.createElement('script');
-    s.src = 'https://accounts.google.com/gsi/client';
-    s.async = true;
-    s.defer = true;
-    s.onload = () => { _runInitialize(); resolve(true); };
-    s.onerror = () => resolve(false);
-    document.head.appendChild(s);
-  });
+    return new Promise((resolve) => {
+      const s = document.createElement('script');
+      s.src = 'https://accounts.google.com/gsi/client';
+      s.async = true;
+      s.defer = true;
+      s.onload = () => { _runInitialize(); resolve(true); };
+      s.onerror = () => resolve(false);
+      document.head.appendChild(s);
+    });
+  })();
 
   return _loadPromise;
 }

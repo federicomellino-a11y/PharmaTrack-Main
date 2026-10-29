@@ -4,6 +4,24 @@ import { API } from '@/lib/config';
 
 const AuthContext = createContext(null);
 
+const USER_CACHE_KEY = 'pt_user_cache';
+
+const readCachedUser = () => {
+  try {
+    const raw = window.localStorage?.getItem(USER_CACHE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
+
+const writeCachedUser = (value) => {
+  try {
+    if (value) window.localStorage?.setItem(USER_CACHE_KEY, JSON.stringify(value));
+    else window.localStorage?.removeItem(USER_CACHE_KEY);
+  } catch { /* storage non disponibile */ }
+};
+
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) throw new Error('useAuth must be used within an AuthProvider');
@@ -11,18 +29,20 @@ export const useAuth = () => {
 };
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState(() => readCachedUser());
+  const [loading, setLoading] = useState(() => !readCachedUser());
   const [error, setError] = useState(null);
 
   const checkAuth = useCallback(async () => {
     try {
       const response = await axios.get(`${API}/auth/me`, { withCredentials: true });
       setUser(response.data);
+      writeCachedUser(response.data);
       setError(null);
     } catch (err) {
       setUser(null);
-      if (err.response?.status !== 401) setError('Errore di connessione');
+      if (err.response?.status === 401) writeCachedUser(null);
+      else setError('Errore di connessione');
     } finally {
       setLoading(false);
     }
