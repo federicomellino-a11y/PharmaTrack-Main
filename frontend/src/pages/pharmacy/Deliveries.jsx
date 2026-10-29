@@ -628,9 +628,6 @@ export default function DeliveriesPage() {
                             <Clock className="w-3 h-3" />{formatDate(d.created_at)}
                           </span>
                         </div>
-                        {d.nre && (
-                          <p className="text-xs text-muted-foreground mt-0.5">🧾 NRE: {d.nre}</p>
-                        )}
                         {d.notes && (
                           <p className="text-xs text-muted-foreground mt-1.5 bg-secondary/40 rounded-lg px-2.5 py-1.5 italic">
                             📝 {d.notes}
@@ -935,11 +932,6 @@ export default function DeliveriesPage() {
               </div>
             </div>
 
-            <div className="form-group">
-              <Label>NRE (ricetta elettronica) — opzionale</Label>
-              <Input placeholder="Numero ricetta" value={form.nre || ''}
-                onChange={e => setForm({ ...form, nre: e.target.value })} maxLength={40} />
-            </div>
 
             <DialogFooter className="gap-2">
               <Button type="button" variant="outline" onClick={() => { setDialogOpen(false); resetForm(); }}>

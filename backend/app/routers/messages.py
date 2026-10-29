@@ -29,6 +29,32 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+async def _open_thread(pharmacy_id: str, driver_id: str) -> dict:
+    """Chat aperta per la coppia farmacia/fattorino, creata se non esiste."""
+    thread = await db.chat_threads.find_one(
+        {"pharmacy_id": pharmacy_id, "driver_id": driver_id, "status": "open"},
+        {"_id": 0}, sort=[("created_at", -1)],
+    )
+    if thread:
+        return thread
+    count = await db.chat_threads.count_documents({"pharmacy_id": pharmacy_id, "driver_id": driver_id})
+    now = datetime.now(timezone.utc).isoformat()
+    thread = {
+        "conversation_id": f"chat_{uuid.uuid4().hex[:12]}",
+        "pharmacy_id": pharmacy_id, "driver_id": driver_id,
+        "number": count + 1, "title": None, "status": "open",
+        "created_at": now, "last_message_at": None, "last_message": None,
+    }
+    await db.chat_threads.insert_one(dict(thread))
+    # i messaggi storici senza thread appartengono alla prima chat
+    if count == 0:
+        await db.messages.update_many(
+            {"pharmacy_id": pharmacy_id, "driver_id": driver_id, "conversation_id": {"$exists": False}},
+            {"$set": {"conversation_id": thread["conversation_id"]}},
+        )
+    return thread
+
+
 @router.get("/messages/conversations")
 async def get_message_conversations(user: dict = Depends(get_current_user)):
     drivers = await db.drivers.find({"pharmacy_id": user["user_id"]}, {"_id": 0, "password_hash": 0}).sort("name", 1).to_list(200)
@@ -76,10 +102,51 @@ async def mark_messages_read(driver_id: str, user: dict = Depends(get_current_us
     )
     return {"updated": result.modified_count}
 
+@router.get("/messages/{driver_id}/history")
+async def get_chat_history(driver_id: str, user: dict = Depends(get_current_user)):
+    threads = await db.chat_threads.find(
+        {"pharmacy_id": user["user_id"], "driver_id": driver_id}, {"_id": 0}
+    ).sort("created_at", -1).to_list(100)
+    return threads
+
+
+@router.post("/messages/{driver_id}/new-chat")
+async def open_new_chat(driver_id: str, user: dict = Depends(get_current_user)):
+    """Chiude la chat attiva e ne apre una nuova (stesso fattorino)."""
+    driver = await db.drivers.find_one({"driver_id": driver_id, "pharmacy_id": user["user_id"]}, {"_id": 0, "driver_id": 1})
+    if not driver:
+        raise HTTPException(status_code=404, detail="Fattorino non trovato")
+    now = datetime.now(timezone.utc).isoformat()
+    await db.chat_threads.update_many(
+        {"pharmacy_id": user["user_id"], "driver_id": driver_id, "status": "open"},
+        {"$set": {"status": "closed", "closed_at": now}},
+    )
+    thread = await _open_thread(user["user_id"], driver_id)
+    return thread
+
+
+@router.put("/messages/{driver_id}/close-chat")
+async def close_chat(driver_id: str, user: dict = Depends(get_current_user)):
+    """Chiude la chat attiva: il prossimo messaggio ne apre una nuova."""
+    now = datetime.now(timezone.utc).isoformat()
+    result = await db.chat_threads.update_many(
+        {"pharmacy_id": user["user_id"], "driver_id": driver_id, "status": "open"},
+        {"$set": {"status": "closed", "closed_at": now}},
+    )
+    return {"closed": result.modified_count}
+
+
 @router.get("/messages/{driver_id}")
 async def get_messages(driver_id: str, user: dict = Depends(get_current_user)):
-    messages = await db.messages.find({"pharmacy_id": user["user_id"], "driver_id": driver_id}, {"_id": 0}).sort("created_at", 1).to_list(500)
-    await db.messages.update_many({"pharmacy_id": user["user_id"], "driver_id": driver_id, "sender_type": "driver"}, {"$set": {"is_read": True}})
+    thread = await _open_thread(user["user_id"], driver_id)
+    messages = await db.messages.find(
+        {"pharmacy_id": user["user_id"], "driver_id": driver_id, "conversation_id": thread["conversation_id"]},
+        {"_id": 0},
+    ).sort("created_at", 1).to_list(500)
+    await db.messages.update_many(
+        {"pharmacy_id": user["user_id"], "driver_id": driver_id, "sender_type": "driver", "is_read": False},
+        {"$set": {"is_read": True}},
+    )
     return messages
 
 @router.post("/messages")
@@ -87,14 +154,20 @@ async def send_message(message: MessageCreate, user: dict = Depends(get_current_
     driver = await db.drivers.find_one({"driver_id": message.driver_id, "pharmacy_id": user["user_id"]}, {"_id": 0})
     if not driver:
         raise HTTPException(status_code=404, detail="Fattorino non trovato")
+    thread = await _open_thread(user["user_id"], message.driver_id)
     message_data = {
         "message_id": f"msg_{uuid.uuid4().hex[:12]}",
         "pharmacy_id": user["user_id"], "driver_id": message.driver_id,
+        "conversation_id": thread["conversation_id"],
         "sender_type": "pharmacy", "sender_id": user["user_id"],
         "content": message.content, "is_read": False,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
-    await db.messages.insert_one(message_data)
+    await db.messages.insert_one(dict(message_data))
+    await db.chat_threads.update_one(
+        {"conversation_id": thread["conversation_id"]},
+        {"$set": {"last_message_at": message_data["created_at"], "last_message": message_data["content"]}},
+    )
     await manager.send_personal_message({"type": "new_message", "message": {k: v for k, v in message_data.items() if k != "_id"}}, message.driver_id, "driver")
     return {k: v for k, v in message_data.items() if k != "_id"}
 
@@ -108,7 +181,10 @@ async def mark_driver_messages_read(driver: dict = Depends(get_current_driver)):
 
 @router.get("/driver/messages")
 async def get_driver_messages(driver: dict = Depends(get_current_driver)):
-    messages = await db.messages.find({"driver_id": driver["driver_id"]}, {"_id": 0}).sort("created_at", 1).to_list(500)
+    thread = await _open_thread(driver["pharmacy_id"], driver["driver_id"])
+    messages = await db.messages.find(
+        {"driver_id": driver["driver_id"], "conversation_id": thread["conversation_id"]}, {"_id": 0}
+    ).sort("created_at", 1).to_list(500)
     await db.messages.update_many({"driver_id": driver["driver_id"], "sender_type": "pharmacy"}, {"$set": {"is_read": True}})
     return messages
 
@@ -118,13 +194,19 @@ async def send_driver_message(request: Request, driver: dict = Depends(get_curre
     content = body.get("content")
     if not content:
         raise HTTPException(status_code=400, detail="Content required")
+    thread = await _open_thread(driver["pharmacy_id"], driver["driver_id"])
     message_data = {
         "message_id": f"msg_{uuid.uuid4().hex[:12]}",
         "pharmacy_id": driver["pharmacy_id"], "driver_id": driver["driver_id"],
+        "conversation_id": thread["conversation_id"],
         "sender_type": "driver", "sender_id": driver["driver_id"],
         "content": content, "is_read": False,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
-    await db.messages.insert_one(message_data)
+    await db.messages.insert_one(dict(message_data))
+    await db.chat_threads.update_one(
+        {"conversation_id": thread["conversation_id"]},
+        {"$set": {"last_message_at": message_data["created_at"], "last_message": content}},
+    )
     await manager.send_personal_message({"type": "new_message", "message": {k: v for k, v in message_data.items() if k != "_id"}}, driver["pharmacy_id"], "pharmacy")
     return {k: v for k, v in message_data.items() if k != "_id"}
