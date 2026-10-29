@@ -1,7 +1,7 @@
 import os
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import FastAPI, APIRouter, WebSocket, WebSocketDisconnect
 from starlette.middleware.cors import CORSMiddleware
@@ -190,6 +190,19 @@ async def setup_indexes():
 
         await collection.delete_many({"expires_at": {"$lt": now}})
         await safe_create_index(collection, [("expires_at", pymongo.ASCENDING)], expireAfterSeconds=0, name=f"{collection.name}_expires_ttl", background=True)
+
+    # ── Notifiche: indici e pulizia (le notifiche non devono crescere senza limite) ──
+    await safe_create_index(db.notifications, [("user_id", pymongo.ASCENDING), ("user_type", pymongo.ASCENDING), ("created_at", pymongo.DESCENDING)], name="notifications_user_created_idx", background=True)
+    await safe_create_index(db.notifications, [("created_at", pymongo.ASCENDING)], name="notifications_created_idx", background=True)
+    try:
+        now = datetime.now(timezone.utc)
+        old_cutoff = (now - timedelta(days=60)).isoformat()
+        read_cutoff = (now - timedelta(days=30)).isoformat()
+        dropped_old = await db.notifications.delete_many({"created_at": {"$lt": old_cutoff}})
+        dropped_read = await db.notifications.delete_many({"is_read": True, "created_at": {"$lt": read_cutoff}})
+        logger.info("Pulizia notifiche: %d vecchie, %d lette", dropped_old.deleted_count, dropped_read.deleted_count)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Pulizia notifiche non completata: %s", exc)
 
     # ── Chat: thread multipli per farmacia/fattorino ──
     await safe_create_index(db.chat_threads, [("pharmacy_id", pymongo.ASCENDING), ("driver_id", pymongo.ASCENDING), ("status", pymongo.ASCENDING), ("created_at", pymongo.DESCENDING)], name="chat_threads_pair_idx", background=True)
