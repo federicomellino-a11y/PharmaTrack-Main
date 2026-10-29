@@ -19,7 +19,7 @@ import { ScrollArea } from '../../components/ui/scroll-area';
 import {
   Search, Plus, Package, MapPin, Phone, User, Clock, Truck, CheckCircle2, XCircle,
   Euro, CreditCard, Banknote, Calculator, Pencil, Calendar, AlertTriangle, Filter, RefreshCw, Printer, History, RotateCcw, Share2,
-  ClipboardCheck, ChevronRight
+  ClipboardCheck, ChevronRight, Download
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../../contexts/AuthContext';
@@ -343,6 +343,42 @@ export default function DeliveriesPage() {
     } catch (error) { toast.error(error?.response?.data?.detail || 'Ripristino non riuscito'); }
   };
 
+  const exportCsv = () => {
+    const rows = (sorted && sorted.length ? sorted : filtered) || [];
+    if (!rows.length) {
+      toast.info('Nessuna consegna da esportare');
+      return;
+    }
+    const esc = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+    const header = ['Data', 'Cliente', 'Telefono', 'Indirizzo', 'Stato', 'Fattorino', 'Pagamento', 'Importo', 'Priorita', 'Note'];
+    const lines = [header.join(',')];
+    rows.forEach((d) => {
+      const driver = safeDrivers.find((dr) => dr.driver_id === d.driver_id);
+      lines.push([
+        d.created_at ? new Date(d.created_at).toLocaleString('it-IT') : '',
+        d.customer_name,
+        d.customer_phone,
+        d.customer_address,
+        STATUS_LABELS[d.status] || d.status,
+        driver?.name || '',
+        d.payment_method === 'cash' ? 'Contanti' : 'POS',
+        d.amount != null ? String(d.amount).replace('.', ',') : '',
+        PRIORITY_LABELS[d.priority] || '',
+        d.notes || '',
+      ].map(esc).join(','));
+    });
+    const blob = new Blob([`\ufeff${lines.join('\n')}`], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `consegne-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    toast.success(`${rows.length} consegne esportate`);
+  };
+
   const handleMarkDelivered = async (id) => {
     try {
       await axios.put(`${API}/deliveries/${id}`, { status: 'delivered' }, { withCredentials: true });
@@ -547,6 +583,15 @@ export default function DeliveriesPage() {
               ))}
             </SelectContent>
           </Select>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-10 sm:h-9 w-full sm:w-auto"
+            onClick={exportCsv}
+            data-testid="export-deliveries-csv"
+          >
+            <Download className="w-4 h-4 mr-1.5" />Esporta CSV
+          </Button>
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full sm:w-auto">
             <TabsList className="h-10 sm:h-9 w-full sm:w-auto">
               <TabsTrigger value="active" className="flex-1 sm:flex-none text-[11px] sm:text-xs px-2 sm:px-3">Attive {activeCount > 0 && <span className="ml-1 px-1.5 py-0 text-[10px] rounded-full bg-primary/15 text-primary font-bold">{activeCount}</span>}</TabsTrigger>
