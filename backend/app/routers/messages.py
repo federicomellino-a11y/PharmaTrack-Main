@@ -29,6 +29,100 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+EDIT_WINDOW_HOURS = 24
+
+
+def _parse_iso(value):
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except Exception:
+        return None
+
+
+def _is_within_edit_window(message: dict) -> bool:
+    created = _parse_iso(message.get("created_at"))
+    if not created:
+        return True
+    if created.tzinfo is None:
+        created = created.replace(tzinfo=timezone.utc)
+    return (datetime.now(timezone.utc) - created) <= timedelta(hours=EDIT_WINDOW_HOURS)
+
+
+async def _sync_thread_preview(message: dict, content: str) -> None:
+    conversation_id = message.get("conversation_id")
+    if not conversation_id:
+        return
+    last = await db.messages.find_one(
+        {"conversation_id": conversation_id, "is_deleted": {"$ne": True}},
+        {"_id": 0, "message_id": 1},
+        sort=[("created_at", -1)],
+    )
+    if last and last.get("message_id") == message.get("message_id"):
+        await db.chat_threads.update_one(
+            {"conversation_id": conversation_id}, {"$set": {"last_message": content}}
+        )
+
+
+async def _apply_edit(message: dict, content: str) -> dict:
+    now = datetime.now(timezone.utc).isoformat()
+    await db.messages.update_one(
+        {"message_id": message["message_id"]},
+        {"$set": {"content": content, "edited_at": now}},
+    )
+    await _sync_thread_preview(message, content)
+    updated = {**message, "content": content, "edited_at": now}
+    updated.pop("_id", None)
+    target = ("driver", message["driver_id"]) if message.get("sender_type") == "pharmacy" else ("pharmacy", message["pharmacy_id"])
+    await manager.send_personal_message({"type": "message_updated", "message": updated}, target[1], target[0])
+    return updated
+
+
+async def _apply_delete(message: dict) -> dict:
+    now = datetime.now(timezone.utc).isoformat()
+    await db.messages.update_one(
+        {"message_id": message["message_id"]},
+        {"$set": {"is_deleted": True, "content": "", "deleted_at": now}},
+    )
+    await _sync_thread_preview(message, "")
+    updated = {**message, "content": "", "is_deleted": True, "deleted_at": now}
+    updated.pop("_id", None)
+    target = ("driver", message["driver_id"]) if message.get("sender_type") == "pharmacy" else ("pharmacy", message["pharmacy_id"])
+    await manager.send_personal_message({"type": "message_updated", "message": updated}, target[1], target[0])
+    return updated
+
+
+async def _load_message_for_actor(message_id: str, actor_type: str, actor: dict) -> dict:
+    query = {"message_id": message_id}
+    if actor_type == "pharmacy":
+        query["pharmacy_id"] = actor["user_id"]
+    else:
+        query["driver_id"] = actor["driver_id"]
+    message = await db.messages.find_one(query, {"_id": 0})
+    if not message:
+        raise HTTPException(status_code=404, detail="Messaggio non trovato")
+    if message.get("is_deleted"):
+        raise HTTPException(status_code=400, detail="Messaggio eliminato")
+    if message.get("sender_type") != actor_type:
+        raise HTTPException(status_code=403, detail="Puoi modificare solo i tuoi messaggi")
+    if not _is_within_edit_window(message):
+        raise HTTPException(status_code=403, detail=f"Modificabile solo entro {EDIT_WINDOW_HOURS} ore")
+    return message
+
+
+async def _read_content(request: Request) -> str:
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    content = (body.get("content") or "").strip()
+    if not content:
+        raise HTTPException(status_code=400, detail="Il messaggio non può essere vuoto")
+    if len(content) > 4000:
+        raise HTTPException(status_code=400, detail="Messaggio troppo lungo")
+    return content
+
+
+
 async def _open_thread(pharmacy_id: str, driver_id: str) -> dict:
     """Chat aperta per la coppia farmacia/fattorino, creata se non esiste."""
     thread = await db.chat_threads.find_one(
@@ -210,3 +304,29 @@ async def send_driver_message(request: Request, driver: dict = Depends(get_curre
     )
     await manager.send_personal_message({"type": "new_message", "message": {k: v for k, v in message_data.items() if k != "_id"}}, driver["pharmacy_id"], "pharmacy")
     return {k: v for k, v in message_data.items() if k != "_id"}
+
+
+@router.put("/messages/{message_id}")
+async def edit_message(message_id: str, request: Request, user: dict = Depends(get_current_user)):
+    content = await _read_content(request)
+    message = await _load_message_for_actor(message_id, "pharmacy", user)
+    return await _apply_edit(message, content)
+
+
+@router.delete("/messages/{message_id}")
+async def delete_message(message_id: str, user: dict = Depends(get_current_user)):
+    message = await _load_message_for_actor(message_id, "pharmacy", user)
+    return await _apply_delete(message)
+
+
+@router.put("/driver/messages/{message_id}")
+async def edit_driver_message(message_id: str, request: Request, driver: dict = Depends(get_current_driver)):
+    content = await _read_content(request)
+    message = await _load_message_for_actor(message_id, "driver", driver)
+    return await _apply_edit(message, content)
+
+
+@router.delete("/driver/messages/{message_id}")
+async def delete_driver_message(message_id: str, driver: dict = Depends(get_current_driver)):
+    message = await _load_message_for_actor(message_id, "driver", driver)
+    return await _apply_delete(message)

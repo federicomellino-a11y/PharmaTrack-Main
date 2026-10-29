@@ -336,6 +336,13 @@ export default function DeliveriesPage() {
     } catch { toast.error('Errore'); }
   };
 
+  const handleRestore = async (id) => {
+    try {
+      await axios.post(`${API}/deliveries/${id}/restore`, {}, { withCredentials: true });
+      toast.success('Consegna ripristinata'); fetchData();
+    } catch (error) { toast.error(error?.response?.data?.detail || 'Ripristino non riuscito'); }
+  };
+
   const handleMarkDelivered = async (id) => {
     try {
       await axios.put(`${API}/deliveries/${id}`, { status: 'delivered' }, { withCredentials: true });
@@ -738,6 +745,13 @@ export default function DeliveriesPage() {
                                 data-testid={`cancel-delivery-${d.delivery_id}`}
                                 onClick={() => handleCancel(d.delivery_id)}>
                                 <XCircle className="w-3 h-3" />
+                              </Button>
+                            )}
+                            {d.status === 'cancelled' && (
+                              <Button variant="outline" size="sm" className="h-7 px-2 text-xs"
+                                data-testid={`restore-delivery-${d.delivery_id}`}
+                                onClick={() => handleRestore(d.delivery_id)}>
+                                <RotateCcw className="w-3 h-3 mr-1" />Ripristina
                               </Button>
                             )}
                           </div>

@@ -65,6 +65,9 @@ export default function ChatPage() {
   const { messages: wsMessages, removeMessages, connected } = useSocket();
   const [conversations, setConversations] = useState([]);
   const [messages, setMessages] = useState([]);
+  const [editingId, setEditingId] = useState(null);
+  const [editingText, setEditingText] = useState('');
+  const [busyMessageId, setBusyMessageId] = useState(null);
   const [newMessage, setNewMessage] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [loadingList, setLoadingList] = useState(true);
@@ -202,6 +205,50 @@ export default function ChatPage() {
   const handleBackToList = () => {
     setMessages([]);
     navigate('/chat');
+  };
+
+
+  const startEditMessage = (message) => {
+    setEditingId(message.message_id);
+    setEditingText(message.content || '');
+  };
+
+  const cancelEditMessage = () => {
+    setEditingId(null);
+    setEditingText('');
+  };
+
+  const saveEditedMessage = async (message) => {
+    const content = editingText.trim();
+    if (!content) return;
+    setBusyMessageId(message.message_id);
+    try {
+      const res = await axios.put(`${API}/messages/${message.message_id}`, { content }, { withCredentials: true });
+      const updated = res.data || {};
+      setMessages((prev) => ensureArray(prev).map((item) => (
+        item.message_id === message.message_id ? { ...item, ...updated } : item
+      )));
+      cancelEditMessage();
+    } catch (error) {
+      toast.error(msg);const detail = error?.response?.data?.detail || 'Operazione non riuscita'; toast.error(msg); 
+    } finally {
+      setBusyMessageId(null);
+    }
+  };
+
+  const deleteMessage = async (message) => {
+    if (!window.confirm('Eliminare questo messaggio?')) return;
+    setBusyMessageId(message.message_id);
+    try {
+      await axios.delete(`${API}/messages/${message.message_id}`, { withCredentials: true });
+      setMessages((prev) => ensureArray(prev).map((item) => (
+        item.message_id === message.message_id ? { ...item, is_deleted: true, content: '' } : item
+      )));
+    } catch (error) {
+      toast.error(msg);const detail = error?.response?.data?.detail || 'Operazione non riuscita'; toast.error(msg);
+    } finally {
+      setBusyMessageId(null);
+    }
   };
 
   const handleSendMessage = async (event) => {
@@ -481,11 +528,42 @@ export default function ChatPage() {
                             )}
                             <div className={`flex ${isSent ? 'justify-end' : 'justify-start'} ${groupedWithPrev ? 'mt-0.5' : 'mt-2'}`}>
                               <div className={`chat-bubble ${isSent ? 'sent' : 'received'}`}>
-                                <p className="whitespace-pre-wrap break-words">{message.content}</p>
+                                {message.is_deleted ? (
+                                  <p className="italic opacity-70">Messaggio eliminato</p>
+                                ) : editingId === message.message_id ? (
+                                  <div className="min-w-[200px]">
+                                    <textarea
+                                      value={editingText}
+                                      onChange={(event) => setEditingText(event.target.value)}
+                                      rows={2}
+                                      className="w-full rounded-md border border-current/30 bg-transparent p-1.5 text-sm outline-none"
+                                    />
+                                    <div className="mt-1 flex justify-end gap-2 text-xs">
+                                      <button type="button" onClick={cancelEditMessage} className="opacity-70 hover:opacity-100">Annulla</button>
+                                      <button
+                                        type="button"
+                                        onClick={() => saveEditedMessage(message)}
+                                        disabled={busyMessageId === message.message_id}
+                                        className="font-semibold underline disabled:opacity-50"
+                                      >
+                                        Salva
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <p className="whitespace-pre-wrap break-words">{message.content}</p>
+                                )}
                                 <div className="chat-bubble-meta">
                                   <span>{new Date(message.created_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}</span>
-                                  {isSent && (isRead ? <CheckCheck className="h-3.5 w-3.5 text-sky-500" /> : <CheckCheck className="h-3.5 w-3.5" />)}
+                                  {message.edited_at && !message.is_deleted && <span className="opacity-70">modificato</span>}
+                                  {isSent && !message.is_deleted && (isRead ? <CheckCheck className="h-3.5 w-3.5 text-sky-500" /> : <CheckCheck className="h-3.5 w-3.5" />)}
                                 </div>
+                                {isSent && !message.is_deleted && editingId !== message.message_id && (
+                                  <div className="mt-1 flex justify-end gap-3 text-[11px] opacity-70 hover:opacity-100">
+                                    <button type="button" onClick={() => startEditMessage(message)}>Modifica</button>
+                                    <button type="button" onClick={() => deleteMessage(message)} className="text-red-200">Elimina</button>
+                                  </div>
+                                )}
                               </div>
                             </div>
                           </React.Fragment>
