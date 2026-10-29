@@ -5,6 +5,7 @@ via senza numero, poi il comune. La risposta mantiene il civico scritto
 dall'utente e segnala la precisione ottenuta (civico / via / comune).
 """
 import logging
+import os
 import re
 from typing import Any, Dict, List, Optional
 
@@ -18,6 +19,71 @@ NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
 PHOTON_URL = "https://photon.komoot.io/api/"
 HEADERS = {"User-Agent": "PharmaTrack/1.0 (gestionale consegne farmacie)", "Accept-Language": "it"}
 TIMEOUT = 8.0
+
+# Se configurata, Google Geocoding/Places ha la precedenza (civici piu' precisi)
+GOOGLE_KEY = os.environ.get("GOOGLE_MAPS_API_KEY") or os.environ.get("GOOGLE_GEOCODING_API_KEY") or ""
+GOOGLE_GEOCODE_URL = "https://maps.googleapis.com/maps/api/geocode/json"
+GOOGLE_AUTOCOMPLETE_URL = "https://maps.googleapis.com/maps/api/place/autocomplete/json"
+GOOGLE_PRECISE = {"ROOFTOP", "RANGE_INTERPOLATED"}
+
+
+def google_enabled() -> bool:
+    return bool(GOOGLE_KEY)
+
+
+async def _google_geocode(client: "httpx.AsyncClient", address: str) -> Optional[Dict[str, Any]]:
+    try:
+        res = await client.get(GOOGLE_GEOCODE_URL, params={
+            "address": address, "key": GOOGLE_KEY, "language": "it", "region": "it",
+        })
+        if res.status_code != 200:
+            return None
+        data = res.json()
+        if data.get("status") != "OK" or not data.get("results"):
+            logger.info("Google geocode '%s': %s", address, data.get("status"))
+            return None
+        row = data["results"][0]
+        geo = row.get("geometry") or {}
+        loc = geo.get("location") or {}
+        location_type = geo.get("location_type")
+        return {
+            "lat": float(loc.get("lat")), "lng": float(loc.get("lng")),
+            "label": row.get("formatted_address"),
+            "precision": "civico" if location_type in GOOGLE_PRECISE else "via",
+            "provider": "google", "location_type": location_type,
+            "house_number": next((c["long_name"] for c in row.get("address_components", []) if "street_number" in c.get("types", [])), None),
+        }
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Google geocode error: %s", exc)
+        return None
+
+
+async def _google_autocomplete(client: "httpx.AsyncClient", query: str, limit: int) -> List[Dict[str, Any]]:
+    try:
+        res = await client.get(GOOGLE_AUTOCOMPLETE_URL, params={
+            "input": query, "key": GOOGLE_KEY, "language": "it",
+            "components": "country:it", "types": "address",
+        })
+        if res.status_code != 200:
+            return []
+        data = res.json()
+        out = []
+        for pred in (data.get("predictions") or [])[:limit]:
+            fmt = pred.get("structured_formatting") or {}
+            out.append({
+                "place_id": pred.get("place_id"),
+                "description": pred.get("description"),
+                "structured_formatting": {
+                    "main_text": fmt.get("main_text") or pred.get("description", ""),
+                    "secondary_text": fmt.get("secondary_text") or "",
+                },
+                "lat": None, "lng": None,
+                "provider": "google", "_nominatim": True,
+            })
+        return out
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Google autocomplete error: %s", exc)
+        return []
 
 
 def strip_civic(street: str) -> str:
@@ -111,6 +177,10 @@ async def geocode_search(q: str = Query(..., min_length=3), limit: int = 6) -> L
     street, civic, city = _split(q)
     out: List[Dict[str, Any]] = []
     async with httpx.AsyncClient(timeout=TIMEOUT, headers=HEADERS) as client:
+        if google_enabled():
+            predictions = await _google_autocomplete(client, q, limit)
+            if predictions:
+                return predictions
         rows = await _nominatim(client, {"q": q, "limit": limit})
         for item in rows:
             addr = item.get("address") or {}
@@ -183,6 +253,23 @@ async def geocode_resolve(address: str = Query(..., min_length=3)) -> Dict[str, 
         attempts.append(("comune", "nominatim", {"q": city}))
 
     async with httpx.AsyncClient(timeout=TIMEOUT, headers=HEADERS) as client:
+        if google_enabled():
+            google_attempts = [address]
+            if street and civic and city:
+                google_attempts.append(f"{street} {civic}, {city}")
+            if street and city:
+                google_attempts.append(f"{street}, {city}")
+            if city:
+                google_attempts.append(city)
+            for candidate in google_attempts:
+                found = await _google_geocode(client, candidate)
+                if found and (found.get("precision") == "civico" or candidate == google_attempts[-1]):
+                    return found
+                if found:
+                    best_google = found  # memorizza il fallback migliore
+            if 'best_google' in dir() and best_google:
+                return best_google
+
         for precision, provider, params in attempts:
             if provider.startswith("nominatim"):
                 rows = await _nominatim(client, {**params, "limit": 1})
