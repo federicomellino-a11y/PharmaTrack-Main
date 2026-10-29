@@ -69,21 +69,27 @@ async def create_delivery(delivery: DeliveryCreate, user: dict = Depends(get_cur
         if not delivery.driver_id and not assigned_driver:
             selected_driver_id = None
 
-    # V19: se non c'è fattorino (nè scelto nè predefinito) e la modalità non è manuale,
-    # assegna al fattorino in turno con meno consegne attive; altrimenti al meno carico
-    if not selected_driver_id and (user.get("settings") or {}).get("assignment_mode", "least_loaded") != "manual":
+    # V19: smistamento automatico (opt-in via settings.assignment_mode = "least_loaded").
+    # Default "manual": se il farmacista non sceglie un fattorino, la consegna resta in coda.
+    assignment_mode = (user.get("settings") or {}).get("assignment_mode", "manual")
+    if not selected_driver_id and assignment_mode == "least_loaded":
         candidates = await db.drivers.find({"pharmacy_id": user["user_id"], "is_active": True}, {"_id": 0, "driver_id": 1, "name": 1}).to_list(50)
         if candidates:
             open_shift_ids = set()
-            async for sh in db.shifts.find({"pharmacy_id": user["user_id"], "status": "open"}, {"_id": 0, "driver_id": 1}):
+            async for sh in db.driver_shifts.find({"pharmacy_id": user["user_id"], "status": "open"}, {"_id": 0, "driver_id": 1}):
                 open_shift_ids.add(sh.get("driver_id"))
             pool = [c for c in candidates if c["driver_id"] in open_shift_ids] or candidates
             best, best_load = None, None
             for c in pool:
-                load = await db.deliveries.count_documents({"driver_id": c["driver_id"], "status": {"$in": ["assigned", "picked_up", "in_transit", "da_preparare", "pronta"]}})
+                load = await db.deliveries.count_documents({
+                    "pharmacy_id": user["user_id"],
+                    "driver_id": c["driver_id"],
+                    "status": {"$in": ["assigned", "picked_up", "in_transit", "da_preparare", "pronta"]},
+                })
                 if best is None or load < best_load:
                     best, best_load = c, load
-            selected_driver_id, assigned_driver = best["driver_id"], best
+            if best:
+                selected_driver_id, assigned_driver = best["driver_id"], best
 
     change_due = None
     if delivery.payment_method == "cash" and delivery.amount is not None and delivery.amount_given is not None:
