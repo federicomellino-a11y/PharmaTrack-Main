@@ -99,7 +99,9 @@ return
 ; ---------- ALT + D : Dock di banco ----------
 !d::
 DetectHiddenWindows, On
-WinGet, dockId, ID, PharmaTrack Dock ahk_exe msedge.exe
+SetTitleMatchMode, 2
+
+dockId := FindDock()
 if (dockId)
 {
     if DllCall("IsWindowVisible", "Ptr", dockId)
@@ -110,21 +112,53 @@ if (dockId)
         WinActivate, ahk_id %dockId%
         WinSet, AlwaysOnTop, On, ahk_id %dockId%
     }
+    return
 }
-else
+
+browser := FindBrowser()
+if (browser = "")
 {
-    Run, msedge.exe --app=%PharmaTrackURL%/dock --window-size=380,900
-    Sleep, 3000
-    WinGet, dockId, ID, PharmaTrack Dock ahk_exe msedge.exe
-    if (dockId)
-    {
-        SysGet, wa, MonitorWorkArea
-        WinMove, ahk_id %dockId%,, %waRight% - 390, %waTop%, 380, %waBottom% - %waTop%
-        WinSet, AlwaysOnTop, On, ahk_id %dockId%
-        WinActivate, ahk_id %dockId%
-    }
+    ; Nessun Edge/Chrome trovato: apro il Dock nel browser predefinito
+    Run, % PharmaTrackURL . "/dock"
+    TrayTip, PharmaTrack, Apro il Dock nel browser predefinito.`nPer la finestra dedicata installa Microsoft Edge., 5, 2
+    return
+}
+
+Run, "%browser%" --app=%PharmaTrackURL%/dock --window-size=380,900
+Sleep, 3500
+dockId := FindDock()
+if (dockId)
+{
+    SysGet, wa, MonitorWorkArea
+    WinMove, ahk_id %dockId%,, %waRight% - 390, %waTop%, 380, %waBottom% - %waTop%
+    WinSet, AlwaysOnTop, On, ahk_id %dockId%
+    WinActivate, ahk_id %dockId%
 }
 return
+
+FindDock() {
+    for exe in ["msedge.exe", "chrome.exe"]
+    {
+        WinGet, id, ID, PharmaTrack Dock ahk_exe %exe%
+        if (id)
+            return id
+    }
+    WinGet, id, ID, PharmaTrack Dock
+    return id
+}
+
+FindBrowser() {
+    paths := [ A_ProgramFiles . "\Microsoft\Edge\Application\msedge.exe"
+             , A_ProgramFiles . " (x86)\Microsoft\Edge\Application\msedge.exe"
+             , A_LocalAppData . "\Microsoft\Edge\Application\msedge.exe"
+             , A_ProgramFiles . "\Google\Chrome\Application\chrome.exe"
+             , A_ProgramFiles . " (x86)\Google\Chrome\Application\chrome.exe"
+             , A_LocalAppData . "\Google\Chrome\Application\chrome.exe" ]
+    for p in paths
+        if FileExist(p)
+            return p
+    return ""
+}
 
 ; ---------- helper ----------
 UrlEncode(text) {
