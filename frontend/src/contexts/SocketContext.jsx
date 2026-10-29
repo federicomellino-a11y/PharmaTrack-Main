@@ -325,6 +325,14 @@ export const SocketProvider = ({ children, userId, userType, settings = {} }) =>
               }
               break;
 
+            case 'message_updated':
+              if (data.message && data.message.message_id) {
+                setMessages((prev) => (Array.isArray(prev) ? prev : []).map((item) => (
+                  item.message_id === data.message.message_id ? { ...item, ...data.message } : item
+                )));
+              }
+              break;
+
             case 'notification':
               if (data.notification) {
                 mergeNotification(data.notification);

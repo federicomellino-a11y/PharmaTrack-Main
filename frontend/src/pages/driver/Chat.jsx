@@ -45,6 +45,9 @@ export default function DriverChat() {
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [editingText, setEditingText] = useState('');
+  const [busyMessageId, setBusyMessageId] = useState(null);
   const messagesEndRef = useRef(null);
   const processedMessageIdsRef = useRef(new Set());
 
@@ -94,6 +97,51 @@ export default function DriverChat() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+
+
+  const startEditMessage = (message) => {
+    setEditingId(message.message_id);
+    setEditingText(message.content || '');
+  };
+
+  const cancelEditMessage = () => {
+    setEditingId(null);
+    setEditingText('');
+  };
+
+  const saveEditedMessage = async (message) => {
+    const content = editingText.trim();
+    if (!content) return;
+    setBusyMessageId(message.message_id);
+    try {
+      const res = await axios.put(`${API}/driver/messages/${message.message_id}`, { content }, { withCredentials: true });
+      const updated = res.data || {};
+      setMessages((prev) => (Array.isArray(prev) ? prev : []).map((item) => (
+        item.message_id === message.message_id ? { ...item, ...updated } : item
+      )));
+      cancelEditMessage();
+    } catch (error) {
+      toast.error(error?.response?.data?.detail || 'Operazione non riuscita');
+    } finally {
+      setBusyMessageId(null);
+    }
+  };
+
+  const removeMessage = async (message) => {
+    if (!window.confirm('Eliminare questo messaggio?')) return;
+    setBusyMessageId(message.message_id);
+    try {
+      await axios.delete(`${API}/driver/messages/${message.message_id}`, { withCredentials: true });
+      setMessages((prev) => (Array.isArray(prev) ? prev : []).map((item) => (
+        item.message_id === message.message_id ? { ...item, is_deleted: true, content: '' } : item
+      )));
+    } catch (error) {
+      toast.error(error?.response?.data?.detail || 'Operazione non riuscita');
+    } finally {
+      setBusyMessageId(null);
+    }
+  };
 
   const handleSendMessage = async (event) => {
     event.preventDefault();
@@ -192,9 +240,33 @@ export default function DriverChat() {
                   )}
                   <div className={`flex ${isSent ? 'justify-end' : 'justify-start'} ${groupedWithPrev ? 'mt-0.5' : 'mt-2'}`}>
                     <div className={`chat-bubble ${isSent ? 'sent' : 'received'}`}>
-                      <p className="whitespace-pre-wrap break-words">{message.content}</p>
+                      {message.is_deleted ? (
+                        <p className="italic opacity-70">Messaggio eliminato</p>
+                      ) : editingId === message.message_id ? (
+                        <div className="min-w-[160px]">
+                          <textarea
+                            value={editingText}
+                            onChange={(event) => setEditingText(event.target.value)}
+                            rows={2}
+                            className="w-full rounded-md border border-current/30 bg-transparent p-1.5 text-sm outline-none"
+                          />
+                          <div className="mt-1 flex justify-end gap-2 text-xs">
+                            <button type="button" onClick={cancelEditMessage} className="opacity-70">Annulla</button>
+                            <button type="button" onClick={() => saveEditedMessage(message)} className="font-semibold underline">Salva</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="whitespace-pre-wrap break-words">{message.content}</p>
+                      )}
                       <div className="chat-bubble-meta">
                         <span>{formatTime(message.created_at)}</span>
+                        {message.edited_at && !message.is_deleted && <span className="opacity-70">modificato</span>}
+                        {isSent && !message.is_deleted && editingId !== message.message_id && (
+                          <span className="ml-1 flex gap-2">
+                            <button type="button" onClick={() => startEditMessage(message)} className="underline">Modifica</button>
+                            <button type="button" onClick={() => removeMessage(message)} className="underline text-red-300">Elimina</button>
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>

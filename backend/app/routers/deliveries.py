@@ -209,6 +209,9 @@ async def update_delivery(delivery_id: str, update: DeliveryUpdate, user: dict =
         if update.status == "in_transit" and not effective_driver_id:
             raise HTTPException(status_code=400, detail="Assegna prima un fattorino per avviare la consegna")
         update_data["status"] = update.status
+        if update.status == "cancelled" and delivery.get("status") != "cancelled":
+            update_data["previous_status"] = delivery.get("status") or "pronta"
+            update_data["cancelled_at"] = datetime.now(timezone.utc).isoformat()
         if update.status == "delivered":
             update_data["actual_delivery"] = datetime.now(timezone.utc).isoformat()
     if update.notes is not None: update_data["notes"] = update.notes
@@ -231,6 +234,53 @@ async def update_delivery(delivery_id: str, update: DeliveryUpdate, user: dict =
         await _attach_delivery_to_open_shift(update.driver_id, delivery_id)
         await manager.send_personal_message({"type": "new_delivery", "delivery_id": delivery_id}, update.driver_id, "driver")
         await create_notification_internal(update.driver_id, "driver", "Nuova consegna assegnata", f"Hai una nuova consegna per {delivery['customer_name']}", "delivery", {"delivery_id": delivery_id})
+    return await db.deliveries.find_one({"delivery_id": delivery_id}, {"_id": 0})
+
+
+@router.post("/deliveries/{delivery_id}/restore")
+async def restore_delivery(delivery_id: str, user: dict = Depends(get_current_user)):
+    """Riporta una consegna annullata allo stato precedente (di norma 'pronta')."""
+    delivery = await db.deliveries.find_one(
+        {"delivery_id": delivery_id, "pharmacy_id": user["user_id"]}, {"_id": 0}
+    )
+    if not delivery:
+        raise HTTPException(status_code=404, detail="Consegna non trovata")
+    if delivery.get("status") != "cancelled":
+        raise HTTPException(status_code=400, detail="Solo le consegne annullate possono essere ripristinate")
+
+    previous = delivery.get("previous_status") or "pronta"
+    if previous in ("cancelled", "delivered"):
+        previous = "pronta"
+    if previous in ("assigned", "picked_up", "in_transit") and not delivery.get("driver_id"):
+        previous = "pronta"
+
+    now = datetime.now(timezone.utc).isoformat()
+    updates = {
+        "status": previous,
+        "updated_at": now,
+        "restored_at": now,
+        "previous_status": None,
+        "cancelled_at": None,
+    }
+    await db.deliveries.update_one(
+        {"delivery_id": delivery_id, "pharmacy_id": user["user_id"]}, {"$set": updates}
+    )
+    await db.audit_log.insert_one({
+        "audit_id": f"aud_{uuid.uuid4().hex[:12]}",
+        "entity": "delivery", "entity_id": delivery_id,
+        "action": "delivery_restored", "actor": user["user_id"], "actor_role": "pharmacy",
+        "detail": {"from": "cancelled", "to": previous},
+        "created_at": now,
+    })
+    if delivery.get("driver_id"):
+        await manager.send_personal_message(
+            {"type": "delivery_restored", "delivery_id": delivery_id}, delivery["driver_id"], "driver"
+        )
+        await create_notification_internal(
+            delivery["driver_id"], "driver", "Consegna ripristinata",
+            f"La consegna per {delivery.get('customer_name')} è di nuovo attiva",
+            "delivery", {"delivery_id": delivery_id},
+        )
     return await db.deliveries.find_one({"delivery_id": delivery_id}, {"_id": 0})
 
 @router.delete("/deliveries/{delivery_id}")
