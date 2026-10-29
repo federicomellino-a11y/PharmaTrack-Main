@@ -26,6 +26,13 @@ from app.core.shifts_service import (
 from app.models.schemas import *
 
 from app.core.limiter import limiter
+from pydantic import BaseModel
+
+
+class AdminLoginLoose(BaseModel):
+    """Login admin: nessuna validazione di formato, la password e' quella configurata."""
+    email: str
+    password: str
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -33,7 +40,7 @@ router = APIRouter()
 
 @router.post("/admin/login")
 @limiter.limit(LOGIN_RATE_LIMIT)
-async def admin_login(request: Request, data: AdminLogin, response: Response):
+async def admin_login(request: Request, data: AdminLoginLoose, response: Response):
     if not ADMIN_EMAIL or not ADMIN_PASSWORD:
         raise HTTPException(status_code=503, detail="Super amministratore non configurato")
     if data.email != ADMIN_EMAIL or data.password != ADMIN_PASSWORD:
@@ -218,6 +225,16 @@ async def admin_database_schema(admin: dict = Depends(get_current_admin)):
                 "description": "Consegne e relativo stato operativo",
                 "primary_keys": ["delivery_id"],
                 "important_fields": ["pharmacy_id", "customer_id", "driver_id", "status", "payment_method", "amount", "priority", "scheduled_date", "auto_assigned", "created_at", "updated_at"],
+            },
+            "chat_threads": {
+                "description": "Thread di chat (piu' conversazioni per fattorino)",
+                "primary_keys": ["conversation_id"],
+                "important_fields": ["pharmacy_id", "driver_id", "number", "status", "last_message", "last_message_at", "created_at", "closed_at"],
+            },
+            "photo_files": {
+                "description": "Foto POD su GridFS locale (fallback senza Cloudinary)",
+                "primary_keys": ["photo_id"],
+                "important_fields": ["delivery_id", "pharmacy_id", "driver_id", "content_type", "size", "created_at"],
             },
             "messages": {
                 "description": "Chat farmacia ↔ fattorini",

@@ -236,7 +236,20 @@ export default function AddressAutocomplete({
         .filter(Boolean).join(', ');
       setQuery(addr);
       onChange(addr);
-      onAddressSelect?.({ address: addr, lat: prediction.lat, lng: prediction.lng, placeId: null, raw: prediction });
+      let lat = prediction.lat ?? null;
+      let lng = prediction.lng ?? null;
+      if ((lat == null || lng == null) && addr) {
+        // Google/OSM hanno dato solo il testo: chiediamo le coordinate al backend
+        try {
+          const res = await fetch(`${API}/geocode/resolve?address=${encodeURIComponent(addr)}`);
+          if (res.ok) {
+            const coords = await res.json();
+            lat = coords.lat;
+            lng = coords.lng;
+          }
+        } catch { /* coordinate non disponibili */ }
+      }
+      onAddressSelect?.({ address: addr, lat, lng, placeId: prediction.place_id || null, raw: prediction });
       return;
     }
 
