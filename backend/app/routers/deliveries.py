@@ -56,7 +56,9 @@ async def create_delivery(delivery: DeliveryCreate, user: dict = Depends(get_cur
     if delivery.payment_method == "cash" and delivery.amount is not None and delivery.amount_given is not None and delivery.amount_given < delivery.amount:
         raise HTTPException(status_code=400, detail="Il pagato con non può essere inferiore all'importo")
 
-    selected_driver_id = delivery.driver_id or (user.get("settings") or {}).get("default_driver_id")
+    # Solo il fattorino scelto esplicitamente: nessun default dal profilo,
+    # altrimenti la consegna saltando la coda finisce direttamente "assegnata".
+    selected_driver_id = delivery.driver_id
     assigned_driver = None
     if selected_driver_id:
         assigned_driver = await db.drivers.find_one({
