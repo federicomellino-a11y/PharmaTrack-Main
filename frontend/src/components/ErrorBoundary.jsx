@@ -1,6 +1,7 @@
 import React from 'react'
 import { AlertTriangle, Home, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { reportClientError } from '@/lib/errorReporter'
 
 export default class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -14,6 +15,10 @@ export default class ErrorBoundary extends React.Component {
 
   componentDidCatch(error, errorInfo) {
     console.error('PharmaTrack runtime error', error, errorInfo)
+    reportClientError(error, {
+      scope: 'error-boundary',
+      componentStack: errorInfo?.componentStack?.slice(0, 1500),
+    })
   }
 
   handleReload = () => {

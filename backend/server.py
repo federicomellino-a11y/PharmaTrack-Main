@@ -22,7 +22,7 @@ from app.routers import (
     health, pharmacy_auth, admin, driver_auth, customers, drivers,
     deliveries, driver_deliveries, messages, notifications, statistics,
     archive, doctors, useful_numbers, notes, reports, integrations, shifts,
-    analytics, photos,
+    analytics, photos, client_errors,
 )
 from middleware_security import SecurityHeadersMiddleware
 
@@ -91,7 +91,7 @@ for module in [
     health, pharmacy_auth, admin, driver_auth, customers, drivers,
     deliveries, driver_deliveries, messages, notifications, statistics,
     archive, doctors, useful_numbers, notes, reports, integrations, shifts,
-    analytics, photos, geocode_router,
+    analytics, photos, client_errors, geocode_router,
 ]:
     tag = _ROUTER_TAGS.get(module.__name__.split(".")[-1])
     api_router.include_router(module.router, tags=[tag] if tag else None)
