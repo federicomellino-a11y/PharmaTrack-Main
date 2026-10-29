@@ -8,10 +8,51 @@
   "theme_color": "#2d7a6b",
   "orientation": "portrait-primary",
   "icons": [
-    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
-    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" },
-    { "src": "/icons/apple-touch-icon.png", "sizes": "180x180", "type": "image/png" }
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    }
   ],
-  "categories": ["business", "productivity"],
-  "lang": "it-IT"
+  "categories": [
+    "business",
+    "productivity"
+  ],
+  "lang": "it-IT",
+  "shortcuts": [
+    {
+      "name": "Nuova consegna",
+      "short_name": "Nuova",
+      "url": "/quick",
+      "icons": [
+        {
+          "src": "/icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Consegne attive",
+      "short_name": "Consegne",
+      "url": "/deliveries",
+      "icons": [
+        {
+          "src": "/icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ]
 }

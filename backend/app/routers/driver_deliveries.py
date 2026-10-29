@@ -39,7 +39,11 @@ async def get_driver_deliveries(status: Optional[str] = None, driver: dict = Dep
             query["status"] = {"$in": ["delivered", "cancelled"]}
         else:
             query["status"] = status
-    return await db.deliveries.find(query, {"_id": 0}).sort("created_at", -1).to_list(100)
+    items = await db.deliveries.find(query, {"_id": 0}).sort("created_at", -1).to_list(100)
+    if status in (None, "active") or not status:
+        rank = {"urgent": 0, "high": 1, "normal": 2, "low": 3}
+        items.sort(key=lambda d: (rank.get(d.get("priority") or "normal", 2), d.get("scheduled_time") or "99:99", d.get("created_at") or ""))
+    return items
 
 @router.put("/driver/deliveries/{delivery_id}/status")
 async def update_delivery_status_driver(delivery_id: str, request: Request, driver: dict = Depends(get_current_driver)):
