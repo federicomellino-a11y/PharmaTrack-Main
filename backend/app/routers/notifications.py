@@ -28,6 +28,20 @@ from app.models.schemas import *
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
+async def prune_notifications(user_id: str, user_type: str, keep: int = 100) -> int:
+    """Mantiene le ultime `keep` notifiche per utente, cancella le piu' vecchie."""
+    stale = []
+    cursor = db.notifications.find(
+        {"user_id": user_id, "user_type": user_type}, {"_id": 1}
+    ).sort("created_at", -1).skip(keep)
+    async for doc in cursor:
+        stale.append(doc["_id"])
+    if not stale:
+        return 0
+    result = await db.notifications.delete_many({"_id": {"$in": stale}})
+    return result.deleted_count
+
+
 
 @router.post("/push/subscribe")
 async def subscribe_push_notifications(request: Request, user: dict = Depends(get_current_user)):
@@ -43,6 +57,7 @@ async def unsubscribe_push_notifications(request: Request, user: dict = Depends(
 
 @router.get("/notifications")
 async def get_notifications(user: dict = Depends(get_current_user)):
+    await prune_notifications(user["user_id"], "pharmacy", keep=100)
     return await db.notifications.find({"user_id": user["user_id"], "user_type": "pharmacy"}, {"_id": 0}).sort("created_at", -1).to_list(100)
 
 @router.put("/notifications/{notification_id}/read")
@@ -90,6 +105,7 @@ async def unsubscribe_driver_push_notifications(request: Request, driver: dict =
 
 @router.get("/driver/notifications")
 async def get_driver_notifications(driver: dict = Depends(get_current_driver)):
+    await prune_notifications(driver["driver_id"], "driver", keep=100)
     return await db.notifications.find({"user_id": driver["driver_id"], "user_type": "driver"}, {"_id": 0}).sort("created_at", -1).to_list(100)
 
 @router.put("/driver/notifications/{notification_id}/read")
