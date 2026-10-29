@@ -112,7 +112,7 @@ async def create_delivery(delivery: DeliveryCreate, user: dict = Depends(get_cur
         "priority": delivery.priority,
         "estimated_delivery": None, "actual_delivery": None,
         "created_at": datetime.now(timezone.utc).isoformat(), "updated_at": datetime.now(timezone.utc).isoformat(),
-        "auto_assigned": bool(assigned_driver and not delivery.driver_id),
+        "auto_assigned": False,  # in coda: non ancora assegnata
         "nre": (getattr(delivery, "nre", None) or None),
         "client_meta": (getattr(delivery, "client_meta", None) or None),
     }
