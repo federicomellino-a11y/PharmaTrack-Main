@@ -69,6 +69,9 @@ def _enrich_with_eta(items, drivers_by_id):
         if item.get("customer_lat") is None or item.get("customer_lng") is None:
             continue
         km = _haversine_km(float(lat), float(lng), float(item["customer_lat"]), float(item["customer_lng"]))
+        if km > 50:
+            # coordinate probabilmente approssimate al centro citta: meglio nessuna stima
+            continue
         item["driver_distance_km"] = round(km, 1)
         item["driver_eta_minutes"] = max(1, int(round(km * ETA_ROAD_FACTOR / ETA_AVG_SPEED_KMH * 60)))
     return items
