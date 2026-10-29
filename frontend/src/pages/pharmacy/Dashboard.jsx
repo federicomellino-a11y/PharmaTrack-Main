@@ -58,6 +58,13 @@ const formatCurrency = (v) => new Intl.NumberFormat('it-IT', { style: 'currency'
 
 export default function PharmacyDashboard() {
   const navigate = useNavigate();
+  const openNewDelivery = () => {
+    if (window.location.pathname === '/deliveries') {
+      window.dispatchEvent(new Event('pt:new-delivery'));
+      return;
+    }
+    navigate('/deliveries?new=true');
+  };
   const { isDark } = useTheme();
   const { user, checkAuth } = useAuth();
   const [customerCoords, setCustomerCoords] = useState({});
@@ -208,7 +215,7 @@ export default function PharmacyDashboard() {
               {user?.pharmacy_name || 'La tua farmacia'} · {new Date().toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })}
             </p>
           </div>
-          <Button className="btn-primary shrink-0" size="sm" onClick={() => navigate('/deliveries?new=true')}>
+          <Button className="btn-primary shrink-0" size="sm" onClick={openNewDelivery}>
             <Plus className="w-4 h-4 mr-1.5" />Nuova
           </Button>
         </div>
@@ -343,7 +350,7 @@ export default function PharmacyDashboard() {
               <div className="text-center py-10 text-muted-foreground">
                 <Package className="w-10 h-10 mx-auto mb-2 opacity-30" />
                 <p className="text-sm">Nessuna consegna attiva</p>
-                <Button size="sm" className="btn-primary mt-3" onClick={() => navigate('/deliveries?new=true')}>
+                <Button size="sm" className="btn-primary mt-3" onClick={openNewDelivery}>
                   <Plus className="w-3.5 h-3.5 mr-1.5" />Crea Consegna
                 </Button>
               </div>

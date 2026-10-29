@@ -136,11 +136,11 @@ export default function DeliveriesPage() {
 
   // Dialog "Crea cliente al volo" dentro Nuova Consegna
   const [createCustomerOpen, setCreateCustomerOpen] = useState(false);
-  const [newCustomer, setNewCustomer] = useState({ name: '', phone: '', address: '', notes: '' });
+  const [newCustomer, setNewCustomer] = useState({ name: '', phone: '', phone2: '', address: '', notes: '' });
   const [creatingCustomer, setCreatingCustomer] = useState(false);
 
   const openCreateCustomer = (prefilledName) => {
-    setNewCustomer({ name: prefilledName || '', phone: '', address: '', notes: '' });
+    setNewCustomer({ name: prefilledName || '', phone: '', phone2: '', address: '', notes: '' });
     setCreateCustomerOpen(true);
   };
 
@@ -156,6 +156,7 @@ export default function DeliveriesPage() {
         customer_lat: newCustomer.lat || null,
         customer_lng: newCustomer.lng || null,
         place_id: newCustomer.placeId || null,
+        extra_phones: [newCustomer.phone2 || ''].map(p => p.trim()).filter(Boolean),
         notes: newCustomer.notes.trim() || null,
       }, { withCredentials: true });
       const created = res.data;
@@ -166,7 +167,7 @@ export default function DeliveriesPage() {
       setCustomerSearchTerm('');
       setCustomerDropdownOpen(false);
       setCreateCustomerOpen(false);
-      setNewCustomer({ name: '', phone: '', address: '', notes: '' });
+      setNewCustomer({ name: '', phone: '', phone2: '', address: '', notes: '' });
     } catch (err) {
       console.error('Errore creazione cliente:', err);
       toast.error(err.response?.data?.detail || 'Errore creazione cliente');
@@ -202,6 +203,13 @@ export default function DeliveriesPage() {
       setDialogOpen(true);
       window.history.replaceState({}, '', '/deliveries');
     }
+  }, []);
+
+  // Apertura da un altro punto dell'app mentre sei gia' su questa pagina
+  useEffect(() => {
+    const open = () => setDialogOpen(true);
+    window.addEventListener('pt:new-delivery', open);
+    return () => window.removeEventListener('pt:new-delivery', open);
   }, []);
 
   // Autofocus sul campo cliente quando si apre "Nuova consegna" (meno click al banco)
@@ -800,7 +808,7 @@ export default function DeliveriesPage() {
                     onChange={(e) => { setCustomerSearchTerm(e.target.value); setCustomerDropdownOpen(true); setActiveCustomerIndex(-1); }}
                     onKeyDown={(e) => {
                       if (!customerDropdownOpen) return;
-                      const list = customerSearchTerm.trim() ? dialogCustomers.slice(0, 8) : frequentCustomers;
+                      const list = customerSearchTerm.trim() ? dialogCustomers.slice(0, 60) : frequentCustomers;
                       if (e.key === 'ArrowDown') { e.preventDefault(); setActiveCustomerIndex((i) => Math.min(i + 1, list.length - 1)); }
                       else if (e.key === 'ArrowUp') { e.preventDefault(); setActiveCustomerIndex((i) => Math.max(i - 1, 0)); }
                       else if (e.key === 'Enter' && activeCustomerIndex >= 0 && list[activeCustomerIndex]) { e.preventDefault(); selectCustomer(list[activeCustomerIndex]); }
@@ -813,7 +821,7 @@ export default function DeliveriesPage() {
                   />
                   {customerDropdownOpen && (
                     <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-background border border-border rounded-xl shadow-lg overflow-hidden">
-                      <div className="max-h-52 overflow-y-auto">
+                      <div className="max-h-64 overflow-y-auto overscroll-contain" data-testid="customer-list-scroll">
                         {dialogCustomers.length === 0 ? (
                           <div className="p-4 text-center">
                             <p className="text-sm text-muted-foreground mb-2">Nessun cliente trovato</p>
@@ -826,7 +834,7 @@ export default function DeliveriesPage() {
                             {!customerSearchTerm.trim() && frequentCustomers.length > 0 && (
                               <p className="px-4 pt-2.5 pb-1 text-[10px] uppercase tracking-wide text-muted-foreground">I più frequenti</p>
                             )}
-                            {(customerSearchTerm.trim() ? dialogCustomers.slice(0, 8) : frequentCustomers).map((c, i) => (
+                            {(customerSearchTerm.trim() ? dialogCustomers.slice(0, 60) : frequentCustomers).map((c, i) => (
                               <button type="button" key={c.customer_id}
                                 className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors border-b border-border/50 last:border-0 ${i === activeCustomerIndex ? 'bg-accent' : 'hover:bg-accent'}`}
                                 onMouseEnter={() => setActiveCustomerIndex(i)}
@@ -842,11 +850,7 @@ export default function DeliveriesPage() {
                                 </div>
                               </button>
                             ))}
-                            {dialogCustomers.length > 8 && (
-                              <div className="px-4 py-2 text-xs text-muted-foreground text-center bg-muted/30">
-                                +{dialogCustomers.length - 8} altri risultati · scrivi per affinare
-                              </div>
-                            )}
+
                           </>
                         )}
                       </div>
@@ -856,28 +860,19 @@ export default function DeliveriesPage() {
               )}
             </div>
 
-            )}
-
             <div className="form-group space-y-2">
               <Label>Priorità</Label>
-              <div className="flex gap-2" data-testid="priority-chips">
-                {[
-                  { value: 'low', dot: 'bg-emerald-500', label: 'Bassa' },
-                  { value: 'normal', dot: 'bg-blue-500', label: 'Normale' },
-                  { value: 'high', dot: 'bg-amber-400', label: 'Alta' },
-                  { value: 'urgent', dot: 'bg-red-500', label: 'Urgente' },
-                ].map(opt => (
-                  <button key={opt.value} type="button"
-                    onClick={() => setForm({ ...form, priority: opt.value })}
-                    className={`flex-1 flex items-center justify-center gap-1.5 h-9 rounded-lg border text-xs font-medium transition-colors ${
-                      form.priority === opt.value
-                        ? 'border-primary bg-primary/10 text-primary'
-                        : 'border-border text-muted-foreground hover:bg-accent'
-                    }`}>
-                    <span className={`w-2 h-2 rounded-full ${opt.dot}`} />{opt.label}
-                  </button>
-                ))}
-              </div>
+              <button type="button"
+                onClick={() => setForm({ ...form, priority: form.priority === 'urgent' ? 'normal' : 'urgent' })}
+                className={`flex items-center gap-2 h-9 px-3 rounded-lg border text-xs font-medium transition-colors ${
+                  form.priority === 'urgent'
+                    ? 'border-destructive bg-destructive/10 text-destructive'
+                    : 'border-border text-muted-foreground hover:bg-accent'
+                }`}
+                data-testid="priority-urgent-toggle">
+                <span className="w-2 h-2 rounded-full bg-red-500" />
+                {form.priority === 'urgent' ? 'Urgente' : 'Segna come urgente'}
+              </button>
             </div>
 
 
@@ -893,28 +888,6 @@ export default function DeliveriesPage() {
                 <Input type="time" value={form.scheduled_time}
                   onChange={e => setForm({...form, scheduled_time: e.target.value})} />
               </div>
-            </div>
-
-            <div className="form-group">
-              <Label>Note / Farmaci</Label>
-              <Textarea placeholder="Es: Augmentin 1g, Tachipirina 1000..." value={form.notes}
-                onChange={e => setForm({...form, notes: e.target.value})} className="min-h-[80px]" />
-              <div className="flex flex-wrap gap-1.5">
-                {['Ritirare ricetta', 'Chiamare all\'arrivo', 'Solo pomeriggio', 'Frigorifero', 'Lasciare al portiere'].map(chip => (
-                  <button key={chip} type="button"
-                    onClick={() => setForm(f => ({ ...f, notes: f.notes ? `${f.notes}, ${chip}` : chip }))}
-                    className="px-2 h-7 rounded-full border border-border text-xs text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
-                    data-testid="note-chip">
-                    + {chip}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="form-group">
-              <Label>NRE (ricetta elettronica) — opzionale</Label>
-              <Input placeholder="Numero ricetta" value={form.nre || ''}
-                onChange={e => setForm({ ...form, nre: e.target.value })} maxLength={40} />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -946,6 +919,28 @@ export default function DeliveriesPage() {
                 {change_due >= 0 ? `Resto: ${formatCurrency(change_due)}` : 'Il pagato con deve coprire l’importo'}
               </p>
             )}
+            <div className="form-group">
+              <Label>Note / Farmaci</Label>
+              <Textarea placeholder="Es: Augmentin 1g, Tachipirina 1000..." value={form.notes}
+                onChange={e => setForm({...form, notes: e.target.value})} className="min-h-[80px]" />
+              <div className="flex flex-wrap gap-1.5">
+                {['Ritirare ricetta', 'Chiamare all\'arrivo', 'Solo pomeriggio', 'Frigorifero', 'Lasciare al portiere'].map(chip => (
+                  <button key={chip} type="button"
+                    onClick={() => setForm(f => ({ ...f, notes: f.notes ? `${f.notes}, ${chip}` : chip }))}
+                    className="px-2 h-7 rounded-full border border-border text-xs text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+                    data-testid="note-chip">
+                    + {chip}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="form-group">
+              <Label>NRE (ricetta elettronica) — opzionale</Label>
+              <Input placeholder="Numero ricetta" value={form.nre || ''}
+                onChange={e => setForm({ ...form, nre: e.target.value })} maxLength={40} />
+            </div>
+
             <DialogFooter className="gap-2">
               <Button type="button" variant="outline" onClick={() => { setDialogOpen(false); resetForm(); }}>
                 Annulla
@@ -1147,6 +1142,11 @@ export default function DeliveriesPage() {
               </div>
             </div>
             <div>
+              <Label htmlFor="qc-phone2">Secondo telefono (opzionale)</Label>
+              <Input id="qc-phone2" type="tel" inputMode="tel" placeholder="Altro recapito"
+                data-testid="create-customer-phone2"
+                value={newCustomer.phone2 || ''}
+                onChange={(e) => setNewCustomer({ ...newCustomer, phone2: e.target.value })} />
               <Label htmlFor="qc-notes">Note (opzionale)</Label>
               <Input id="qc-notes"
                 placeholder="Es: anziano, citofonare al cancello"

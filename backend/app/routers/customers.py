@@ -47,6 +47,18 @@ async def create_customer(customer: CustomerCreate, user: dict = Depends(get_cur
         "extra_phones": [p for p in (customer.extra_phones or []) if p and p.strip()],
         "created_at": datetime.now(timezone.utc).isoformat()
     }
+    # Fallback geocodifica: se il client non ha trovato le coordinate (civici
+    # ostici come a Volla) le ricaviamo lato server, senza bloccare il salvataggio.
+    if customer_data.get("address") and not (customer_data.get("customer_lat") and customer_data.get("customer_lng")):
+        try:
+            from app.core.geocode import ensure_coords
+            lat, lng = await ensure_coords(customer_data["address"])
+            if lat is not None and lng is not None:
+                customer_data["customer_lat"], customer_data["customer_lng"] = lat, lng
+                customer_data["geocode_source"] = "nominatim_fallback"
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Geocodifica di riserva non disponibile: %s", exc)
+
     await db.customers.insert_one(customer_data)
     return {k: v for k, v in customer_data.items() if k != "_id"}
 
