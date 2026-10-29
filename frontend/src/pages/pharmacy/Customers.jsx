@@ -11,6 +11,7 @@ import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Textarea } from '../../components/ui/textarea';
 import AddressAutocomplete from '../../components/AddressAutocomplete';
+import { Link } from 'react-router-dom';
 import { Badge } from '../../components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog';
 import { ScrollArea } from '../../components/ui/scroll-area';
@@ -246,6 +247,20 @@ export default function CustomersPage() {
     fetchCustomerStats(customer.customer_id, customer);
   };
 
+  const mapLinkFor = (customer) => (
+    customer.customer_lat != null && customer.customer_lng != null
+      ? `https://www.google.com/maps/dir/?api=1&destination=${customer.customer_lat},${customer.customer_lng}`
+      : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(customer.address || customer.name || '')}`
+  );
+
+  const deliveryLinkFor = (customer) => {
+    const params = new URLSearchParams({ new: 'true' });
+    if (customer.name) params.set('customer_name', customer.name);
+    if (customer.phone) params.set('customer_phone', customer.phone);
+    if (customer.address) params.set('customer_address', customer.address);
+    return `/deliveries?${params.toString()}`;
+  };
+
   const filteredCustomers = useMemo(() => ensureArray(customers).filter((customer) => {
     const normalizedTerm = searchTerm.trim().toLowerCase();
     if (!normalizedTerm) return true;
@@ -253,6 +268,157 @@ export default function CustomersPage() {
       .filter(Boolean)
       .some((value) => value.toLowerCase().includes(normalizedTerm));
   }), [customers, searchTerm]);
+
+  // Dialog condiviso: serve sia nella lista sia nel profilo cliente
+  const customerDialog = (
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>{editingCustomer ? 'Modifica cliente' : 'Nuovo cliente'}</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleSubmit}>
+              <div className="space-y-4 py-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div className="form-group sm:col-span-2">
+                    <Label htmlFor="name">Nome completo *</Label>
+                    <Input
+                      id="name"
+                      value={formData.name}
+                      onChange={(event) => setFormData({ ...formData, name: event.target.value })}
+                      placeholder="Mario Rossi"
+                      required
+                      data-testid="customer-name-input"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <Label htmlFor="phone">Telefono *</Label>
+                    <Input
+                      id="phone"
+                      value={formData.phone}
+                      onChange={(event) => setFormData({ ...formData, phone: event.target.value })}
+                      placeholder="+39 333 1234567"
+                      required
+                      data-testid="customer-phone-input"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <Label htmlFor="email">Email</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      value={formData.email}
+                      onChange={(event) => setFormData({ ...formData, email: event.target.value })}
+                      placeholder="mario@email.com"
+                      data-testid="customer-email-input"
+                    />
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <AddressAutocomplete
+                    id="address"
+                    label="Indirizzo"
+                    required
+                    testId="customer-address-input"
+                    value={formData.address}
+                    onChange={(value) => setFormData({ ...formData, address: value, customer_lat: null, customer_lng: null, place_id: '' })}
+                    onAddressSelect={(selection) => setFormData({
+                      ...formData,
+                      address: selection.address,
+                      customer_lat: selection.lat,
+                      customer_lng: selection.lng,
+                      place_id: selection.placeId || '',
+                    })}
+                    placeholder="Via Rossi 119, 80040 Volla (NA)"
+                  />
+                  {formData.customer_lat && formData.customer_lng && (
+                    <p className="text-xs text-emerald-600">Indirizzo verificato sulla mappa</p>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div className="form-group">
+                    <Label htmlFor="fiscal_code">Codice fiscale</Label>
+                    <Input
+                      id="fiscal_code"
+                      value={formData.fiscal_code}
+                      onChange={(event) => setFormData({ ...formData, fiscal_code: event.target.value.toUpperCase() })}
+                      placeholder="RSSMRA80A01H501U"
+                      className="uppercase"
+                      data-testid="customer-fiscal-input"
+                    />
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <Label>Telefoni aggiuntivi</Label>
+                  <div className="space-y-2 mt-1">
+                    {ensureArray(formData.extra_phones).map((phone, i) => (
+                      <div key={i} className="flex gap-2 items-center">
+                        <Input
+                          type="tel"
+                          value={phone}
+                          onChange={(e) => {
+                            const phones = [...ensureArray(formData.extra_phones)];
+                            phones[i] = e.target.value;
+                            setFormData({ ...formData, extra_phones: phones });
+                          }}
+                          placeholder={`Telefono ${i + 2}`}
+                          data-testid={`customer-extra-phone-${i}`}
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            const phones = [...ensureArray(formData.extra_phones)];
+                            phones.splice(i, 1);
+                            setFormData({ ...formData, extra_phones: phones });
+                          }}
+                          className="h-10 w-10 text-muted-foreground hover:text-destructive flex-shrink-0"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setFormData({ ...formData, extra_phones: [...ensureArray(formData.extra_phones), ''] })}
+                      className="gap-2 text-muted-foreground"
+                      data-testid="add-extra-phone-btn"
+                    >
+                      <PlusCircle className="h-4 w-4" />
+                      Aggiungi numero
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <Label htmlFor="notes">Note</Label>
+                  <Textarea
+                    id="notes"
+                    value={formData.notes}
+                    onChange={(event) => setFormData({ ...formData, notes: event.target.value })}
+                    placeholder="Allergie, citofono, preferenze di consegna…"
+                    data-testid="customer-notes-input"
+                  />
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+                  Annulla
+                </Button>
+                <Button type="submit" className="btn-primary" data-testid="save-customer-btn">
+                  {editingCustomer ? 'Salva modifiche' : 'Crea cliente'}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+  );
 
   if (loading) {
     return (
@@ -302,6 +468,7 @@ export default function CustomersPage() {
     return (
       <Layout title="Clienti">
         <div className="space-y-6" data-testid="customer-detail">
+          {customerDialog}
           <Button
             variant="ghost"
             onClick={() => { setSelectedCustomer(null); setCustomerStats(null); }}
@@ -363,6 +530,12 @@ export default function CustomersPage() {
                             </a>
                           </Button>
                         )}
+                        <Button asChild variant="outline">
+                          <Link to={deliveryLinkFor(customer)}>
+                            <Package className="mr-2 h-4 w-4" />
+                            Nuova consegna
+                          </Link>
+                        </Button>
                       </div>
                     </div>
                   </div>
@@ -716,9 +889,32 @@ export default function CustomersPage() {
                       )}
                     </div>
 
-                    <div className="mt-4 flex items-center justify-between border-t pt-4 text-sm">
-                      <span className="text-muted-foreground">Apri profilo completo</span>
-                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    <div className="mt-4 flex items-center justify-between border-t pt-3">
+                      <div className="flex items-center gap-1">
+                        <Button asChild variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary"
+                          data-testid={`quick-call-${customer.customer_id}`}>
+                          <a href={`tel:${customer.phone}`} onClick={(event) => event.stopPropagation()} title="Chiama">
+                            <Phone className="h-4 w-4" />
+                          </a>
+                        </Button>
+                        <Button asChild variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary"
+                          data-testid={`quick-map-${customer.customer_id}`}>
+                          <a href={mapLinkFor(customer)} target="_blank" rel="noopener noreferrer"
+                            onClick={(event) => event.stopPropagation()} title="Apri mappa">
+                            <MapPin className="h-4 w-4" />
+                          </a>
+                        </Button>
+                        <Button asChild variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary"
+                          data-testid={`quick-delivery-${customer.customer_id}`}>
+                          <Link to={deliveryLinkFor(customer)} onClick={(event) => event.stopPropagation()} title="Nuova consegna">
+                            <Package className="h-4 w-4" />
+                          </Link>
+                        </Button>
+                      </div>
+                      <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                        Profilo
+                        <ChevronRight className="h-4 w-4" />
+                      </span>
                     </div>
                   </CardContent>
                 </Card>
@@ -727,153 +923,7 @@ export default function CustomersPage() {
           </div>
         )}
 
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>{editingCustomer ? 'Modifica cliente' : 'Nuovo cliente'}</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit}>
-              <div className="space-y-4 py-4">
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div className="form-group sm:col-span-2">
-                    <Label htmlFor="name">Nome completo *</Label>
-                    <Input
-                      id="name"
-                      value={formData.name}
-                      onChange={(event) => setFormData({ ...formData, name: event.target.value })}
-                      placeholder="Mario Rossi"
-                      required
-                      data-testid="customer-name-input"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <Label htmlFor="phone">Telefono *</Label>
-                    <Input
-                      id="phone"
-                      value={formData.phone}
-                      onChange={(event) => setFormData({ ...formData, phone: event.target.value })}
-                      placeholder="+39 333 1234567"
-                      required
-                      data-testid="customer-phone-input"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <Label htmlFor="email">Email</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      value={formData.email}
-                      onChange={(event) => setFormData({ ...formData, email: event.target.value })}
-                      placeholder="mario@email.com"
-                      data-testid="customer-email-input"
-                    />
-                  </div>
-                </div>
-
-                <div className="form-group">
-                  <AddressAutocomplete
-                    id="address"
-                    label="Indirizzo"
-                    required
-                    testId="customer-address-input"
-                    value={formData.address}
-                    onChange={(value) => setFormData({ ...formData, address: value, customer_lat: null, customer_lng: null, place_id: '' })}
-                    onAddressSelect={(selection) => setFormData({
-                      ...formData,
-                      address: selection.address,
-                      customer_lat: selection.lat,
-                      customer_lng: selection.lng,
-                      place_id: selection.placeId || '',
-                    })}
-                    placeholder="Via Rossi 119, 80040 Volla (NA)"
-                  />
-                  {formData.customer_lat && formData.customer_lng && (
-                    <p className="text-xs text-emerald-600">Indirizzo verificato sulla mappa</p>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div className="form-group">
-                    <Label htmlFor="fiscal_code">Codice fiscale</Label>
-                    <Input
-                      id="fiscal_code"
-                      value={formData.fiscal_code}
-                      onChange={(event) => setFormData({ ...formData, fiscal_code: event.target.value.toUpperCase() })}
-                      placeholder="RSSMRA80A01H501U"
-                      className="uppercase"
-                      data-testid="customer-fiscal-input"
-                    />
-                  </div>
-                </div>
-
-                <div className="form-group">
-                  <Label>Telefoni aggiuntivi</Label>
-                  <div className="space-y-2 mt-1">
-                    {ensureArray(formData.extra_phones).map((phone, i) => (
-                      <div key={i} className="flex gap-2 items-center">
-                        <Input
-                          type="tel"
-                          value={phone}
-                          onChange={(e) => {
-                            const phones = [...ensureArray(formData.extra_phones)];
-                            phones[i] = e.target.value;
-                            setFormData({ ...formData, extra_phones: phones });
-                          }}
-                          placeholder={`Telefono ${i + 2}`}
-                          data-testid={`customer-extra-phone-${i}`}
-                        />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => {
-                            const phones = [...ensureArray(formData.extra_phones)];
-                            phones.splice(i, 1);
-                            setFormData({ ...formData, extra_phones: phones });
-                          }}
-                          className="h-10 w-10 text-muted-foreground hover:text-destructive flex-shrink-0"
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setFormData({ ...formData, extra_phones: [...ensureArray(formData.extra_phones), ''] })}
-                      className="gap-2 text-muted-foreground"
-                      data-testid="add-extra-phone-btn"
-                    >
-                      <PlusCircle className="h-4 w-4" />
-                      Aggiungi numero
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="form-group">
-                  <Label htmlFor="notes">Note</Label>
-                  <Textarea
-                    id="notes"
-                    value={formData.notes}
-                    onChange={(event) => setFormData({ ...formData, notes: event.target.value })}
-                    placeholder="Allergie, citofono, preferenze di consegna…"
-                    data-testid="customer-notes-input"
-                  />
-                </div>
-              </div>
-
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
-                  Annulla
-                </Button>
-                <Button type="submit" className="btn-primary" data-testid="save-customer-btn">
-                  {editingCustomer ? 'Salva modifiche' : 'Crea cliente'}
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
+{customerDialog}
       </div>
     </Layout>
   );
