@@ -29,22 +29,29 @@ def _clean(address: str) -> str:
 
 
 def _split(address: str):
-    """Ritorna (via, civico, comune) da un indirizzo italiano scritto a mano."""
-    addr = _clean(address)
+    """(via, civico, comune) anche senza virgole: "Via Roma 12 Volla"."""
+    addr = re.sub(r"\s{2,}", " ", (address or "").strip())
     if not addr:
         return None, None, None
+
     parts = [p.strip() for p in addr.split(",") if p.strip()]
-    street_part = parts[0] if parts else addr
-    city_part = parts[-1] if len(parts) > 1 else ""
-    # via + civico: "Via Rossi 119" / "Via Rossi 119/A"
-    m = re.match(r"^(.*?)[,\s]+(\d{1,4}[a-zA-Z]?)$", street_part)
-    if m:
-        street, civic = m.group(1).strip(), m.group(2)
+    if len(parts) >= 2:
+        street_part, city_part = parts[0], parts[-1]
+    else:
+        m = re.search(r"\b\d{1,4}\s?[a-zA-Z]?\b", addr)
+        if m and m.start() > 0 and addr[m.end():].strip():
+            street_part = f"{addr[:m.start()].strip(' ,')} {m.group(0).strip()}"
+            city_part = addr[m.end():].strip(" ,")
+        else:
+            street_part, city_part = addr, ""
+
+    m2 = re.match(r"^(.*?)[,\s]+(\d{1,4}\s?[a-zA-Z]?)$", street_part)
+    if m2:
+        street, civic = m2.group(1).strip(), m2.group(2).strip()
     else:
         street, civic = street_part, None
-    # comune con eventuale sigla provincia
     city = re.sub(r"\(?\b[A-Z]{2}\b\)?", "", city_part).strip(" ,()")
-    return street or None, civic, city or None
+    return (street or None), civic, (city or None)
 
 
 async def _nominatim(client: httpx.AsyncClient, params: Dict[str, Any]) -> List[Dict[str, Any]]:
