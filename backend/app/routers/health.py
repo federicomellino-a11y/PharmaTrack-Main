@@ -39,6 +39,8 @@ async def public_health():
         "push_configured": push_notifications_enabled(),
         "smtp_configured": bool(SMTP_FROM and SMTP_PASSWORD),
         "google_auth_configured": bool(os.getenv("GOOGLE_CLIENT_ID") or os.getenv("VITE_GOOGLE_CLIENT_ID")),
+        "sentry_configured": bool(os.getenv("SENTRY_DSN")),
+        "sentry_environment": (os.getenv("SENTRY_ENVIRONMENT") or os.getenv("ENVIRONMENT") or "") or None,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
