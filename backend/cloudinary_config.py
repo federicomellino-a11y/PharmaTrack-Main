@@ -9,6 +9,14 @@ from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
+# Storage locale di riserva: se Cloudinary non è configurato le foto POD
+# finiscono su MongoDB GridFS e vengono servite dall'app (link con chiave).
+LOCAL_STORAGE_BUCKET = "pod_photos"
+API_PUBLIC_URL = (os.environ.get("APP_BASE_URL") or os.environ.get("API_PUBLIC_URL")
+                  or "https://pharmatrack-api.onrender.com").rstrip("/")
+LOCAL_STORAGE_DISABLED = os.environ.get("LOCAL_PHOTO_STORAGE", "1") == "0"
+CLOUDINARY_READY = bool(CLOUDINARY_CLOUD_NAME and CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET)
+
 # Load Cloudinary credentials from environment
 CLOUDINARY_CLOUD_NAME = os.environ.get("CLOUDINARY_CLOUD_NAME")
 CLOUDINARY_API_KEY = os.environ.get("CLOUDINARY_API_KEY")
@@ -38,16 +46,51 @@ class PhotoManager:
     IMAGE_HEIGHT = 720
     COMPRESSION_QUALITY = 80
 
+    STORAGE_LOCAL = "local"
+
+    @staticmethod
+    def storage_backend() -> str:
+        """'cloudinary' se configurato, altrimenti 'local' (MongoDB GridFS)."""
+        if CLOUDINARY_READY:
+            return "cloudinary"
+        return "disabled" if LOCAL_STORAGE_DISABLED else "local"
+
     @staticmethod
     def is_photo_upload_enabled() -> bool:
-        """
-        Check if Cloudinary is configured and photo uploads are enabled.
-        """
-        return all([
-            CLOUDINARY_CLOUD_NAME,
-            CLOUDINARY_API_KEY,
-            CLOUDINARY_API_SECRET,
-        ])
+        """Le foto sono disponibili con Cloudinary oppure con lo storage locale."""
+        return PhotoManager.storage_backend() in ("cloudinary", "local")
+
+    @staticmethod
+    async def _store_local(file_path: str, delivery_id: str, pharmacy_id: str, driver_id: str) -> Dict[str, Any]:
+        """Salva la foto su MongoDB GridFS (nessun servizio esterno richiesto)."""
+        import uuid as _uuid
+        from motor.motor_asyncio import AsyncIOMotorGridFSBucket
+        from app.core.database import db
+
+        with open(file_path, "rb") as fh:
+            data = fh.read()
+        ext = file_path.split(".")[-1].lower()
+        content_type = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png",
+                        "webp": "image/webp"}.get(ext, "image/jpeg")
+        photo_id = f"photo_{_uuid.uuid4().hex[:16]}"
+        access_key = _uuid.uuid4().hex
+        bucket = AsyncIOMotorGridFSBucket(db, bucket_name=LOCAL_STORAGE_BUCKET)
+        grid_id = await bucket.upload_from_stream(
+            f"{delivery_id}.{ext}", data,
+            metadata={"delivery_id": delivery_id, "pharmacy_id": pharmacy_id, "driver_id": driver_id},
+        )
+        await db.photo_files.insert_one({
+            "photo_id": photo_id, "gridfs_id": grid_id, "access_key": access_key,
+            "delivery_id": delivery_id, "pharmacy_id": pharmacy_id, "driver_id": driver_id,
+            "content_type": content_type, "bytes": len(data), "format": ext,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        })
+        url = f"{API_PUBLIC_URL}/api/photos/file/{photo_id}?k={access_key}"
+        logger.info(f"Foto POD salvata su GridFS per la consegna {delivery_id} ({len(data)} byte)")
+        return {"success": True, "public_id": f"local:{photo_id}", "secure_url": url, "url": url,
+                "format": ext, "width": None, "height": None, "bytes": len(data),
+                "version": None, "storage": "local",
+                "uploaded_at": datetime.now(timezone.utc).isoformat()}
 
     @staticmethod
     def validate_file_size(file_size_bytes: int) -> bool:
@@ -87,7 +130,9 @@ class PhotoManager:
             Dictionary with upload result including secure URL and metadata
         """
         if not PhotoManager.is_photo_upload_enabled():
-            raise ValueError("Photo upload is not configured. Set CLOUDINARY_* environment variables.")
+            raise ValueError("Photo upload is disabled.")
+        if PhotoManager.storage_backend() == "local":
+            return await PhotoManager._store_local(file_path, delivery_id, pharmacy_id, driver_id)
 
         try:
             # Organize in folder structure: pharmatrack/pharmacy_id/delivery_id
@@ -160,6 +205,22 @@ class PhotoManager:
         """
         if not PhotoManager.is_photo_upload_enabled():
             return False
+
+        if str(public_id or "").startswith("local:"):
+            import uuid as _uuid
+            from motor.motor_asyncio import AsyncIOMotorGridFSBucket
+            from app.core.database import db
+            photo_id = public_id.split(":", 1)[1]
+            doc = await db.photo_files.find_one({"photo_id": photo_id, "pharmacy_id": pharmacy_id})
+            if not doc:
+                return False
+            try:
+                bucket = AsyncIOMotorGridFSBucket(db, bucket_name=LOCAL_STORAGE_BUCKET)
+                await bucket.delete(_uuid.UUID(str(doc["gridfs_id"]).replace("-", "")) if isinstance(doc.get("gridfs_id"), str) else doc["gridfs_id"])
+            except Exception as e:  # noqa: BLE001
+                logger.warning(f"GridFS delete fallita per {photo_id}: {e}")
+            await db.photo_files.delete_one({"photo_id": photo_id})
+            return True
 
         try:
             # Verify the photo belongs to this pharmacy (security check)
