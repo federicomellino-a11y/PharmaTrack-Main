@@ -20,6 +20,10 @@ HEADERS = {"User-Agent": "PharmaTrack/1.0 (gestionale consegne farmacie)", "Acce
 TIMEOUT = 8.0
 
 
+def strip_civic(street: str) -> str:
+    return re.sub(r"\s{2,}", " ", street).strip()
+
+
 def _clean(address: str) -> str:
     return re.sub(r"\s{2,}", " ", (address or "").strip())
 
@@ -135,6 +139,23 @@ async def geocode_search(q: str = Query(..., min_length=3), limit: int = 6) -> L
         seen.add(key)
         unique.append(item)
     unique.sort(key=lambda i: (0 if i.get("house_number") else 1))
+
+    # OSM/Photon in Italia spesso non hanno il civico: se l'utente l'ha scritto
+    # lo manteniamo nel testo del suggerimento (coordinate della via), cosi'
+    # il fattorino vede comunque il numero civico.
+    if civic and street:
+        for item in unique:
+            if item.get("house_number"):
+                continue
+            main = (item.get("structured_formatting") or {}).get("main_text") or ""
+            if street.lower() in main.lower():
+                item["structured_formatting"]["main_text"] = f"{strip_civic(street)} {civic}".strip()
+                item["structured_formatting"]["secondary_text"] = ", ".join(
+                    [t for t in [item["structured_formatting"].get("secondary_text"), "civico da verificare"] if t]
+                )
+                item["house_number"] = civic
+                item["house_number_source"] = "typed"
+                item["precision"] = "via"
     return unique[:limit]
 
 
@@ -160,9 +181,12 @@ async def geocode_resolve(address: str = Query(..., min_length=3)) -> Dict[str, 
                 rows = await _nominatim(client, {**params, "limit": 1})
                 if rows:
                     row = rows[0]
+                    found_number = (row.get("address") or {}).get("house_number")
+                    real_precision = "civico" if found_number else ("via" if precision == "civico" else precision)
                     return {
                         "lat": float(row["lat"]), "lng": float(row["lon"]),
-                        "label": row.get("display_name"), "precision": precision,
+                        "label": row.get("display_name"), "precision": real_precision,
+                        "house_number": found_number,
                         "provider": "nominatim",
                     }
             else:
