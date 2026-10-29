@@ -56,9 +56,9 @@ async def create_delivery(delivery: DeliveryCreate, user: dict = Depends(get_cur
     if delivery.payment_method == "cash" and delivery.amount is not None and delivery.amount_given is not None and delivery.amount_given < delivery.amount:
         raise HTTPException(status_code=400, detail="Il pagato con non può essere inferiore all'importo")
 
-    # Solo il fattorino scelto esplicitamente: nessun default dal profilo,
-    # altrimenti la consegna saltando la coda finisce direttamente "assegnata".
-    selected_driver_id = delivery.driver_id
+    # Fattorino predefinito dal profilo: viene solo preselezionato.
+    # La consegna resta comunque in "da preparare" finche' non viene confermata.
+    selected_driver_id = delivery.driver_id or (user.get("settings") or {}).get("default_driver_id")
     assigned_driver = None
     if selected_driver_id:
         assigned_driver = await db.drivers.find_one({
@@ -105,7 +105,7 @@ async def create_delivery(delivery: DeliveryCreate, user: dict = Depends(get_cur
         "customer_name": customer["name"], "customer_phone": customer["phone"], "customer_address": customer["address"],
         "customer_lat": customer.get("customer_lat"), "customer_lng": customer.get("customer_lng"),
         "notes": delivery.notes,
-        "status": "assigned" if assigned_driver else "da_preparare",
+        "status": "da_preparare",  # sempre in coda: l'assegnazione e' un passo a parte
         "payment_method": delivery.payment_method, "amount": delivery.amount,
         "amount_given": delivery.amount_given, "change_due": change_due, "payment_collected": False,
         "scheduled_date": delivery.scheduled_date, "scheduled_time": delivery.scheduled_time,

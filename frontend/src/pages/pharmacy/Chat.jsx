@@ -254,6 +254,31 @@ export default function ChatPage() {
     }
   };
 
+  const handleNewChat = async () => {
+    if (!driverId) return;
+    try {
+      await axios.post(`${API}/messages/${driverId}/new-chat`, {}, { withCredentials: true });
+      setMessages([]);
+      setNewMessage('');
+      toast.success('Nuova chat aperta');
+      fetchMessages(driverId);
+    } catch {
+      toast.error('Impossibile aprire una nuova chat');
+    }
+  };
+
+  const handleCloseChat = async () => {
+    if (!driverId) return;
+    try {
+      await axios.put(`${API}/messages/${driverId}/close-chat`, {}, { withCredentials: true });
+      setMessages([]);
+      setNewMessage('');
+      toast.success('Chat chiusa. Il prossimo messaggio ne apre una nuova.');
+    } catch {
+      toast.error('Impossibile chiudere la chat');
+    }
+  };
+
   const safeMessages = ensureArray(messages);
 
   if (loadingList) {
@@ -275,6 +300,16 @@ export default function ChatPage() {
             <h1 className="text-2xl font-bold text-foreground">Chat fattorini</h1>
             <p className="text-sm text-muted-foreground">Messaggi rapidi per indirizzi, note cliente, pagamenti e aggiornamenti operativi.</p>
           </div>
+          {driverId && (
+            <div className="flex w-fit gap-2" data-testid="chat-thread-actions">
+              <button type="button" onClick={handleNewChat}
+                className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-secondary transition-colors"
+                data-testid="chat-new-button">+ Nuova chat</button>
+              <button type="button" onClick={handleCloseChat}
+                className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-secondary transition-colors"
+                data-testid="chat-close-button">Chiudi chat</button>
+            </div>
+          )}
           <Badge variant={connected ? 'secondary' : 'outline'} className="w-fit gap-2 px-3 py-1">
             {connected ? <Wifi className="h-3.5 w-3.5" /> : <WifiOff className="h-3.5 w-3.5" />}
             {connected ? 'Tempo reale attivo' : 'Riconnessione in corso'}
