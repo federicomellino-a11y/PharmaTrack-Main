@@ -11,7 +11,7 @@ import tempfile
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Depends, Request, UploadFile, File, Form
+from fastapi import APIRouter, HTTPException, Depends, Request, UploadFile, File, Form, Response
 
 from app.core.database import db
 from app.core.websocket import manager
@@ -183,3 +183,32 @@ async def confirm_pod(delivery_id: str, user: dict = Depends(get_current_user)) 
         "status": "delivered_pending_confirmation",
         "pod_confirmed_at": now,
     }
+
+
+@router.get("/photos/file/{photo_id}")
+async def serve_stored_photo(photo_id: str, k: str = ""):
+    """Serve una foto POD salvata su GridFS (link con chiave, nessuna sessione).
+
+    La chiave casuale per foto rende l'URL una capability: il tag <img> del
+    browser e l'app mobile la caricano senza cookie cross-site.
+    """
+    import uuid as _uuid
+    import hmac
+    from motor.motor_asyncio import AsyncIOMotorGridFSBucket
+
+    doc = await db.photo_files.find_one({"photo_id": photo_id})
+    if not doc or not k or not hmac.compare_digest(str(doc.get("access_key", "")), k):
+        raise HTTPException(status_code=404, detail="Foto non trovata")
+
+    bucket = AsyncIOMotorGridFSBucket(db, bucket_name="pod_photos")
+    try:
+        stream = await bucket.open_download_stream(doc["gridfs_id"])
+        data = await stream.read()
+    except Exception:  # noqa: BLE001
+        raise HTTPException(status_code=404, detail="Foto non disponibile")
+
+    return Response(
+        content=data,
+        media_type=doc.get("content_type", "image/jpeg"),
+        headers={"Cache-Control": "private, max-age=604800"},
+    )
