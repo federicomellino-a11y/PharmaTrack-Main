@@ -618,6 +618,11 @@ export default function DeliveriesPage() {
                               <Truck className="w-3 h-3" />{driver.name}
                             </span>
                           )}
+                          {['assigned', 'picked_up', 'in_transit'].includes(d.status) && d.driver_eta_minutes != null && (
+                            <span className="flex items-center gap-1 font-medium text-primary" data-testid={`eta-${d.delivery_id}`}>
+                              <Clock className="w-3 h-3" />≈ {d.driver_eta_minutes} min
+                            </span>
+                          )}
                           {d.scheduled_date && (
                             <span className="flex items-center gap-1 text-primary">
                               <Calendar className="w-3 h-3" />

@@ -1,5 +1,6 @@
 import os
 import json
+import math
 import uuid
 import logging
 import hashlib
@@ -30,6 +31,49 @@ from app.models.schemas import *
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
+ETA_ROAD_FACTOR = 1.35
+ETA_AVG_SPEED_KMH = 24.0
+
+
+def _haversine_km(lat1, lng1, lat2, lng2):
+    radius = 6371.0
+    dlat = math.radians(lat2 - lat1)
+    dlng = math.radians(lng2 - lng1)
+    a = (math.sin(dlat / 2) ** 2
+         + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlng / 2) ** 2)
+    return 2 * radius * math.asin(math.sqrt(a))
+
+
+def _parse_iso(value):
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except Exception:
+        return None
+
+
+def _enrich_with_eta(items, drivers_by_id):
+    """Distanza e tempo stimato dal fattorino assegnato a ogni consegna attiva."""
+    now = datetime.now(timezone.utc)
+    for item in items:
+        driver = drivers_by_id.get(item.get("driver_id") or "")
+        if not driver:
+            continue
+        last_update = _parse_iso(driver.get("last_location_update"))
+        if last_update:
+            if last_update.tzinfo is None:
+                last_update = last_update.replace(tzinfo=timezone.utc)
+            item["driver_location_age_minutes"] = max(0, int(round((now - last_update).total_seconds() / 60)))
+        lat, lng = driver.get("current_lat"), driver.get("current_lng")
+        if lat is None or lng is None:
+            continue
+        if item.get("customer_lat") is None or item.get("customer_lng") is None:
+            continue
+        km = _haversine_km(float(lat), float(lng), float(item["customer_lat"]), float(item["customer_lng"]))
+        item["driver_distance_km"] = round(km, 1)
+        item["driver_eta_minutes"] = max(1, int(round(km * ETA_ROAD_FACTOR / ETA_AVG_SPEED_KMH * 60)))
+    return items
+
+
 
 @router.get("/deliveries")
 async def get_deliveries(status: Optional[str] = None, driver_id: Optional[str] = None, user: dict = Depends(get_current_user)):
@@ -45,7 +89,15 @@ async def get_deliveries(status: Optional[str] = None, driver_id: Optional[str] 
             query["status"] = status
     if driver_id:
         query["driver_id"] = driver_id
-    return await db.deliveries.find(query, {"_id": 0}).sort("created_at", -1).to_list(500)
+    items = await db.deliveries.find(query, {"_id": 0}).sort("created_at", -1).to_list(500)
+    driver_ids = {item.get("driver_id") for item in items if item.get("driver_id")}
+    if driver_ids:
+        drivers = await db.drivers.find(
+            {"pharmacy_id": user["user_id"], "driver_id": {"$in": list(driver_ids)}},
+            {"_id": 0, "driver_id": 1, "current_lat": 1, "current_lng": 1, "last_location_update": 1},
+        ).to_list(200)
+        _enrich_with_eta(items, {d["driver_id"]: d for d in drivers})
+    return items
 
 @router.post("/deliveries")
 async def create_delivery(delivery: DeliveryCreate, user: dict = Depends(get_current_user)):
