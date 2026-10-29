@@ -9,14 +9,6 @@ from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
-# Storage locale di riserva: se Cloudinary non è configurato le foto POD
-# finiscono su MongoDB GridFS e vengono servite dall'app (link con chiave).
-LOCAL_STORAGE_BUCKET = "pod_photos"
-API_PUBLIC_URL = (os.environ.get("APP_BASE_URL") or os.environ.get("API_PUBLIC_URL")
-                  or "https://pharmatrack-api.onrender.com").rstrip("/")
-LOCAL_STORAGE_DISABLED = os.environ.get("LOCAL_PHOTO_STORAGE", "1") == "0"
-CLOUDINARY_READY = bool(CLOUDINARY_CLOUD_NAME and CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET)
-
 # Load Cloudinary credentials from environment
 CLOUDINARY_CLOUD_NAME = os.environ.get("CLOUDINARY_CLOUD_NAME")
 CLOUDINARY_API_KEY = os.environ.get("CLOUDINARY_API_KEY")
@@ -31,6 +23,14 @@ if CLOUDINARY_CLOUD_NAME and CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET:
     logger.info("Cloudinary initialized successfully")
 else:
     logger.warning("Cloudinary credentials not fully configured. Photo upload disabled.")
+
+# Storage locale di riserva: se Cloudinary non è configurato le foto POD
+# finiscono su MongoDB GridFS e vengono servite dall'app (link con chiave).
+LOCAL_STORAGE_BUCKET = "pod_photos"
+API_PUBLIC_URL = (os.environ.get("APP_BASE_URL") or os.environ.get("API_PUBLIC_URL")
+                  or "https://pharmatrack-api.onrender.com").rstrip("/")
+LOCAL_STORAGE_DISABLED = os.environ.get("LOCAL_PHOTO_STORAGE", "1") == "0"
+CLOUDINARY_READY = bool(CLOUDINARY_CLOUD_NAME and CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET)
 
 
 class PhotoManager:
