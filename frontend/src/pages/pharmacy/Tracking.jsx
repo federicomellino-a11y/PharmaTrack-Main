@@ -106,6 +106,21 @@ const deliveryIcon = new L.DivIcon({
   iconAnchor: [14, 14],
 });
 
+function formatLastSeen(value) {
+  if (!value) return 'posizione non ancora ricevuta';
+  const then = new Date(value).getTime();
+  if (Number.isNaN(then)) return '';
+  const mins = Math.max(0, Math.round((Date.now() - then) / 60000));
+  if (mins <= 1) return 'posizione aggiornata ora';
+  if (mins < 60) return `ultimo aggiornamento ${mins} min fa`;
+  return `ultimo aggiornamento ${Math.round(mins / 60)} h fa`;
+}
+
+function etaFromKm(km) {
+  if (km == null) return null;
+  return Math.max(1, Math.round((km * 1.35 / 24) * 60));
+}
+
 function MapUpdater({ center }) {
   const map = useMap();
 
@@ -241,6 +256,13 @@ export default function TrackingPage() {
   const safeDrivers = ensureArray(drivers);
   const safeDeliveries = ensureArray(deliveries);
   const safeDeliveryCoords = ensureObject(deliveryCoords);
+  useEffect(() => {
+    const timer = setInterval(() => {
+      fetchData().catch(() => null);
+    }, 25000);
+    return () => clearInterval(timer);
+  }, []);
+
   const activeDrivers = safeDrivers.filter((driver) => driver.is_active && driver.current_lat && driver.current_lng);
   const activeDeliveries = safeDeliveries.filter((delivery) => ['assigned', 'picked_up', 'in_transit'].includes(delivery.status));
 
@@ -304,6 +326,7 @@ export default function TrackingPage() {
                         <p className="font-bold text-lg">{driver.name}</p>
                         <p className="text-sm text-gray-600">{driver.vehicle_type}</p>
                         <p className="text-xs text-gray-500">{driver.phone}</p>
+                        <p className="text-xs text-gray-400 mt-1">{formatLastSeen(driver.last_location_update)}</p>
                       </div>
                     </Popup>
                   </Marker>
@@ -382,6 +405,7 @@ export default function TrackingPage() {
                               <div>
                                 <p className="font-medium text-white text-sm">{driver.name}</p>
                                 <p className="text-xs text-zinc-500">{driver.vehicle_type}</p>
+                                <p className="text-[11px] text-zinc-600">{formatLastSeen(driver.last_location_update)}</p>
                               </div>
                             </div>
                             {driverDeliveries.length > 0 && (
@@ -436,6 +460,7 @@ export default function TrackingPage() {
                               {distanceKm !== null && (
                                 <p className="text-xs text-amber-400 font-semibold">
                                   {distanceKm < 1 ? `${Math.round(distanceKm * 1000)}m` : `${distanceKm.toFixed(1)}km`}
+                                  {' · ≈ '}{etaFromKm(distanceKm)} min
                                 </p>
                               )}
                             </div>
