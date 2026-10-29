@@ -51,11 +51,11 @@ async def create_customer(customer: CustomerCreate, user: dict = Depends(get_cur
     # ostici come a Volla) le ricaviamo lato server, senza bloccare il salvataggio.
     if customer_data.get("address") and not (customer_data.get("customer_lat") and customer_data.get("customer_lng")):
         try:
-            from app.core.geocode import ensure_coords
-            lat, lng = await ensure_coords(customer_data["address"])
+            from app.core.geocode import ensure_coords_with_source
+            lat, lng, source = await ensure_coords_with_source(customer_data["address"])
             if lat is not None and lng is not None:
                 customer_data["customer_lat"], customer_data["customer_lng"] = lat, lng
-                customer_data["geocode_source"] = "nominatim_fallback"
+                customer_data["geocode_source"] = source
         except Exception as exc:  # noqa: BLE001
             logger.warning("Geocodifica di riserva non disponibile: %s", exc)
 
