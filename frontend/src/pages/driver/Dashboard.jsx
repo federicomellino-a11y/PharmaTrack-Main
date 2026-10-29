@@ -15,6 +15,7 @@ import {
 import { toast } from 'sonner';
 import { ensureArray } from '@/lib/collections';
 import { flushOfflineQueue, getPendingCount } from '@/lib/offlineQueue';
+import { flushQueuedPhotos } from '@/lib/offlinePhotos';
 
 const LOCATION_DISTANCE_THRESHOLD = 0.00005;
 const LOCATION_MIN_INTERVAL = 15000;
@@ -38,9 +39,13 @@ export default function DriverDashboard() {
       return { synced: 0, dropped: 0, remaining: getPendingCount() };
     }
     const result = await flushOfflineQueue(axios);
-    setPendingSync(result.remaining);
-    if (result.synced > 0) {
-      toast.success(`${result.synced} aggiornament${result.synced === 1 ? 'o' : 'i'} sincronizzat${result.synced === 1 ? 'o' : 'i'}`);
+    const photos = await flushQueuedPhotos(API);
+    setPendingSync(result.remaining + photos.remaining);
+    if (result.synced > 0 || photos.uploaded > 0) {
+      const parts = [];
+      if (result.synced > 0) parts.push(`${result.synced} aggiornament${result.synced === 1 ? 'o' : 'i'}`);
+      if (photos.uploaded > 0) parts.push(`${photos.uploaded} foto`);
+      toast.success(`${parts.join(' e ')} sincronizzati`);
       fetchDeliveries();
     }
     return result;

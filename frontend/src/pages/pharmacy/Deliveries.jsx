@@ -120,6 +120,7 @@ export default function DeliveriesPage() {
   const [activeCustomerIndex, setActiveCustomerIndex] = useState(-1);
   const customerInputRef = React.useRef(null);
   const [activeTab, setActiveTab] = useState('active');
+  const [repairing, setRepairing] = useState(false);
   const [filterDriver, setFilterDriver] = useState('all');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -341,6 +342,24 @@ export default function DeliveriesPage() {
       await axios.post(`${API}/deliveries/${id}/restore`, {}, { withCredentials: true });
       toast.success('Consegna ripristinata'); fetchData();
     } catch (error) { toast.error(error?.response?.data?.detail || 'Ripristino non riuscito'); }
+  };
+
+  const repairCoordinates = async () => {
+    setRepairing(true);
+    try {
+      const { data } = await axios.post(`${API}/deliveries/repair-coordinates`, {}, { withCredentials: true });
+      if (!data?.checked) {
+        toast.info('Tutti gli indirizzi hanno già coordinate precise');
+      } else {
+        const extra = data.failed_count ? `, ${data.failed_count} non risolti` : '';
+        toast.success(`${data.fixed} indirizzi corretti${extra}`);
+      }
+      fetchData();
+    } catch {
+      toast.error('Riparazione indirizzi non riuscita');
+    } finally {
+      setRepairing(false);
+    }
   };
 
   const exportCsv = () => {
@@ -591,6 +610,17 @@ export default function DeliveriesPage() {
             data-testid="export-deliveries-csv"
           >
             <Download className="w-4 h-4 mr-1.5" />Esporta CSV
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-10 sm:h-9 w-full sm:w-auto"
+            onClick={repairCoordinates}
+            disabled={repairing}
+            title="Ricalcola le coordinate delle consegne aperte con indirizzi approssimativi"
+            data-testid="repair-coordinates"
+          >
+            <MapPin className="w-4 h-4 mr-1.5" />{repairing ? 'Riparo...' : 'Ripara indirizzi'}
           </Button>
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full sm:w-auto">
             <TabsList className="h-10 sm:h-9 w-full sm:w-auto">

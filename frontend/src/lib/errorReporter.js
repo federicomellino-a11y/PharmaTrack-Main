@@ -36,9 +36,56 @@ export function reportClientError(error, context = {}) {
       body: JSON.stringify(payload),
       keepalive: true,
     }).catch(() => null);
+
+    loadSentry()
+      .then((Sentry) => {
+        if (!Sentry) return;
+        if (error instanceof Error) Sentry.captureException(error, { tags: { scope: context.scope || 'client' } });
+        else Sentry.captureMessage(String(message), { level: context.level || 'error', tags: { scope: context.scope || 'client' } });
+      })
+      .catch(() => null);
   } catch {
     // il reporting non deve mai rompere l'app
   }
+}
+
+
+let sentryPromise = null;
+
+/**
+ * Carica Sentry nel browser solo quando serve davvero (primo errore) e solo se
+ * il backend espone un DSN. Nessun impatto sull'avvio dell'app.
+ */
+async function loadSentry() {
+  if (sentryPromise) return sentryPromise;
+  sentryPromise = (async () => {
+    try {
+      if (!window.Sentry) {
+        const config = await fetch(`${API}/monitoring/config`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+        if (!config?.sentry_dsn) return null;
+        await new Promise((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src = 'https://browser.sentry-cdn.com/8.45.0/bundle.min.js';
+          script.crossOrigin = 'anonymous';
+          script.onload = resolve;
+          script.onerror = reject;
+          document.head.appendChild(script);
+        });
+        if (!window.Sentry) return null;
+        window.Sentry.init({
+          dsn: config.sentry_dsn,
+          environment: 'production',
+          tracesSampleRate: 0,
+          sendDefaultPii: false,
+        });
+        window.__ptSentryDsn = config.sentry_dsn;
+      }
+      return window.Sentry;
+    } catch {
+      return null;
+    }
+  })();
+  return sentryPromise;
 }
 
 export function installGlobalErrorHandlers() {
