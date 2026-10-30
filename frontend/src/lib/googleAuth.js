@@ -8,9 +8,11 @@ let GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
 let _initialized = false;
 let _callback = null;
 let _loadPromise = null;
+let _fetchedFromApi = false;
 
 async function fetchGoogleClientId() {
-  if (GOOGLE_CLIENT_ID) return GOOGLE_CLIENT_ID;
+  // Il backend e' la fonte di verita': un VITE_GOOGLE_CLIENT_ID vecchio
+  // cotto nel build faceva usare per sempre un client OAuth dismesso.
   // Nessuna cache locale: un Client ID vecchio in localStorage faceva fallire
   // il login con origin_mismatch anche dopo aver corretto le origini su Google.
   try { window.localStorage?.removeItem(STORAGE_KEY); } catch { /* storage non disponibile */ }
@@ -20,6 +22,7 @@ async function fetchGoogleClientId() {
       const data = await res.json();
       if (data?.client_id) {
         GOOGLE_CLIENT_ID = data.client_id;
+        _fetchedFromApi = true;
       }
     }
   } catch { /* backend non raggiungibile */ }
