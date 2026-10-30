@@ -31,6 +31,28 @@ from app.models.schemas import *
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
+
+WORKFLOW_STATUSES = {
+    "da_preparare", "pronta", "pending", "assigned", "picked_up", "in_transit",
+    "delivered_pending_confirmation", "delivered", "cancelled", "not_delivered",
+}
+
+
+async def _log_delivery_audit(delivery, actor_type, actor_id, action, changes=None):
+    """Traccia chi cambia cosa su una consegna."""
+    try:
+        await db.audit_log.insert_one({
+            "delivery_id": delivery.get("delivery_id"),
+            "pharmacy_id": delivery.get("pharmacy_id"),
+            "actor_type": actor_type,
+            "actor_id": actor_id,
+            "action": action,
+            "changes": changes or {},
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        })
+    except Exception:  # l'audit non deve mai bloccare l'operazione principale
+        logger.exception("audit log fallito per %s", delivery.get("delivery_id"))
+
 ETA_ROAD_FACTOR = 1.35
 ETA_AVG_SPEED_KMH = 24.0
 
@@ -79,7 +101,7 @@ def _enrich_with_eta(items, drivers_by_id):
 
 
 @router.get("/deliveries")
-async def get_deliveries(status: Optional[str] = None, driver_id: Optional[str] = None, user: dict = Depends(get_current_user)):
+async def get_deliveries(response: Response, status: Optional[str] = None, driver_id: Optional[str] = None, limit: int = 500, offset: int = 0, user: dict = Depends(get_current_user)):
     query = {"pharmacy_id": user["user_id"]}
     if status:
         if status == "active":
@@ -87,12 +109,17 @@ async def get_deliveries(status: Optional[str] = None, driver_id: Optional[str] 
         elif status == "pending_confirmation":
             query["status"] = "delivered_pending_confirmation"
         elif status == "completed":
-            query["status"] = {"$in": ["delivered", "cancelled"]}
+            query["status"] = {"$in": ["delivered", "cancelled", "not_delivered"]}
         else:
             query["status"] = status
     if driver_id:
         query["driver_id"] = driver_id
-    items = await db.deliveries.find(query, {"_id": 0}).sort("created_at", -1).to_list(500)
+    safe_limit = max(1, min(int(limit or 500), 2000))
+    safe_offset = max(0, int(offset or 0))
+    total = await db.deliveries.count_documents(query)
+    response.headers["X-Total-Count"] = str(total)
+    response.headers["X-Result-Count"] = str(safe_limit)
+    items = await db.deliveries.find(query, {"_id": 0}).sort("created_at", -1).skip(safe_offset).to_list(safe_limit)
     driver_ids = {item.get("driver_id") for item in items if item.get("driver_id")}
     if driver_ids:
         drivers = await db.drivers.find(
@@ -280,6 +307,8 @@ async def update_delivery(delivery_id: str, update: DeliveryUpdate, user: dict =
         effective_driver_id = update.driver_id if update.driver_id is not None else delivery.get("driver_id")
         if update.status == "in_transit" and not effective_driver_id:
             raise HTTPException(status_code=400, detail="Assegna prima un fattorino per avviare la consegna")
+        if update.status not in WORKFLOW_STATUSES:
+            raise HTTPException(status_code=400, detail="Stato non valido")
         update_data["status"] = update.status
         if update.status == "cancelled" and delivery.get("status") != "cancelled":
             update_data["previous_status"] = delivery.get("status") or "pronta"
@@ -287,6 +316,8 @@ async def update_delivery(delivery_id: str, update: DeliveryUpdate, user: dict =
         if update.status == "delivered":
             update_data["actual_delivery"] = datetime.now(timezone.utc).isoformat()
     if update.notes is not None: update_data["notes"] = update.notes
+    if getattr(update, "failure_reason", None) and update.status not in ("cancelled", "not_delivered"):
+        update_data["failure_reason"] = update.failure_reason[:200]
     if update.payment_method is not None: update_data["payment_method"] = update.payment_method
     if update.amount is not None: update_data["amount"] = update.amount
     if update.amount_given is not None:
@@ -317,11 +348,11 @@ async def restore_delivery(delivery_id: str, user: dict = Depends(get_current_us
     )
     if not delivery:
         raise HTTPException(status_code=404, detail="Consegna non trovata")
-    if delivery.get("status") != "cancelled":
-        raise HTTPException(status_code=400, detail="Solo le consegne annullate possono essere ripristinate")
+    if delivery.get("status") not in ("cancelled", "not_delivered"):
+        raise HTTPException(status_code=400, detail="Solo le consegne annullate o non consegnate possono essere ripristinate")
 
     previous = delivery.get("previous_status") or "pronta"
-    if previous in ("cancelled", "delivered"):
+    if previous in ("cancelled", "delivered", "not_delivered"):
         previous = "pronta"
     if previous in ("assigned", "picked_up", "in_transit") and not delivery.get("driver_id"):
         previous = "pronta"
@@ -333,6 +364,7 @@ async def restore_delivery(delivery_id: str, user: dict = Depends(get_current_us
         "restored_at": now,
         "previous_status": None,
         "cancelled_at": None,
+        "failure_reason": None,
     }
     await db.deliveries.update_one(
         {"delivery_id": delivery_id, "pharmacy_id": user["user_id"]}, {"$set": updates}
@@ -419,3 +451,17 @@ async def public_delivery_tracking(token: str):
         "pharmacy_name": (pharmacy or {}).get("pharmacy_name") or "Farmacia",
         "has_pod": bool(delivery.get("pod_confirmed_at")),
     }
+
+@router.get("/deliveries/{delivery_id}/audit")
+async def get_delivery_audit(delivery_id: str, user: dict = Depends(get_current_user)):
+    """Storico delle modifiche di una consegna, dalla piu' recente."""
+    delivery = await db.deliveries.find_one(
+        {"delivery_id": delivery_id, "pharmacy_id": user["user_id"]}, {"_id": 0, "delivery_id": 1}
+    )
+    if not delivery:
+        raise HTTPException(status_code=404, detail="Consegna non trovata")
+    entries = await db.audit_log.find(
+        {"delivery_id": delivery_id}, {"_id": 0}
+    ).sort("created_at", -1).to_list(50)
+    return entries
+

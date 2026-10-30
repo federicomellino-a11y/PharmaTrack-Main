@@ -112,6 +112,7 @@ class DeliveryUpdate(BaseModel):
     scheduled_date: Optional[str] = None
     scheduled_time: Optional[str] = None
     priority: Optional[str] = None
+    failure_reason: Optional[str] = None
 
 class MessageCreate(BaseModel):
     driver_id: str

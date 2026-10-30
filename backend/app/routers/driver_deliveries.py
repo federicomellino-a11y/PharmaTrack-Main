@@ -49,7 +49,7 @@ async def get_driver_deliveries(status: Optional[str] = None, driver: dict = Dep
 async def update_delivery_status_driver(delivery_id: str, request: Request, driver: dict = Depends(get_current_driver)):
     body = await request.json()
     new_status = body.get("status")
-    if new_status not in ["picked_up", "in_transit", "delivered", "cancelled"]:
+    if new_status not in ["picked_up", "in_transit", "delivered", "cancelled", "not_delivered"]:
         raise HTTPException(status_code=400, detail="Stato non valido")
     delivery = await db.deliveries.find_one({"delivery_id": delivery_id, "driver_id": driver["driver_id"]}, {"_id": 0})
     if not delivery:
@@ -61,17 +61,34 @@ async def update_delivery_status_driver(delivery_id: str, request: Request, driv
     # Driver "delivered" → diventa pending_confirmation (la farmacia deve confermare l'incasso)
     effective_status = "delivered_pending_confirmation" if new_status == "delivered" else new_status
     update_data = {"status": effective_status, "updated_at": datetime.now(timezone.utc).isoformat()}
+    if new_status == "not_delivered":
+        update_data["failure_reason"] = (body.get("failure_reason") or "Non specificato")[:200]
+        update_data["previous_status"] = delivery.get("status")
     if new_status == "delivered":
         update_data["actual_delivery"] = datetime.now(timezone.utc).isoformat()
         update_data["delivered_by_driver_at"] = datetime.now(timezone.utc).isoformat()
         # POS: pagamento già transitato, ma serve comunque conferma del bigliettino → resta pending_confirmation
         # cash: serve consegna fisica del contante → resta pending_confirmation
     await db.deliveries.update_one({"delivery_id": delivery_id}, {"$set": update_data})
+    try:
+        await db.audit_log.insert_one({
+            "delivery_id": delivery_id,
+            "pharmacy_id": delivery["pharmacy_id"],
+            "actor_type": "driver",
+            "actor_id": driver["driver_id"],
+            "action": "status",
+            "changes": {"from_status": delivery.get("status"), "to_status": effective_status,
+                        "failure_reason": update_data.get("failure_reason")},
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        })
+    except Exception:
+        pass
     status_labels = {
         "picked_up": "Ritirata",
         "in_transit": "In consegna",
         "delivered_pending_confirmation": "Consegnata · in attesa incasso",
         "cancelled": "Annullata",
+        "not_delivered": "Non consegnata",
     }
     label = status_labels.get(effective_status, effective_status)
     await manager.send_personal_message(
