@@ -57,9 +57,17 @@ export function loadGoogleSignIn() {
     }
     const existing = document.querySelector('script[src*="accounts.google.com/gsi/client"]');
     if (existing) {
+      // Lo script puo' essere gia' stato caricato: il suo evento load non
+      // riscatterebbe e il pulsante restava su "Connessione..." per sempre.
       return new Promise((resolve) => {
-        existing.addEventListener('load', () => { _runInitialize(); resolve(true); });
-        if (window.google?.accounts?.id) { _runInitialize(); resolve(true); }
+        let done = false;
+        const finish = (ok) => { if (done) return; done = true; if (ok) _runInitialize(); resolve(ok); };
+        existing.addEventListener('load', () => finish(true));
+        const startedAt = Date.now();
+        const timer = setInterval(() => {
+          if (window.google?.accounts?.id) { clearInterval(timer); finish(true); }
+          else if (Date.now() - startedAt > 7000) { clearInterval(timer); finish(false); }
+        }, 200);
       });
     }
     return new Promise((resolve) => {
@@ -73,7 +81,12 @@ export function loadGoogleSignIn() {
     });
   })();
 
-  return _loadPromise;
+  // Rete di sicurezza: se Google non risponde entro 8 secondi il pulsante
+  // torna cliccabile invece di restare in caricamento.
+  return Promise.race([
+    _loadPromise,
+    new Promise((resolve) => setTimeout(() => { _loadPromise = null; resolve(false); }, 8000)),
+  ]);
 }
 
 export function setGoogleCredentialCallback(cb) {
@@ -89,7 +102,10 @@ export function setGoogleCredentialCallback(cb) {
 }
 
 export function promptGoogleSignIn(onNotDisplayed, onIssue) {
-  if (!window.google?.accounts?.id) return;
+  if (!window.google?.accounts?.id) {
+    if (onNotDisplayed) onNotDisplayed('unavailable');
+    return;
+  }
   window.google.accounts.id.prompt((notification) => {
     const notDisplayed = notification.isNotDisplayed?.() || false;
     const skipped = notification.isSkippedMoment?.() || false;
