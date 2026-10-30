@@ -24,6 +24,7 @@ import {
 import { toast } from 'sonner';
 import { useAuth } from '../../contexts/AuthContext';
 import { ensureArray } from '@/lib/collections';
+import { printDeliveryLabel } from '@/lib/printLabel';
 
 
 const STATUS_LABELS = { da_preparare: 'Da preparare', pending: 'Da preparare', pronta: 'Pronta', assigned: 'Assegnata', picked_up: 'Ritirata', in_transit: 'In consegna', delivered_pending_confirmation: 'Da confermare incasso', delivered: 'Consegnata', cancelled: 'Annullata' };
@@ -822,7 +823,19 @@ export default function DeliveriesPage() {
                                 <XCircle className="w-3 h-3" />
                               </Button>
                             )}
-                            {d.status === 'cancelled' && (
+                            {(
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 px-2 text-xs"
+                              data-testid={`print-label-${d.delivery_id}`}
+                              onClick={(event) => { event.stopPropagation(); printDeliveryLabel(d); }}
+                              title="Stampa etichetta"
+                            >
+                              <Printer className="w-3 h-3 mr-1" />Etichetta
+                            </Button>
+                          )}
+                          {d.status === 'cancelled' && (
                               <Button variant="outline" size="sm" className="h-7 px-2 text-xs"
                                 data-testid={`restore-delivery-${d.delivery_id}`}
                                 onClick={() => handleRestore(d.delivery_id)}>

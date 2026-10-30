@@ -53,6 +53,24 @@ function MapResizer() {
   return null;
 }
 
+
+const buildUrgentItems = (deliveries) => {
+  const now = new Date();
+  const items = [];
+  ensureArray(deliveries).forEach((delivery) => {
+    if (['delivered', 'cancelled'].includes(delivery.status)) return;
+    const unassigned = !delivery.driver_id && ['da_preparare', 'pronta', 'pending'].includes(delivery.status);
+    let late = false;
+    if (delivery.scheduled_date) {
+      const when = new Date(`${delivery.scheduled_date}T${delivery.scheduled_time || '23:59'}`);
+      late = !Number.isNaN(when.getTime()) && when < now;
+    }
+    if (unassigned) items.push({ delivery, reason: 'unassigned' });
+    else if (late) items.push({ delivery, reason: 'late' });
+  });
+  return items.sort((a, b) => (a.reason === b.reason ? 0 : a.reason === 'late' ? -1 : 1));
+};
+
 const formatCurrency = (v) => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(v || 0);
 
 
@@ -150,6 +168,7 @@ export default function PharmacyDashboard() {
   );
 
   const safeRecentDeliveries = ensureArray(recentDeliveries);
+  const urgentDeliveries = buildUrgentItems(activeDeliveries);
   const safeCustomers = ensureArray(customers);
   const customerCoordEntries = Object.entries(ensureObject(customerCoords));
   const firstCustomerCoord = customerCoordEntries[0]?.[1];
@@ -164,10 +183,10 @@ export default function PharmacyDashboard() {
   const tileAttribution = '&copy; OpenStreetMap contributors';
 
   const kpis = [
-    { label: 'Consegne oggi', value: stats?.deliveries?.today || 0, sub: `${stats?.deliveries?.today_completed || 0} completate`, icon: Package, color: 'text-primary', bg: 'bg-primary/10' },
-    { label: 'In corso', value: stats?.deliveries?.active || 0, sub: `${stats?.deliveries?.pending || 0} in attesa`, icon: Clock, color: 'text-amber-600', bg: 'bg-amber-500/10', alert: (stats?.deliveries?.pending || 0) > 3 },
-    { label: 'Completate', value: stats?.deliveries?.completed || 0, sub: 'Totale storico', icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-500/10' },
-    { label: 'Fattorini attivi', value: stats?.drivers?.active || 0, sub: `su ${stats?.drivers?.total || 0} totali`, icon: Truck, color: 'text-blue-600', bg: 'bg-blue-500/10' },
+    { to: '/deliveries', label: 'Consegne oggi', value: stats?.deliveries?.today || 0, sub: `${stats?.deliveries?.today_completed || 0} completate`, icon: Package, color: 'text-primary', bg: 'bg-primary/10' },
+    { to: '/deliveries', label: 'In corso', value: stats?.deliveries?.active || 0, sub: `${stats?.deliveries?.pending || 0} in attesa`, icon: Clock, color: 'text-amber-600', bg: 'bg-amber-500/10', alert: (stats?.deliveries?.pending || 0) > 3 },
+    { to: '/archive', label: 'Completate', value: stats?.deliveries?.completed || 0, sub: 'Totale storico', icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-500/10' },
+    { to: '/drivers', label: 'Fattorini attivi', value: stats?.drivers?.active || 0, sub: `su ${stats?.drivers?.total || 0} totali`, icon: Truck, color: 'text-blue-600', bg: 'bg-blue-500/10' },
   ];
 
   const weeklyChartData = ensureArray(stats?.weekly).map((entry) => ({
@@ -240,7 +259,13 @@ export default function PharmacyDashboard() {
         {/* KPIs */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {kpis.map((kpi, i) => (
-            <Card key={kpi.label} className={`stat-modern animate-slide-up stagger-${i}`}>
+            <Link
+              key={kpi.label}
+              to={kpi.to}
+              className="block rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              data-testid={`kpi-${kpi.label.toLowerCase().replace(/\s+/g, '-')}`}
+            >
+            <Card className={`stat-modern card-interactive animate-slide-up stagger-${i}`}>
               <CardContent className="p-4">
                 <div className="flex items-start justify-between mb-2">
                   <p className="text-xs text-muted-foreground font-medium">{kpi.label}</p>
@@ -253,6 +278,7 @@ export default function PharmacyDashboard() {
                 </div>
               </CardContent>
             </Card>
+            </Link>
           ))}
         </div>
 
@@ -334,6 +360,37 @@ export default function PharmacyDashboard() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Da gestire ora */}
+        {urgentDeliveries.length > 0 && (
+          <Card className="card-exclusive border-amber-500/40">
+            <CardHeader className="pb-2 pt-4 px-4">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-amber-500" />Da gestire ora
+                <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-300 text-[11px]">{urgentDeliveries.length}</Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="px-3 pb-3 space-y-1.5">
+              {urgentDeliveries.slice(0, 5).map(({ delivery, reason }) => (
+                <Link
+                  key={delivery.delivery_id}
+                  to="/deliveries"
+                  data-testid={`urgent-${delivery.delivery_id}`}
+                  className="flex items-center gap-3 rounded-xl p-2.5 transition-colors hover:bg-secondary/60"
+                >
+                  <span className={`h-2 w-2 shrink-0 rounded-full ${reason === 'late' ? 'bg-destructive' : 'bg-amber-500'}`} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium">{delivery.customer_name}</span>
+                    <span className="block truncate text-[11px] text-muted-foreground">
+                      {reason === 'late' ? 'In ritardo' : 'Senza fattorino'} · {delivery.customer_address}
+                    </span>
+                  </span>
+                  <ArrowRight className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+                </Link>
+              ))}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Recent deliveries */}
         <Card className="card-exclusive">
