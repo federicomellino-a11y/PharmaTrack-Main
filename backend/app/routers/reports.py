@@ -36,7 +36,7 @@ async def get_reports(period: str = "month", user: dict = Depends(get_current_us
     if period == "week": start_date = now - timedelta(days=7)
     elif period == "year": start_date = now - timedelta(days=365)
     else: start_date = now - timedelta(days=30)
-    deliveries = await db.deliveries.find({"pharmacy_id": pharmacy_id, "status": "delivered", "actual_delivery": {"$gte": start_date.isoformat()}}, {"_id": 0, "amount": 1, "customer_id": 1, "driver_id": 1, "payment_method": 1, "actual_delivery": 1, "created_at": 1, "updated_at": 1}).to_list(10000)
+    deliveries = await db.deliveries.find({"pharmacy_id": pharmacy_id, "status": {"$in": ["delivered", "delivered_pending_confirmation"]}, "actual_delivery": {"$gte": start_date.isoformat()}}, {"_id": 0, "amount": 1, "customer_id": 1, "driver_id": 1, "payment_method": 1, "actual_delivery": 1, "created_at": 1, "updated_at": 1}).to_list(10000)
     total_revenue = sum(d.get("amount", 0) or 0 for d in deliveries)
     total_deliveries = len(deliveries)
     customer_counts = {}

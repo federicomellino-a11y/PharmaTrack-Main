@@ -27,8 +27,8 @@ import { ensureArray } from '@/lib/collections';
 import { printDeliveryLabel } from '@/lib/printLabel';
 
 
-const STATUS_LABELS = { da_preparare: 'Da preparare', pending: 'Da preparare', pronta: 'Pronta', assigned: 'Assegnata', picked_up: 'Ritirata', in_transit: 'In consegna', delivered_pending_confirmation: 'Da confermare incasso', delivered: 'Consegnata', cancelled: 'Annullata' };
-const STATUS_ICONS = { da_preparare: Clock, pending: Clock, pronta: ClipboardCheck, assigned: User, picked_up: Package, in_transit: Truck, delivered_pending_confirmation: Euro, delivered: CheckCircle2, cancelled: XCircle };
+const STATUS_LABELS = { da_preparare: 'Da preparare', pending: 'Da preparare', pronta: 'Pronta', assigned: 'Assegnata', picked_up: 'Ritirata', in_transit: 'In consegna', delivered_pending_confirmation: 'Da confermare incasso', delivered: 'Consegnata', cancelled: 'Annullata', not_delivered: 'Non consegnata' };
+const STATUS_ICONS = { da_preparare: Clock, pending: Clock, pronta: ClipboardCheck, assigned: User, picked_up: Package, in_transit: Truck, delivered_pending_confirmation: Euro, delivered: CheckCircle2, cancelled: XCircle, not_delivered: AlertTriangle };
 const PRIORITY_LABELS = { low: 'Bassa', normal: 'Normale', high: 'Alta', urgent: 'Urgente' };
 const PRIORITY_ICONS = { low: null, normal: null, high: AlertTriangle, urgent: AlertTriangle };
 
@@ -485,7 +485,7 @@ export default function DeliveriesPage() {
       ? ['da_preparare', 'pronta', 'pending', 'assigned', 'picked_up', 'in_transit', 'delivered_pending_confirmation'].includes(d.status)
       : activeTab === 'pending_confirmation'
         ? d.status === 'delivered_pending_confirmation'
-        : ['delivered', 'cancelled'].includes(d.status);
+        : ['delivered', 'cancelled', 'not_delivered'].includes(d.status);
     const matchSearch = !searchTerm ||
       (d.customer_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (d.customer_address || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -494,6 +494,7 @@ export default function DeliveriesPage() {
       (filterDriver === 'unassigned' && !d.driver_id);
     return matchTab && matchSearch && matchDriver;
   }), [safeDeliveries, activeTab, searchTerm, filterDriver]);
+  const listIsCapped = safeDeliveries.length >= 500;
 
   // V17: la lista attiva si ordina per priorità reale, poi orario, poi data
   const sorted = useMemo(() => {
@@ -641,7 +642,12 @@ export default function DeliveriesPage() {
             <CardContent className="py-16 text-center">
               <Package className="w-12 h-12 mx-auto mb-3 text-muted-foreground/30" />
               <p className="font-medium text-muted-foreground">
-                {searchTerm ? 'Nessuna consegna trovata' : activeTab === 'active' ? 'Nessuna consegna attiva' : 'Archivio vuoto'}
+                {listIsCapped && (
+                <p className="mb-2 rounded-lg bg-amber-500/10 px-3 py-2 text-[11px] text-amber-700 dark:text-amber-300">
+                  Stai vedendo le 500 consegne più recenti: usa la ricerca o l'archivio per le altre.
+                </p>
+              )}
+              {searchTerm ? 'Nessuna consegna trovata' : activeTab === 'active' ? 'Nessuna consegna attiva' : 'Archivio vuoto'}
               </p>
               {!searchTerm && activeTab === 'active' && (
                 <Button className="btn-primary mt-4" size="sm" onClick={() => { resetForm(); dialogOpenedAtRef.current = Date.now(); setDialogOpen(true); }}>

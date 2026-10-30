@@ -12,7 +12,7 @@ import { Badge } from '../../components/ui/badge';
 import { 
   ArrowLeft, MapPin, Phone, Package, Navigation, 
   Clock, CheckCircle2, Truck, Play, MessageSquare, LogOut,
-  Euro, Banknote, CreditCard, Calculator, Camera, Loader2
+  Euro, Banknote, CreditCard, Calculator, Camera, Loader2, AlertTriangle
 } from 'lucide-react';
 import { toast } from 'sonner';
 import 'leaflet/dist/leaflet.css';
@@ -86,6 +86,30 @@ export default function DriverDeliveryDetail() {
     });
     return () => { cancelled = true; };
   }, []);
+
+  const [failurePanel, setFailurePanel] = useState(false);
+  const [failureReason, setFailureReason] = useState('Cliente assente');
+  const [failureNote, setFailureNote] = useState('');
+
+  const reportFailure = async () => {
+    setUpdating(true);
+    try {
+      const note = [failureReason, failureNote.trim()].filter(Boolean).join(' · ');
+      const result = await requestWithOfflineQueue(axios, {
+        method: 'put',
+        url: `${API}/driver/deliveries/${deliveryId}/status`,
+        data: { status: 'not_delivered', failure_reason: note.slice(0, 200) },
+        label: 'Consegna non riuscita',
+      });
+      toast.success(result.queued ? 'Segnalazione salvata: si invia appena torna la rete' : 'Consegna segnalata come non riuscita');
+      navigate('/driver');
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || 'Segnalazione non riuscita');
+    } finally {
+      setUpdating(false);
+      setFailurePanel(false);
+    }
+  };
 
   const updateStatus = async (newStatus) => {
     setUpdating(true);
@@ -388,6 +412,48 @@ export default function DriverDeliveryDetail() {
               </Button>
 
               {/* Status update button */}
+              {!failurePanel ? (
+                <Button
+                  variant="outline"
+                  className="w-full border-red-500/40 text-red-300 hover:text-red-200 hover:border-red-400"
+                  onClick={() => setFailurePanel(true)}
+                  data-testid="report-failure"
+                >
+                  <AlertTriangle className="w-4 h-4 mr-2" />
+                  Non consegnata
+                </Button>
+              ) : (
+                <div className="rounded-2xl border border-red-500/30 bg-red-500/5 p-3 space-y-3" data-testid="failure-panel">
+                  <p className="text-xs font-semibold text-red-200">Perché non è stata consegnata?</p>
+                  <div className="flex flex-wrap gap-2">
+                    {['Cliente assente', 'Indirizzo errato', 'Rifiutata dal cliente', 'Importo non disponibile'].map((reason) => (
+                      <button
+                        key={reason}
+                        type="button"
+                        onClick={() => setFailureReason(reason)}
+                        className={`rounded-full px-3 py-1.5 text-xs border transition-colors ${failureReason === reason ? 'bg-red-500 text-black border-red-400 font-semibold' : 'border-zinc-600 text-zinc-300'}`}
+                      >
+                        {reason}
+                      </button>
+                    ))}
+                  </div>
+                  <input
+                    value={failureNote}
+                    onChange={(event) => setFailureNote(event.target.value)}
+                    placeholder="Nota per la farmacia (facoltativa)"
+                    className="w-full rounded-lg bg-zinc-900 border border-zinc-700 px-3 py-2 text-sm text-white outline-none focus:border-red-400"
+                  />
+                  <div className="flex gap-2">
+                    <Button variant="ghost" className="flex-1 text-zinc-300" onClick={() => setFailurePanel(false)} disabled={updating}>
+                      Annulla
+                    </Button>
+                    <Button className="flex-1 bg-red-500 hover:bg-red-600 text-black font-semibold" onClick={reportFailure} disabled={updating}>
+                      {updating ? 'Invio...' : 'Conferma'}
+                    </Button>
+                  </div>
+                </div>
+              )}
+
               {nextAction && (
                 <Button 
                   className="w-full btn-glow bg-teal-500 hover:bg-teal-600 text-black font-semibold py-6"
