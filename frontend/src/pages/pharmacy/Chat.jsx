@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ensureArray } from '@/lib/collections';
+import { confirmAction } from '../../components/ConfirmDialog';
 
 
 const sortMessages = (items = []) => [...items].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
@@ -237,7 +238,7 @@ export default function ChatPage() {
   };
 
   const deleteMessage = async (message) => {
-    if (!window.confirm('Eliminare questo messaggio?')) return;
+    if (!(await confirmAction({ title: 'Eliminare questo messaggio?', description: "Al suo posto restera la dicitura messaggio eliminato.", confirmLabel: 'Elimina', destructive: true }))) return;
     setBusyMessageId(message.message_id);
     try {
       await axios.delete(`${API}/messages/${message.message_id}`, { withCredentials: true });

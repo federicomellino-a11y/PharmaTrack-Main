@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-route
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClient } from './lib/queryClient'
 import { Toaster } from './components/ui/sonner'
+import ConfirmHost from './components/ConfirmDialog'
 import { ThemeProvider } from './contexts/ThemeContext'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { DriverAuthProvider, useDriverAuth } from './contexts/DriverAuthContext'
@@ -177,6 +178,7 @@ function App() {
           <ErrorBoundary>
             <AppRouter />
             <Toaster position="top-right" richColors />
+            <ConfirmHost />
           </ErrorBoundary>
         </ThemeProvider>
       </QueryClientProvider>
