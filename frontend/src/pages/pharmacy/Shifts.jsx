@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
+import { useQueryClient } from '@tanstack/react-query';
+import { useShiftsQuery, useDriversQuery } from '@/hooks/queries';
 import { API } from '@/lib/config';
 import { Layout } from '../../components/Layout';
 import { Card, CardContent } from '../../components/ui/card';
@@ -29,9 +31,12 @@ const STATUS_CONFIG = {
 };
 
 export default function ShiftsPage() {
-  const [shifts, setShifts] = useState([]);
-  const [drivers, setDrivers] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const { data: shiftsData = [], isLoading: shiftsLoading } = useShiftsQuery();
+  const { data: driversData = [], isLoading: driversLoading } = useDriversQuery();
+  const shifts = ensureArray(shiftsData);
+  const drivers = ensureArray(driversData);
+  const loading = shiftsLoading || driversLoading;
   const [refreshing, setRefreshing] = useState(false);
   const [statusFilter, setStatusFilter] = useState('all');
   const [driverFilter, setDriverFilter] = useState('all');
@@ -43,22 +48,16 @@ export default function ShiftsPage() {
 
   const fetchData = useCallback(async () => {
     try {
-      const [shiftsRes, driversRes] = await Promise.all([
-        axios.get(`${API}/shifts`, { withCredentials: true }),
-        axios.get(`${API}/drivers`, { withCredentials: true }),
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['shifts'] }),
+        queryClient.invalidateQueries({ queryKey: ['drivers'] }),
       ]);
-      setShifts(ensureArray(shiftsRes.data));
-      setDrivers(ensureArray(driversRes.data));
     } catch (err) {
-      console.error('Errore caricamento turni:', err);
       toast.error('Errore caricamento turni');
     } finally {
-      setLoading(false);
       setRefreshing(false);
     }
-  }, []);
-
-  useEffect(() => { fetchData(); }, [fetchData]);
+  }, [queryClient]);
 
   const safeShifts = ensureArray(shifts);
   const filtered = safeShifts.filter((s) => {

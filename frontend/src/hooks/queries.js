@@ -33,3 +33,13 @@ export const useDoctorsQuery = (options = {}) =>
 
 export const useUsefulNumbersQuery = (options = {}) =>
   useQuery({ queryKey: ['useful-numbers'], queryFn: getList('/useful-numbers'), ...options });
+
+export const useShiftsQuery = (options = {}) =>
+  useQuery({ queryKey: ['shifts'], queryFn: getList('/shifts'), ...options });
+
+export const useArchiveQuery = (page = 1, limit = 20, options = {}) =>
+  useQuery({
+    queryKey: ['archive', page, limit],
+    queryFn: getObj(`/archive?page=${page}&limit=${limit}`),
+    ...options,
+  });
