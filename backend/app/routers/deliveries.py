@@ -310,9 +310,11 @@ async def update_delivery(delivery_id: str, update: DeliveryUpdate, user: dict =
         if update.status not in WORKFLOW_STATUSES:
             raise HTTPException(status_code=400, detail="Stato non valido")
         update_data["status"] = update.status
-        if update.status == "cancelled" and delivery.get("status") != "cancelled":
+        if update.status in ("cancelled", "not_delivered") and delivery.get("status") not in ("cancelled", "not_delivered"):
             update_data["previous_status"] = delivery.get("status") or "pronta"
             update_data["cancelled_at"] = datetime.now(timezone.utc).isoformat()
+            if update.status == "not_delivered":
+                update_data["failure_reason"] = (getattr(update, "failure_reason", None) or "Non specificato")[:200]
         if update.status == "delivered":
             update_data["actual_delivery"] = datetime.now(timezone.utc).isoformat()
     if update.notes is not None: update_data["notes"] = update.notes
@@ -337,7 +339,19 @@ async def update_delivery(delivery_id: str, update: DeliveryUpdate, user: dict =
         await _attach_delivery_to_open_shift(update.driver_id, delivery_id)
         await manager.send_personal_message({"type": "new_delivery", "delivery_id": delivery_id}, update.driver_id, "driver")
         await create_notification_internal(update.driver_id, "driver", "Nuova consegna assegnata", f"Hai una nuova consegna per {delivery['customer_name']}", "delivery", {"delivery_id": delivery_id})
-    return await db.deliveries.find_one({"delivery_id": delivery_id}, {"_id": 0})
+    updated = await db.deliveries.find_one({"delivery_id": delivery_id}, {"_id": 0})
+    await _log_delivery_audit(
+        updated or delivery,
+        "pharmacy",
+        user["user_id"],
+        "update",
+        {
+            "from_status": delivery.get("status"),
+            "to_status": update_data.get("status", delivery.get("status")),
+            "fields": sorted([k for k in update_data.keys() if k not in ("updated_at",)]),
+        },
+    )
+    return updated
 
 
 @router.post("/deliveries/{delivery_id}/restore")
