@@ -6,11 +6,11 @@ from fastapi import APIRouter, HTTPException, Depends, Request, Response
 
 from app.core.database import db
 from app.core.websocket import manager
-from app.core.config import *
+from app.core.config import LOGIN_RATE_LIMIT
 from app.core.security import (
     get_current_driver, clear_cookie_variants,
 )
-from app.models.schemas import *
+# (nessun uso di app.models.schemas)
 
 from app.core.limiter import limiter
 

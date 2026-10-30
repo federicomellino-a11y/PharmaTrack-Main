@@ -5,11 +5,11 @@ from fastapi import APIRouter, HTTPException, Depends, Request
 
 from app.core.database import db
 from app.core.websocket import manager
-from app.core.config import *
+# (nessun uso di app.core.config)
 from app.core.security import (
     get_current_user, get_current_driver,
 )
-from app.models.schemas import *
+from app.models.schemas import MessageCreate
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

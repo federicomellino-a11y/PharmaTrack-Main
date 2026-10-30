@@ -7,7 +7,7 @@ ripiega su OpenStreetMap e Photon. Non solleva mai eccezioni.
 import logging
 import os
 import re
-from typing import Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 import httpx
 
@@ -51,34 +51,55 @@ def _split(address: str):
     return (street or None), civic, (city or None)
 
 
+def google_enabled() -> bool:
+    return bool(GOOGLE_KEY)
+
+
+async def google_geocode(client: httpx.AsyncClient, address: str) -> Optional[Dict[str, Any]]:
+    """Chiamata Google Geocoding con dettagli (label, precisione, civico)."""
+    if not GOOGLE_KEY:
+        return None
+    try:
+        res = await client.get(GOOGLE_GEOCODE_URL, params={
+            "address": address, "key": GOOGLE_KEY, "language": "it", "region": "it",
+        })
+        if res.status_code != 200:
+            return None
+        data = res.json()
+        if data.get("status") != "OK" or not data.get("results"):
+            logger.info("Google geocode '%s': %s", address, data.get("status"))
+            return None
+        row = data["results"][0]
+        geo = row.get("geometry") or {}
+        loc = geo.get("location") or {}
+        location_type = geo.get("location_type")
+        return {
+            "lat": float(loc.get("lat")), "lng": float(loc.get("lng")),
+            "label": row.get("formatted_address"),
+            "precision": "civico" if location_type in GOOGLE_PRECISE else "via",
+            "provider": "google", "location_type": location_type,
+            "house_number": next((c["long_name"] for c in row.get("address_components", []) if "street_number" in c.get("types", [])), None),
+        }
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Google geocode error: %s", exc)
+        return None
+
+
 async def _google_lookup(client: httpx.AsyncClient, candidates) -> Optional[Tuple[float, float, str]]:
-    """(lat, lng, precisione) dal primo candidato non vuoto di Google."""
+    """(lat, lng, precisione): primo candidato preciso, altrimenti il primo trovato."""
     if not GOOGLE_KEY:
         return None
     fallback = None
     for candidate in candidates:
         if not candidate:
             continue
-        try:
-            res = await client.get(GOOGLE_GEOCODE_URL, params={
-                "address": candidate, "key": GOOGLE_KEY, "language": "it", "region": "it",
-            })
-            if res.status_code != 200:
-                continue
-            data = res.json()
-            if data.get("status") != "OK" or not data.get("results"):
-                logger.info("Google geocode '%s': %s", candidate, data.get("status"))
-                continue
-            row = data["results"][0]
-            loc = (row.get("geometry") or {}).get("location") or {}
-            location_type = (row.get("geometry") or {}).get("location_type")
-            found = (float(loc["lat"]), float(loc["lng"]),
-                     "civico" if location_type in GOOGLE_PRECISE else "via")
-            if found[2] == "civico":
-                return found
-            fallback = fallback or found
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("Google geocode errore per '%s': %s", candidate, exc)
+        found = await google_geocode(client, candidate)
+        if not found:
+            continue
+        result = (found["lat"], found["lng"], found["precision"])
+        if found["precision"] == "civico":
+            return result
+        fallback = fallback or result
     return fallback
 
 
@@ -138,3 +159,7 @@ async def ensure_coords(address: Optional[str]) -> Tuple[Optional[float], Option
     """Compatibilita': solo (lat, lng)."""
     lat, lng, _ = await ensure_coords_with_source(address)
     return lat, lng
+
+
+# nome pubblico per i router: stessa logica di parsing ovunque
+split_address = _split

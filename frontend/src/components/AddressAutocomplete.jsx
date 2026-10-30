@@ -227,6 +227,18 @@ export default function AddressAutocomplete({
     debounceRef.current = setTimeout(() => search(val), 300);
   };
 
+  // Il civico digitato a mano completa l'indirizzo scelto dal suggerimento.
+  const applyStreetNumber = () => {
+    const number = streetNumber.trim();
+    if (!number) return;
+    const base = (value || query || '').toString().trim().replace(/\s+/g, ' ');
+    const combined = base ? `${base} ${number}` : number;
+    setMissingNumber(false);
+    setStreetNumber('');
+    onChange(combined);
+    onAddressSelect?.({ address: combined, lat: null, lng: null, placeId: null, raw: null, streetNumber: number });
+  };
+
   const handleSelect = async (prediction) => {
     setSuggestions([]);
     setOpen(false);
