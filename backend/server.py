@@ -8,7 +8,7 @@ from starlette.middleware.cors import CORSMiddleware
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
-from app.core.database import db, client, database_name
+from app.core.database import db, client
 from app.core.websocket import manager
 from app.core.security import normalize_session_expiry
 from app.core.config import ADMIN_EMAIL, ADMIN_PASSWORD

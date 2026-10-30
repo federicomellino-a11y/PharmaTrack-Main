@@ -192,7 +192,6 @@ async def serve_stored_photo(photo_id: str, k: str = ""):
     La chiave casuale per foto rende l'URL una capability: il tag <img> del
     browser e l'app mobile la caricano senza cookie cross-site.
     """
-    import uuid as _uuid
     import hmac
     from motor.motor_asyncio import AsyncIOMotorGridFSBucket
 
