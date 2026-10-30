@@ -15,6 +15,7 @@ import {
   Euro, Banknote, CreditCard, Calculator, Camera, Loader2, AlertTriangle
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { confirmAction } from '../../components/ConfirmDialog';
 import 'leaflet/dist/leaflet.css';
 import { geocodeAddress as geocodeWithRateLimit } from '../../lib/geocoding';
 import { useDriverAuth } from '../../contexts/DriverAuthContext';
@@ -457,9 +458,14 @@ export default function DriverDeliveryDetail() {
               {nextAction && (
                 <Button 
                   className="w-full btn-glow bg-teal-500 hover:bg-teal-600 text-black font-semibold py-6"
-                  onClick={() => {
+                  onClick={async () => {
                     if (nextAction.status === 'delivered' && !photoUrl) {
-                      if (!window.confirm('Nessuna foto caricata. Confermare la consegna senza foto?')) return;
+                      const proceed = await confirmAction({
+                        title: 'Consegna senza foto',
+                        description: "Non hai caricato la prova di consegna. Confermi comunque?",
+                        confirmLabel: 'Conferma consegna',
+                      });
+                      if (!proceed) return;
                     }
                     updateStatus(nextAction.status);
                   }}

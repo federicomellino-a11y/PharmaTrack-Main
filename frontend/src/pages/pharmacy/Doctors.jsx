@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ensureArray, ensureObject } from '@/lib/collections';
+import { confirmAction } from '../../components/ConfirmDialog';
 
 
 const DAYS = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'];
@@ -60,7 +61,7 @@ export default function DoctorsPage() {
  };
 
  const handleDelete = async (id) => {
- if (!window.confirm('Eliminare questo medico?')) return;
+ if (!(await confirmAction({ title: 'Eliminare questo medico?', description: "", confirmLabel: 'Elimina', destructive: true }))) return;
  try {
  await axios.delete(`${API}/doctors/${id}`, { withCredentials: true });
  toast.success('Medico eliminato');

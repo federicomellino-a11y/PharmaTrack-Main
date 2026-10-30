@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ensureArray } from '@/lib/collections';
+import { confirmAction } from '../../components/ConfirmDialog';
 
 
 const CATEGORIES = [
@@ -58,7 +59,7 @@ export default function UsefulNumbersPage() {
  };
 
  const handleDelete = async (id) => {
- if (!window.confirm('Eliminare questo numero?')) return;
+ if (!(await confirmAction({ title: 'Eliminare questo numero?', description: "", confirmLabel: 'Elimina', destructive: true }))) return;
  try {
  await axios.delete(`${API}/useful-numbers/${id}`, { withCredentials: true });
  toast.success('Numero eliminato');

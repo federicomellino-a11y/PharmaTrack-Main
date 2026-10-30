@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ensureArray, ensureObject } from '@/lib/collections';
+import { confirmAction } from '../../components/ConfirmDialog';
 
 
 const statusLabels = {
@@ -228,7 +229,7 @@ export default function CustomersPage() {
   };
 
   const handleDelete = async (customerId) => {
-    if (!window.confirm('Eliminare questo cliente?')) return;
+    if (!(await confirmAction({ title: 'Eliminare questo cliente?', description: "Il cliente e le sue consegne passate restano nello storico.", confirmLabel: 'Elimina', destructive: true }))) return;
     try {
       await axios.delete(`${API}/customers/${customerId}`, { withCredentials: true });
       setCustomers((prev) => ensureArray(prev).filter((customer) => customer.customer_id !== customerId));

@@ -22,6 +22,7 @@ import {
 import { toast } from 'sonner';
 import { ensureArray } from '@/lib/collections';
 import { useAuth } from '../../contexts/AuthContext';
+import { confirmAction } from '../../components/ConfirmDialog';
 
 const generatePassword = () => {
  const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
@@ -97,7 +98,7 @@ export default function DriversPage() {
  fetchDrivers();
  if (!user?.settings?.default_driver_id && newDriver?.driver_id) {
  toast('Impostarlo come fattorino predefinito?', {
- description: 'Le nuove consegne verranno assegnate automaticamente.',
+ description: "Le nuove consegne verranno assegnate automaticamente.",
  action: { label: 'Sì, predefinito', onClick: () => handleSetDefaultDriver(newDriver) },
  duration: 12000,
  id: 'default-driver-onboarding',
@@ -155,7 +156,7 @@ export default function DriversPage() {
  };
 
  const handleDelete = async (driverId) => {
- if (!window.confirm('Eliminare questo fattorino?')) return;
+ if (!(await confirmAction({ title: 'Eliminare questo fattorino?', description: "Non potra piu accedere all'app.", confirmLabel: 'Elimina', destructive: true }))) return;
  try {
  await axios.delete(`${API}/drivers/${driverId}`, { withCredentials: true });
  toast.success('Fattorino eliminato');

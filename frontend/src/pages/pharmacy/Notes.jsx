@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ensureArray } from '@/lib/collections';
+import { confirmAction } from '../../components/ConfirmDialog';
 
 
 const NOTE_COLORS = [
@@ -63,7 +64,7 @@ export default function NotesPage() {
  };
 
  const handleDelete = async (id) => {
- if (!window.confirm('Eliminare questa nota?')) return;
+ if (!(await confirmAction({ title: 'Eliminare questa nota?', description: "", confirmLabel: 'Elimina', destructive: true }))) return;
  try {
  await axios.delete(`${API}/notes/${id}`, { withCredentials: true });
  toast.success('Nota eliminata');

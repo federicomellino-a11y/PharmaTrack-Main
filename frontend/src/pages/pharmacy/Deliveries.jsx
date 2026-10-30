@@ -25,6 +25,7 @@ import { toast } from 'sonner';
 import { useAuth } from '../../contexts/AuthContext';
 import { ensureArray } from '@/lib/collections';
 import { printDeliveryLabel } from '@/lib/printLabel';
+import { confirmAction } from '../../components/ConfirmDialog';
 
 
 const STATUS_LABELS = { da_preparare: 'Da preparare', pending: 'Da preparare', pronta: 'Pronta', assigned: 'Assegnata', picked_up: 'Ritirata', in_transit: 'In consegna', delivered_pending_confirmation: 'Da confermare incasso', delivered: 'Consegnata', cancelled: 'Annullata', not_delivered: 'Non consegnata' };
@@ -331,7 +332,7 @@ export default function DeliveriesPage() {
   };
 
   const handleCancel = async (id) => {
-    if (!window.confirm('Annullare questa consegna?')) return;
+    if (!(await confirmAction({ title: 'Annullare questa consegna?', description: "Potrai ripristinarla dalla sezione archivio.", confirmLabel: 'Annulla consegna', destructive: true }))) return;
     try {
       await axios.put(`${API}/deliveries/${id}`, { status: 'cancelled' }, { withCredentials: true });
       toast.success('Consegna annullata'); fetchData();
