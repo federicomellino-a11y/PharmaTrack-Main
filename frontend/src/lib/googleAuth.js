@@ -11,20 +11,15 @@ let _loadPromise = null;
 
 async function fetchGoogleClientId() {
   if (GOOGLE_CLIENT_ID) return GOOGLE_CLIENT_ID;
-  try {
-    const cached = window.localStorage?.getItem(STORAGE_KEY);
-    if (cached) {
-      GOOGLE_CLIENT_ID = cached;
-      return GOOGLE_CLIENT_ID;
-    }
-  } catch { /* storage non disponibile */ }
+  // Nessuna cache locale: un Client ID vecchio in localStorage faceva fallire
+  // il login con origin_mismatch anche dopo aver corretto le origini su Google.
+  try { window.localStorage?.removeItem(STORAGE_KEY); } catch { /* storage non disponibile */ }
   try {
     const res = await fetch(`${API}/auth/google/config`);
     if (res.ok) {
       const data = await res.json();
       if (data?.client_id) {
         GOOGLE_CLIENT_ID = data.client_id;
-        try { window.localStorage?.setItem(STORAGE_KEY, data.client_id); } catch { /* ignora */ }
       }
     }
   } catch { /* backend non raggiungibile */ }
@@ -112,4 +107,10 @@ export function promptGoogleSignIn(onNotDisplayed, onIssue) {
 export function currentOrigin() {
   if (typeof window === 'undefined') return '';
   return window.location.origin;
+}
+
+
+/** Client ID attualmente in uso, per la diagnostica nel login. */
+export function currentClientId() {
+  return GOOGLE_CLIENT_ID || '';
 }

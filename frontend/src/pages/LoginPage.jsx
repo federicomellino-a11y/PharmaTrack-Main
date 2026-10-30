@@ -135,6 +135,16 @@ export default function LoginPage() {
                       <b> Origini JavaScript autorizzate</b> del client OAuth. Aggiungi:
                     </p>
                     <code className="block break-all rounded-md bg-background/70 px-2 py-1 font-mono text-[11px]">{currentOrigin()}</code>
+                    <p className="flex flex-wrap items-center gap-1">
+                      Client OAuth in uso:
+                      <b className="font-mono text-[11px] break-all" data-testid="google-client-id">
+                        {currentClientId() || 'non configurato'}
+                      </b>
+                    </p>
+                    <p className="opacity-80">
+                      Se l'ID non inizia con le stesse cifre del client che hai modificato su
+                      Google Cloud, stai correggendo il client sbagliato.
+                    </p>
                     <p>
                       Google Cloud Console → API e servizi → Credenziali → il tuo client OAuth →
                       Origini JavaScript autorizzate → incolla l'indirizzo → Salva. Le modifiche
