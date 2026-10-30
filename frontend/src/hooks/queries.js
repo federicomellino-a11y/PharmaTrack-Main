@@ -24,3 +24,12 @@ export const useStatisticsQuery = (options = {}) =>
 
 export const useAnalyticsQuery = (period = 'month', options = {}) =>
   useQuery({ queryKey: ['analytics', period], queryFn: getObj(`/analytics?period=${period}`), ...options });
+
+export const useNotesQuery = (options = {}) =>
+  useQuery({ queryKey: ['notes'], queryFn: getList('/notes'), ...options });
+
+export const useDoctorsQuery = (options = {}) =>
+  useQuery({ queryKey: ['doctors'], queryFn: getList('/doctors'), ...options });
+
+export const useUsefulNumbersQuery = (options = {}) =>
+  useQuery({ queryKey: ['useful-numbers'], queryFn: getList('/useful-numbers'), ...options });

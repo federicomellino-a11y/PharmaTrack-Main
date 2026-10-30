@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { API } from '@/lib/config';
 import { Layout } from '../../components/Layout';
@@ -13,14 +14,19 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ensureArray, ensureObject } from '@/lib/collections';
+import { useDoctorsQuery } from '@/hooks/queries';
 import { confirmAction } from '../../components/ConfirmDialog';
 
 
 const DAYS = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'];
 
 export default function DoctorsPage() {
- const [doctors, setDoctors] = useState([]);
- const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const { data: doctors = [], isLoading: loading } = useDoctorsQuery();
+  const setDoctors = (updater) =>
+    queryClient.setQueryData(['doctors'], (prev) =>
+      (typeof updater === 'function' ? updater(ensureArray(prev)) : updater));
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ['doctors'] });
  const [searchTerm, setSearchTerm] = useState('');
  const [dialogOpen, setDialogOpen] = useState(false);
  const [editing, setEditing] = useState(null);
@@ -29,18 +35,7 @@ export default function DoctorsPage() {
  schedule: { mon: '', tue: '', wed: '', thu: '', fri: '', sat: '', sun: '' }
  });
 
- useEffect(() => { fetchDoctors(); }, []);
 
- const fetchDoctors = async () => {
- try {
- const response = await axios.get(`${API}/doctors`, { withCredentials: true });
- setDoctors(ensureArray(response.data));
- } catch (err) {
- toast.error('Errore nel caricamento');
- } finally {
- setLoading(false);
- }
- };
 
  const handleSubmit = async (e) => {
  e.preventDefault();
@@ -54,7 +49,7 @@ export default function DoctorsPage() {
  }
  setDialogOpen(false);
  resetForm();
- fetchDoctors();
+ refresh();
  } catch (err) {
  toast.error('Errore');
  }
@@ -65,7 +60,7 @@ export default function DoctorsPage() {
  try {
  await axios.delete(`${API}/doctors/${id}`, { withCredentials: true });
  toast.success('Medico eliminato');
- fetchDoctors();
+ refresh();
  } catch (err) {
  toast.error('Errore');
  }

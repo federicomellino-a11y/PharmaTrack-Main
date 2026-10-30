@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { API } from '@/lib/config';
 import { Layout } from '../../components/Layout';
@@ -15,6 +16,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ensureArray } from '@/lib/collections';
+import { useUsefulNumbersQuery } from '@/hooks/queries';
 import { confirmAction } from '../../components/ConfirmDialog';
 
 
@@ -26,24 +28,17 @@ const CATEGORIES = [
 ];
 
 export default function UsefulNumbersPage() {
- const [numbers, setNumbers] = useState([]);
- const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const { data: numbers = [], isLoading: loading } = useUsefulNumbersQuery();
+  const setNumbers = (updater) =>
+    queryClient.setQueryData(['useful-numbers'], (prev) =>
+      (typeof updater === 'function' ? updater(ensureArray(prev)) : updater));
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ['useful-numbers'] });
  const [searchTerm, setSearchTerm] = useState('');
  const [dialogOpen, setDialogOpen] = useState(false);
  const [formData, setFormData] = useState({ name: '', phone: '', category: 'general', notes: '' });
 
- useEffect(() => { fetchNumbers(); }, []);
 
- const fetchNumbers = async () => {
- try {
- const response = await axios.get(`${API}/useful-numbers`, { withCredentials: true });
- setNumbers(ensureArray(response.data));
- } catch (err) {
- toast.error('Errore nel caricamento');
- } finally {
- setLoading(false);
- }
- };
 
  const handleSubmit = async (e) => {
  e.preventDefault();
@@ -52,7 +47,7 @@ export default function UsefulNumbersPage() {
  toast.success('Numero aggiunto');
  setDialogOpen(false);
  setFormData({ name: '', phone: '', category: 'general', notes: '' });
- fetchNumbers();
+ refresh();
  } catch (err) {
  toast.error('Errore');
  }
@@ -63,7 +58,7 @@ export default function UsefulNumbersPage() {
  try {
  await axios.delete(`${API}/useful-numbers/${id}`, { withCredentials: true });
  toast.success('Numero eliminato');
- fetchNumbers();
+ refresh();
  } catch (err) {
  toast.error('Errore');
  }

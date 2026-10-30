@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { API } from '@/lib/config';
 import { Layout } from '../../components/Layout';
@@ -13,6 +14,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ensureArray } from '@/lib/collections';
+import { useNotesQuery } from '@/hooks/queries';
 import { confirmAction } from '../../components/ConfirmDialog';
 
 
@@ -25,25 +27,18 @@ const NOTE_COLORS = [
 ];
 
 export default function NotesPage() {
- const [notes, setNotes] = useState([]);
- const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const { data: notes = [], isLoading: loading } = useNotesQuery();
+  const setNotes = (updater) =>
+    queryClient.setQueryData(['notes'], (prev) =>
+      (typeof updater === 'function' ? updater(ensureArray(prev)) : updater));
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ['notes'] });
  const [searchTerm, setSearchTerm] = useState('');
  const [dialogOpen, setDialogOpen] = useState(false);
  const [editing, setEditing] = useState(null);
  const [formData, setFormData] = useState({ title: '', content: '', color: 'default', pinned: false });
 
- useEffect(() => { fetchNotes(); }, []);
 
- const fetchNotes = async () => {
- try {
- const response = await axios.get(`${API}/notes`, { withCredentials: true });
- setNotes(ensureArray(response.data));
- } catch (err) {
- toast.error('Errore nel caricamento');
- } finally {
- setLoading(false);
- }
- };
 
  const handleSubmit = async (e) => {
  e.preventDefault();
@@ -57,7 +52,7 @@ export default function NotesPage() {
  }
  setDialogOpen(false);
  resetForm();
- fetchNotes();
+ refresh();
  } catch (err) {
  toast.error('Errore');
  }
@@ -68,7 +63,7 @@ export default function NotesPage() {
  try {
  await axios.delete(`${API}/notes/${id}`, { withCredentials: true });
  toast.success('Nota eliminata');
- fetchNotes();
+ refresh();
  } catch (err) {
  toast.error('Errore');
  }
@@ -78,7 +73,7 @@ export default function NotesPage() {
  try {
  await axios.put(`${API}/notes/${note.note_id}`, { pinned: !note.pinned }, { withCredentials: true });
  toast.success(note.pinned ? 'Nota sbloccata' : 'Nota fissata');
- fetchNotes();
+ refresh();
  } catch (err) {
  toast.error('Errore');
  }
