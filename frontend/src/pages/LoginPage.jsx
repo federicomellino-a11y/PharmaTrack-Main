@@ -44,6 +44,12 @@ function GoogleSignInButton({ onCredential, onIssue, label = 'Continua con Googl
             if (onIssue) onIssue(reason);
           },
         );
+        // Google a volte non richiama il callback (cookie di terze parti
+        // bloccati, popup soppresso): il pulsante non deve restare muto.
+        window.setTimeout(() => {
+          setLoading(false);
+          if (onIssue) onIssue('nessuna risposta da Google');
+        }, 12000);
       }}
       disabled={loading}
     >
