@@ -7,7 +7,7 @@ import { Label } from '../components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { isGoogleConfigured, loadGoogleSignIn, setGoogleCredentialCallback, promptGoogleSignIn, currentOrigin } from '@/lib/googleAuth';
+import { isGoogleConfigured, loadGoogleSignIn, setGoogleCredentialCallback, promptGoogleSignIn, currentOrigin, currentClientId } from '@/lib/googleAuth';
 
 function GoogleSignInButton({ onCredential, onIssue, label = 'Continua con Google' }) {
   const [loading, setLoading] = useState(false);
