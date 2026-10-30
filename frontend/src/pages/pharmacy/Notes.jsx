@@ -29,9 +29,6 @@ const NOTE_COLORS = [
 export default function NotesPage() {
   const queryClient = useQueryClient();
   const { data: notes = [], isLoading: loading } = useNotesQuery();
-  const setNotes = (updater) =>
-    queryClient.setQueryData(['notes'], (prev) =>
-      (typeof updater === 'function' ? updater(ensureArray(prev)) : updater));
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['notes'] });
  const [searchTerm, setSearchTerm] = useState('');
  const [dialogOpen, setDialogOpen] = useState(false);

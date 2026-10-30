@@ -23,9 +23,6 @@ const DAYS = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'];
 export default function DoctorsPage() {
   const queryClient = useQueryClient();
   const { data: doctors = [], isLoading: loading } = useDoctorsQuery();
-  const setDoctors = (updater) =>
-    queryClient.setQueryData(['doctors'], (prev) =>
-      (typeof updater === 'function' ? updater(ensureArray(prev)) : updater));
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['doctors'] });
  const [searchTerm, setSearchTerm] = useState('');
  const [dialogOpen, setDialogOpen] = useState(false);
