@@ -28,9 +28,15 @@ function GoogleSignInButton({ onCredential, onIssue, label = 'Continua con Googl
       type="button"
       variant="outline"
       className="w-full h-12 gap-3 text-base font-medium"
-      onClick={() => {
-        if (!ready) { toast.error('Libreria Google non ancora pronta. Riprova.'); return; }
+      onClick={async () => {
         setLoading(true);
+        let available = ready;
+        if (!available) available = await loadGoogleSignIn();
+        if (!available) {
+          toast.error('Google non risponde, riprova tra un istante');
+          setLoading(false);
+          return;
+        }
         promptGoogleSignIn(
           () => setLoading(false),
           (reason) => {
