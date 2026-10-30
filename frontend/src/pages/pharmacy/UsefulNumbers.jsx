@@ -30,9 +30,6 @@ const CATEGORIES = [
 export default function UsefulNumbersPage() {
   const queryClient = useQueryClient();
   const { data: numbers = [], isLoading: loading } = useUsefulNumbersQuery();
-  const setNumbers = (updater) =>
-    queryClient.setQueryData(['useful-numbers'], (prev) =>
-      (typeof updater === 'function' ? updater(ensureArray(prev)) : updater));
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['useful-numbers'] });
  const [searchTerm, setSearchTerm] = useState('');
  const [dialogOpen, setDialogOpen] = useState(false);
