@@ -12,6 +12,10 @@ from typing import Any, Dict, List, Optional
 import httpx
 from fastapi import APIRouter, HTTPException, Query
 
+# Il motore Google e il parsing degli indirizzi vivono in app.core.geocode:
+# una sola implementazione condivisa con il salvataggio dei clienti.
+from app.core.geocode import google_enabled, google_geocode as _google_geocode, split_address as _split
+
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
@@ -26,36 +30,6 @@ GOOGLE_GEOCODE_URL = "https://maps.googleapis.com/maps/api/geocode/json"
 GOOGLE_AUTOCOMPLETE_URL = "https://maps.googleapis.com/maps/api/place/autocomplete/json"
 GOOGLE_PRECISE = {"ROOFTOP", "RANGE_INTERPOLATED"}
 
-
-def google_enabled() -> bool:
-    return bool(GOOGLE_KEY)
-
-
-async def _google_geocode(client: "httpx.AsyncClient", address: str) -> Optional[Dict[str, Any]]:
-    try:
-        res = await client.get(GOOGLE_GEOCODE_URL, params={
-            "address": address, "key": GOOGLE_KEY, "language": "it", "region": "it",
-        })
-        if res.status_code != 200:
-            return None
-        data = res.json()
-        if data.get("status") != "OK" or not data.get("results"):
-            logger.info("Google geocode '%s': %s", address, data.get("status"))
-            return None
-        row = data["results"][0]
-        geo = row.get("geometry") or {}
-        loc = geo.get("location") or {}
-        location_type = geo.get("location_type")
-        return {
-            "lat": float(loc.get("lat")), "lng": float(loc.get("lng")),
-            "label": row.get("formatted_address"),
-            "precision": "civico" if location_type in GOOGLE_PRECISE else "via",
-            "provider": "google", "location_type": location_type,
-            "house_number": next((c["long_name"] for c in row.get("address_components", []) if "street_number" in c.get("types", [])), None),
-        }
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("Google geocode error: %s", exc)
-        return None
 
 
 async def _google_autocomplete(client: "httpx.AsyncClient", query: str, limit: int) -> List[Dict[str, Any]]:
@@ -92,32 +66,6 @@ def strip_civic(street: str) -> str:
 
 def _clean(address: str) -> str:
     return re.sub(r"\s{2,}", " ", (address or "").strip())
-
-
-def _split(address: str):
-    """(via, civico, comune) anche senza virgole: "Via Roma 12 Volla"."""
-    addr = re.sub(r"\s{2,}", " ", (address or "").strip())
-    if not addr:
-        return None, None, None
-
-    parts = [p.strip() for p in addr.split(",") if p.strip()]
-    if len(parts) >= 2:
-        street_part, city_part = parts[0], parts[-1]
-    else:
-        m = re.search(r"\b\d{1,4}\s?[a-zA-Z]?\b", addr)
-        if m and m.start() > 0 and addr[m.end():].strip():
-            street_part = f"{addr[:m.start()].strip(' ,')} {m.group(0).strip()}"
-            city_part = addr[m.end():].strip(" ,")
-        else:
-            street_part, city_part = addr, ""
-
-    m2 = re.match(r"^(.*?)[,\s]+(\d{1,4}\s?[a-zA-Z]?)$", street_part)
-    if m2:
-        street, civic = m2.group(1).strip(), m2.group(2).strip()
-    else:
-        street, civic = street_part, None
-    city = re.sub(r"\(?\b[A-Z]{2}\b\)?", "", city_part).strip(" ,()")
-    return (street or None), civic, (city or None)
 
 
 async def _nominatim(client: httpx.AsyncClient, params: Dict[str, Any]) -> List[Dict[str, Any]]:

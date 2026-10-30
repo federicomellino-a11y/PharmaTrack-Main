@@ -6,14 +6,14 @@ from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, HTTPException, Depends, Request, Response
 
 from app.core.database import db
-from app.core.config import *
+from app.core.config import APP_BASE_URL, FORGOT_RATE_LIMIT, LOGIN_RATE_LIMIT, REGISTER_RATE_LIMIT, os
 from app.core.security import (
     get_current_user, clear_cookie_variants, delete_pharmacy_account_data,
 )
 from app.core.notifications import (
     send_transactional_email,
 )
-from app.models.schemas import *
+from app.models.schemas import ForgotPasswordRequest, GoogleAuthRequest, PharmacyLogin, PharmacyRegister, ResetPasswordRequest, VerifyEmailRequest
 
 from app.core.limiter import limiter
 

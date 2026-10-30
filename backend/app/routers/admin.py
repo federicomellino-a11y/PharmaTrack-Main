@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException, Depends, Request, Response
 
 from app.core.database import db
 from app.core.websocket import manager
-from app.core.config import *
+from app.core.config import ADMIN_EMAIL, ADMIN_NAME, ADMIN_PASSWORD, LOGIN_RATE_LIMIT
 from app.core.security import (
     get_current_admin, normalize_session_expiry, clear_cookie_variants,
     delete_pharmacy_account_data,
@@ -13,7 +13,7 @@ from app.core.security import (
 from app.core.notifications import (
     send_transactional_email, push_notifications_enabled,
 )
-from app.models.schemas import *
+from app.models.schemas import AdminUserStatusUpdate, BaseModel
 
 from app.core.limiter import limiter
 from pydantic import BaseModel

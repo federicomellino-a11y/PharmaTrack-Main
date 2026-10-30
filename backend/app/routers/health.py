@@ -4,11 +4,11 @@ from datetime import datetime, timezone
 from fastapi import APIRouter
 
 from app.core.database import db, database_name
-from app.core.config import *
+from app.core.config import ADMIN_EMAIL, ADMIN_PASSWORD, SMTP_FROM, SMTP_PASSWORD, VAPID_PUBLIC_KEY, VAPID_SUBJECT, os
 from app.core.notifications import (
     push_notifications_enabled,
 )
-from app.models.schemas import *
+# (nessun uso di app.models.schemas)
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

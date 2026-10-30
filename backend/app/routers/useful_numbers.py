@@ -4,11 +4,11 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Depends
 
 from app.core.database import db
-from app.core.config import *
+# (nessun uso di app.core.config)
 from app.core.security import (
     get_current_user,
 )
-from app.models.schemas import *
+from app.models.schemas import UsefulNumberCreate
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

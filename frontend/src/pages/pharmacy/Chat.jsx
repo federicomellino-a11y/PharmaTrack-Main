@@ -231,7 +231,8 @@ export default function ChatPage() {
       )));
       cancelEditMessage();
     } catch (error) {
-      toast.error(msg);const detail = error?.response?.data?.detail || 'Operazione non riuscita'; toast.error(msg); 
+      const detail = error?.response?.data?.detail || 'Operazione non riuscita';
+      toast.error(detail); 
     } finally {
       setBusyMessageId(null);
     }
@@ -246,7 +247,8 @@ export default function ChatPage() {
         item.message_id === message.message_id ? { ...item, is_deleted: true, content: '' } : item
       )));
     } catch (error) {
-      toast.error(msg);const detail = error?.response?.data?.detail || 'Operazione non riuscita'; toast.error(msg);
+      const detail = error?.response?.data?.detail || 'Operazione non riuscita';
+      toast.error(detail);
     } finally {
       setBusyMessageId(null);
     }

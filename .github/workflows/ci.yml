@@ -34,6 +34,9 @@ jobs:
       - name: Installa le dipendenze
         working-directory: frontend
         run: npm ci
+      - name: Lint (nomi non definiti e regole degli hook)
+        working-directory: frontend
+        run: npm run lint
       - name: Build di produzione
         working-directory: frontend
         run: npm run build

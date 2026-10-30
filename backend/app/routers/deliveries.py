@@ -9,7 +9,7 @@ from fastapi import APIRouter, HTTPException, Depends, Response
 
 from app.core.database import db
 from app.core.websocket import manager
-from app.core.config import *
+# (nessun uso di app.core.config)
 from app.core.security import (
     get_current_user,
 )
@@ -19,7 +19,7 @@ from app.core.notifications import (
 from app.core.shifts_service import (
     _attach_delivery_to_open_shift,
 )
-from app.models.schemas import *
+from app.models.schemas import DeliveryCreate, DeliveryUpdate, List, Optional
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
