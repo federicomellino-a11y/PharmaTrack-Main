@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import { useQueryClient } from '@tanstack/react-query';
+import { useWinfarmStatusQuery } from '@/hooks/queries';
 import { Layout } from '../../components/Layout';
 import { Card, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
@@ -39,18 +41,14 @@ export default function IntegrationsPage() {
   const [downloading, setDownloading] = useState(false);
   const [testing, setTesting] = useState(false);
 
-  const loadStatus = async () => {
-    try {
-      const { data } = await axios.get(`${API}/integrations/winfarm/status`, { withCredentials: true });
-      setStatus(data);
-    } catch {
-      setStatus(null);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const queryClient = useQueryClient();
+  const { data: winfarmData, isLoading: winfarmLoading } = useWinfarmStatusQuery();
+  useEffect(() => {
+    setStatus(winfarmData || null);
+    setLoading(winfarmLoading);
+  }, [winfarmData, winfarmLoading]);
 
-  useEffect(() => { loadStatus(); }, []);
+  const loadStatus = () => queryClient.invalidateQueries({ queryKey: ['winfarm-status'] });
 
   const downloadBridge = async () => {
     setDownloading(true);

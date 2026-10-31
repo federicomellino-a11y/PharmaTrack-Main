@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
+import { useDriversQuery } from '@/hooks/queries';
 import AddressAutocomplete from '../../components/AddressAutocomplete';
 import { API } from '@/lib/config';
 import { ensureArray, ensureObject } from '@/lib/collections';
@@ -84,13 +85,10 @@ export default function SettingsPage() {
     setSettings(buildSettingsData(user));
   }, [user]);
 
+  const { data: driversQuery = [] } = useDriversQuery();
   useEffect(() => {
-    axios.get(`${API}/drivers`, { withCredentials: true })
-      .then((res) => setDrivers(ensureArray(res.data)))
-      .catch(() => {
-        setDrivers([]);
-      });
-  }, []);
+    setDrivers(ensureArray(driversQuery));
+  }, [driversQuery]);
 
   const activeDrivers = useMemo(
     () => ensureArray(drivers).filter((driver) => driver?.is_active),
