@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import "@/index.css";
 import App from "@/App";
 import { installGlobalErrorHandlers } from "@/lib/errorReporter";
+import { hardReload } from "@/lib/hardReload";
 
 installGlobalErrorHandlers();
 
@@ -16,7 +17,7 @@ if (typeof window !== 'undefined') {
     const last = Number(window.sessionStorage.getItem(key) || 0);
     if (Date.now() - last > 10000) {
       window.sessionStorage.setItem(key, String(Date.now()));
-      window.location.reload();
+      hardReload();
     }
   });
 }

@@ -2,6 +2,7 @@ import React from 'react'
 import { AlertTriangle, Home, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { reportClientError } from '@/lib/errorReporter'
+import { hardReload } from '@/lib/hardReload';
 
 export default class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -22,7 +23,7 @@ export default class ErrorBoundary extends React.Component {
   }
 
   handleReload = () => {
-    window.location.reload()
+    hardReload()
   }
 
   handleGoHome = () => {
