@@ -46,3 +46,6 @@ export const useArchiveQuery = (page = 1, limit = 20, options = {}) =>
 
 export const useConversationsQuery = (options = {}) =>
   useQuery({ queryKey: ['conversations'], queryFn: getList('/messages/conversations'), ...options });
+
+export const useWinfarmStatusQuery = (options = {}) =>
+  useQuery({ queryKey: ['winfarm-status'], queryFn: getObj('/integrations/winfarm/status'), ...options });

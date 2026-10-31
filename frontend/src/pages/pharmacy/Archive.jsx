@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useQueryClient } from '@tanstack/react-query';
+import { useArchiveQuery } from '@/hooks/queries';
 import { API } from '@/lib/config';
 import { Layout } from '../../components/Layout';
 import { Card, CardContent } from '../../components/ui/card';
@@ -15,33 +17,17 @@ import { ensureArray } from '@/lib/collections';
 
 
 export default function ArchivePage() {
-  const [deliveries, setDeliveries] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-
-  useEffect(() => {
-    fetchArchive();
-  }, [page]);
+  const { data: archiveData, isLoading: loading } = useArchiveQuery(page, 20);
+  const deliveries = ensureArray(archiveData?.deliveries);
+  const totalPages = archiveData?.pages || 1;
+  const fetchArchive = () => queryClient.invalidateQueries({ queryKey: ['archive'] });
 
   useEffect(() => {
     setPage(1);
   }, [searchTerm]);
-
-  const fetchArchive = async () => {
-    try {
-      const response = await axios.get(`${API}/archive?page=${page}&limit=20`, {
-        withCredentials: true
-      });
-      setDeliveries(ensureArray(response.data?.deliveries));
-      setTotalPages(response.data.pages);
-    } catch {
-      toast.error('Errore nel caricamento archivio');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const statusLabels = {
     delivered: 'Consegnata',
