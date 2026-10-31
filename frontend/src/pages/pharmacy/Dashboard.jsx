@@ -4,6 +4,7 @@ import axios from 'axios';
 import { API } from '@/lib/config';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
+import { safeInvalidateSize } from '@/lib/leafletSafe';
 import { Layout } from '../../components/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
@@ -45,10 +46,18 @@ const pharmacyIcon = new L.DivIcon({
 function MapResizer() {
   const map = useMap();
   useEffect(() => {
-    const t = setTimeout(() => map.invalidateSize(), 200);
-    const h = () => setTimeout(() => map.invalidateSize(), 100);
+    let alive = true;
+    const run = () => {
+      if (alive) safeInvalidateSize(map);
+    };
+    const t = setTimeout(run, 200);
+    const h = () => setTimeout(run, 100);
     window.addEventListener('resize', h);
-    return () => { clearTimeout(t); window.removeEventListener('resize', h); };
+    return () => {
+      alive = false;
+      clearTimeout(t);
+      window.removeEventListener('resize', h);
+    };
   }, [map]);
   return null;
 }
