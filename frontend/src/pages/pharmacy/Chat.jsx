@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { API } from '@/lib/config';
+import { useQueryClient } from '@tanstack/react-query';
+import { useConversationsQuery } from '@/hooks/queries';
 import { Layout } from '../../components/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
@@ -117,16 +119,28 @@ export default function ChatPage() {
     )));
   }, [updateConversationList]);
 
+  const queryClient = useQueryClient();
+  const { data: conversationsQuery = [], isLoading: conversationsLoading } = useConversationsQuery();
+
+  // La lista conversazioni arriva dalla cache condivisa: il websocket la
+  // aggiorna con updateConversationList, il refresh invalida la chiave.
+  useEffect(() => {
+    updateConversationList(ensureArray(conversationsQuery));
+  }, [conversationsQuery, updateConversationList]);
+
+  useEffect(() => {
+    setLoadingList(conversationsLoading);
+  }, [conversationsLoading]);
+
   const fetchConversations = useCallback(async () => {
     try {
-      const response = await axios.get(`${API}/messages/conversations`, { withCredentials: true });
-      updateConversationList(ensureArray(response.data));
+      await queryClient.invalidateQueries({ queryKey: ['conversations'] });
     } catch {
       toast.error('Errore nel caricamento conversazioni');
     } finally {
       setLoadingList(false);
     }
-  }, [updateConversationList]);
+  }, [queryClient]);
 
   const fetchMessages = useCallback(async (selectedDriverId, silent = false) => {
     if (!selectedDriverId) return;

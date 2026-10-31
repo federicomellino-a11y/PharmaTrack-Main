@@ -43,3 +43,6 @@ export const useArchiveQuery = (page = 1, limit = 20, options = {}) =>
     queryFn: getObj(`/archive?page=${page}&limit=${limit}`),
     ...options,
   });
+
+export const useConversationsQuery = (options = {}) =>
+  useQuery({ queryKey: ['conversations'], queryFn: getList('/messages/conversations'), ...options });
