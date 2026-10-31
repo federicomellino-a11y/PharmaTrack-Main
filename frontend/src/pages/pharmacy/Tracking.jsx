@@ -2,8 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { API } from '@/lib/config';
-import { useQueryClient } from '@tanstack/react-query';
-import { useDeliveriesQuery, useDriversQuery } from '@/hooks/queries';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { Layout } from '../../components/Layout';
@@ -217,28 +215,17 @@ export default function TrackingPage() {
     }
   };
 
-  const queryClient = useQueryClient();
-  const { data: driversQuery = [] } = useDriversQuery();
-  const { data: activeDeliveriesQuery = [] } = useDeliveriesQuery('active');
-
-  // La cache react-query semina lo stato locale: il websocket continua a
-  // sovrascrivere le posizioni in tempo reale.
-  useEffect(() => {
-    setDrivers(ensureArray(driversQuery));
-  }, [driversQuery]);
-
-  useEffect(() => {
-    setDeliveries(ensureArray(activeDeliveriesQuery));
-  }, [activeDeliveriesQuery]);
-
   const fetchData = async () => {
     try {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['drivers'] }),
-        queryClient.invalidateQueries({ queryKey: ['deliveries'] }),
+      const [driversRes, deliveriesRes] = await Promise.all([
+        axios.get(`${API}/drivers`, { withCredentials: true }),
+        axios.get(`${API}/deliveries?status=active`, { withCredentials: true }),
       ]);
-      const safeDrivers = ensureArray(driversQuery);
-      const safeDeliveries = ensureArray(activeDeliveriesQuery);
+
+      const safeDrivers = ensureArray(driversRes.data);
+      const safeDeliveries = ensureArray(deliveriesRes.data);
+      setDrivers(safeDrivers);
+      setDeliveries(safeDeliveries);
       setDeliveryCoords({});
 
       const activeDeliveriesList = safeDeliveries.filter((delivery) => ['assigned', 'picked_up', 'in_transit'].includes(delivery.status));

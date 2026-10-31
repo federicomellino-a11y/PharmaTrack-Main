@@ -28,7 +28,7 @@ const DriversPage = lazy(() => import('./pages/pharmacy/Drivers'))
 const ChatPage = lazy(() => import('./pages/pharmacy/Chat'))
 const ArchivePage = lazy(() => import('./pages/pharmacy/Archive'))
 const SettingsPage = lazy(() => import('./pages/pharmacy/Settings'))
-const TrackingPage = lazy(() => import('./pages/pharmacy/Tracking'))
+import TrackingPage from './pages/pharmacy/Tracking'
 const ReportsPage = lazy(() => import('./pages/pharmacy/Reports'))
 const DoctorsPage = lazy(() => import('./pages/pharmacy/Doctors'))
 const UsefulNumbersPage = lazy(() => import('./pages/pharmacy/UsefulNumbers'))
