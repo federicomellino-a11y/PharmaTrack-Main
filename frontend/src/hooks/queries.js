@@ -49,3 +49,14 @@ export const useConversationsQuery = (options = {}) =>
 
 export const useWinfarmStatusQuery = (options = {}) =>
   useQuery({ queryKey: ['winfarm-status'], queryFn: getObj('/integrations/winfarm/status'), ...options });
+
+// App fattorino: stessi pattern della farmacia, pronti per il cablaggio delle
+// pagine senza toccare la logica realtime (posizione e stato via websocket).
+export const useDriverDeliveriesQuery = (options = {}) =>
+  useQuery({ queryKey: ['driver-deliveries'], queryFn: getList('/driver/deliveries'), ...options });
+
+export const useDriverShiftQuery = (options = {}) =>
+  useQuery({ queryKey: ['driver-shift'], queryFn: getObj('/driver/shifts/current'), ...options });
+
+export const useDriverMessagesQuery = (options = {}) =>
+  useQuery({ queryKey: ['driver-messages'], queryFn: getList('/driver/messages'), ...options });
