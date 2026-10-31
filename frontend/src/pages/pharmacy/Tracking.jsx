@@ -4,6 +4,7 @@ import axios from 'axios';
 import { API } from '@/lib/config';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
+import { safeInvalidateSize } from '@/lib/leafletSafe';
 import { Layout } from '../../components/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
@@ -131,16 +132,20 @@ function MapUpdater({ center }) {
   }, [center, map]);
 
   useEffect(() => {
+    let alive = true;
     const handleResize = () => {
       setTimeout(() => {
-        map.invalidateSize();
+        if (alive) safeInvalidateSize(map);
       }, 100);
     };
 
     window.addEventListener('resize', handleResize);
     handleResize();
 
-    return () => window.removeEventListener('resize', handleResize);
+    return () => {
+      alive = false;
+      window.removeEventListener('resize', handleResize);
+    };
   }, [map]);
 
   return null;
