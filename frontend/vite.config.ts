@@ -5,8 +5,13 @@ import path from "path";
 
 const port = Number(process.env.PORT || 3000);
 
+// Il commit finisce nel bundle: ogni evento Sentry dice da quale build arriva.
+const appRelease =
+  process.env.VERCEL_GIT_COMMIT_SHA || process.env.GITHUB_SHA || "local";
+
 export default defineConfig({
   base: "/",
+  define: { __APP_RELEASE__: JSON.stringify(String(appRelease).slice(0, 7)) },
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {

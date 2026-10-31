@@ -75,6 +75,7 @@ async function loadSentry() {
         window.Sentry.init({
           dsn: config.sentry_dsn,
           environment: 'production',
+          release: typeof __APP_RELEASE__ !== 'undefined' ? `pharmatrack@${__APP_RELEASE__}` : 'pharmatrack@unknown',
           tracesSampleRate: 0,
           sendDefaultPii: false,
         });
