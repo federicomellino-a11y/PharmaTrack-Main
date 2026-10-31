@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useQueryClient } from '@tanstack/react-query';
+import { useDriversQuery } from '@/hooks/queries';
 import { API } from '@/lib/config';
 import { Layout } from '../../components/Layout';
 import { Card, CardContent } from '../../components/ui/card';
@@ -45,8 +47,9 @@ const formatDateTime = (d) => d ? new Date(d).toLocaleString('it-IT', { day: '2-
 
 export default function DriversPage() {
  const { user, updateProfile } = useAuth();
- const [drivers, setDrivers] = useState([]);
- const [loading, setLoading] = useState(true);
+ const queryClient = useQueryClient();
+ const { data: driversData = [], isLoading: loading } = useDriversQuery();
+ const drivers = ensureArray(driversData);
  const [searchTerm, setSearchTerm] = useState('');
  const [dialogOpen, setDialogOpen] = useState(false);
  const [editingDriver, setEditingDriver] = useState(null);
@@ -64,20 +67,7 @@ export default function DriversPage() {
  vehicle_type: 'scooter'
  });
 
- useEffect(() => {
- fetchDrivers();
- }, []);
-
- const fetchDrivers = async () => {
- try {
- const response = await axios.get(`${API}/drivers`, { withCredentials: true });
- setDrivers(ensureArray(response.data));
- } catch (err) {
- toast.error('Errore nel caricamento fattorini');
- } finally {
- setLoading(false);
- }
- };
+ const fetchDrivers = () => queryClient.invalidateQueries({ queryKey: ['drivers'] });
 
  const handleSubmit = async (e) => {
  e.preventDefault();
