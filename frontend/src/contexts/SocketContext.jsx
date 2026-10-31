@@ -182,7 +182,9 @@ export const SocketProvider = ({ children, userId, userType, settings = {} }) =>
         icon: '/logo.png',
       });
       setTimeout(() => notification.close(), 5000);
-    } catch {}
+    } catch (err) {
+      console.warn('[socket] notifica browser non mostrata:', err);
+    }
   }, [notificationsEnabled]);
 
   const playNotificationSound = useCallback(() => {
@@ -366,7 +368,9 @@ export const SocketProvider = ({ children, userId, userType, settings = {} }) =>
             default:
               break;
           }
-        } catch {}
+        } catch (err) {
+          console.warn('[socket] messaggio realtime scartato:', err);
+        }
       };
 
       ws.onclose = () => {
@@ -380,10 +384,13 @@ export const SocketProvider = ({ children, userId, userType, settings = {} }) =>
         }
       };
 
-      ws.onerror = () => {
+      ws.onerror = (err) => {
+        console.warn('[socket] errore connessione realtime:', err?.message || err);
         ws.close();
       };
-    } catch {}
+    } catch (err) {
+      console.warn('[socket] connessione realtime non avviata:', err);
+    }
   }, [fetchNotifications, mergeNotification, playNotificationSound, pushBufferedMessage, requestNotificationPermission, showBrowserNotification, trackingEnabled, userId, userType]);
 
   useEffect(() => {
