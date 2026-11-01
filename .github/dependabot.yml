@@ -29,12 +29,14 @@ updates:
       timezone: "Europe/Rome"
     open-pull-requests-limit: 3
     groups:
-      minor-e-patch:
+      # Solo patch: con le versioni pinnate in produzione un salto 0.x-minor
+      # puo' rompere il build (e' successo con fastapi 0.110 -> 0.162).
+      patch:
         patterns: ["*"]
-        update-types: ["minor", "patch"]
+        update-types: ["patch"]
     ignore:
       - dependency-name: "*"
-        update-types: ["version-update:semver-major"]
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
 
   # Le action della CI vanno tenute aggiornate: sono eseguite sul repository.
   - package-ecosystem: "github-actions"
