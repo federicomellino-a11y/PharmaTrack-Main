@@ -14,6 +14,8 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ensureArray } from '@/lib/collections';
+import { useQueryClient } from '@tanstack/react-query';
+import { useDriverDeliveriesQuery, useDriverShiftQuery } from '@/hooks/queries';
 import { flushOfflineQueue, getPendingCount } from '@/lib/offlineQueue';
 import { flushQueuedPhotos } from '@/lib/offlinePhotos';
 
@@ -32,6 +34,28 @@ export default function DriverDashboard() {
   const lastSentLocationRef = useRef(null);
   const [pendingSync, setPendingSync] = useState(getPendingCount());
   const [online, setOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
+
+  const queryClient = useQueryClient();
+  // Le letture passano dalla cache condivisa; lo stato locale resta la fonte
+  // per gli aggiornamenti live (posizione, websocket, coda offline).
+  const {
+    data: deliveriesCache,
+    isLoading: deliveriesLoading,
+    isError: deliveriesError,
+  } = useDriverDeliveriesQuery({ staleTime: 30000 });
+  const { data: shiftCache } = useDriverShiftQuery({ staleTime: 30000 });
+
+  useEffect(() => {
+    if (deliveriesLoading) return;
+    if (deliveriesError) { setLoading(false); return; }
+    if (!deliveriesCache) return;
+    setDeliveries(ensureArray(deliveriesCache));
+    setLoading(false);
+  }, [deliveriesCache, deliveriesLoading, deliveriesError]);
+
+  useEffect(() => {
+    if (shiftCache) setShift(shiftCache.shift || null);
+  }, [shiftCache]);
 
   const syncPending = useCallback(async () => {
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
@@ -101,12 +125,7 @@ export default function DriverDashboard() {
   }, []);
 
   const fetchShift = async () => {
-    try {
-      const res = await axios.get(`${API}/driver/shifts/current`, { withCredentials: true });
-      setShift(res.data?.shift || null);
-    } catch (err) {
-      console.error('Errore caricamento turno:', err?.response?.status);
-    }
+    await queryClient.invalidateQueries({ queryKey: ['driver-shift'] });
   };
 
   const handleStartShift = async () => {
@@ -149,10 +168,7 @@ export default function DriverDashboard() {
 
   const fetchDeliveries = async () => {
     try {
-      const response = await axios.get(`${API}/driver/deliveries`, {
-        withCredentials: true,
-      });
-      setDeliveries(ensureArray(response.data));
+      await queryClient.invalidateQueries({ queryKey: ['driver-deliveries'] });
     } catch {
       toast.error('Errore nel caricamento consegne');
     } finally {
