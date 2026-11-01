@@ -130,5 +130,5 @@ websockets==13.1
 wrapt==2.5.1
 yarl==1.25.1
 zipp==3.23.1
-cloudinary>=1.35.0
+cloudinary>=1.46.3
 Pillow>=12.3.0
