@@ -179,9 +179,18 @@ export default function DeliveriesPage() {
     }
   };
 
+  // Ogni azione su una consegna muove anche altro: i KPI della home, l'archivio,
+  // i turni (incassi) e i clienti. Invalidando solo ['deliveries'] restavano
+  // numeri vecchi finche' non si ricaricava la pagina.
   const fetchData = useCallback(async () => {
-    await queryClient.invalidateQueries({ queryKey: ['deliveries'] });
-    await queryClient.invalidateQueries({ queryKey: ['drivers'] });
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['deliveries'] }),
+      queryClient.invalidateQueries({ queryKey: ['drivers'] }),
+      queryClient.invalidateQueries({ queryKey: ['statistics'] }),
+      queryClient.invalidateQueries({ queryKey: ['archive'] }),
+      queryClient.invalidateQueries({ queryKey: ['shifts'] }),
+      queryClient.invalidateQueries({ queryKey: ['customers'] }),
+    ]);
     setRefreshing(false);
   }, [queryClient]);
 
