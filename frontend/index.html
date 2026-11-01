@@ -20,6 +20,32 @@
   <body>
     <noscript>Devi abilitare JavaScript per usare questa app.</noscript>
     <div id="root"></div>
+    <!-- Rete di sicurezza: se il bundle non parte (rete lenta, file non piu
+         esistente, cache incoerente) l'utente vede un messaggio con un
+         pulsante invece di una pagina bianca senza spiegazioni. -->
+    <div id="boot-fallback" style="display:none;position:fixed;inset:0;padding:24px;font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#faf9f6;color:#1f2937;align-items:center;justify-content:center;text-align:center;">
+      <div style="max-width:380px;">
+        <p style="font-size:17px;font-weight:600;margin:0 0 8px;">PharmaTrack non si e caricato</p>
+        <p style="font-size:14px;line-height:1.5;color:#4b5563;margin:0 0 18px;">
+          Di solito e la copia dell'app rimasta in memoria dal caricamento precedente.
+          Ricarica per scaricare la versione aggiornata.
+        </p>
+        <button type="button" onclick="var u=new URL(location.href);u.searchParams.set('v',Date.now());location.replace(u.toString());"
+          style="background:#2d7a6b;color:#fff;border:0;border-radius:10px;padding:12px 22px;font-size:15px;font-weight:600;cursor:pointer;">
+          Ricarica l'app
+        </button>
+      </div>
+    </div>
+    <script>
+      window.__ptBooted = false;
+      setTimeout(function () {
+        var root = document.getElementById('root');
+        if (!window.__ptBooted || !root || root.children.length === 0) {
+          var el = document.getElementById('boot-fallback');
+          if (el) el.style.display = 'flex';
+        }
+      }, 9000);
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
