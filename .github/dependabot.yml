@@ -1,0 +1,44 @@
+version: 2
+updates:
+  # Frontend: aggiornamenti raggruppati e settimanali, cosi' non arriva una PR
+  # per ogni pacchetto. I major restano fuori e si valutano a mano.
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Europe/Rome"
+    open-pull-requests-limit: 3
+    groups:
+      minor-e-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  # Backend: requirements.txt e' pinnato, quindi gli aggiornamenti sono
+  # mirati e leggibili.
+  - package-ecosystem: "pip"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Europe/Rome"
+    open-pull-requests-limit: 3
+    groups:
+      minor-e-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  # Le action della CI vanno tenute aggiornate: sono eseguite sul repository.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 2
