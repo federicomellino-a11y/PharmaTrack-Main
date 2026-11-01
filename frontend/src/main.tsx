@@ -30,6 +30,14 @@ if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 const root = ReactDOM.createRoot(document.getElementById("root")!);
+// Se l'app parte dopo che la rete di sicurezza e comparsa, la togliamo.
+const ptHideFallback = () => {
+  const el = document.getElementById("boot-fallback");
+  if (el) el.style.display = "none";
+};
+window.__ptBooted = true;
+ptHideFallback();
+ptHideFallback();
 root.render(
   <React.StrictMode>
     <App />
