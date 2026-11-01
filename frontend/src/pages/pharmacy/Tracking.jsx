@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import axios from 'axios';
 import { API } from '@/lib/config';
+import { useQueryClient } from '@tanstack/react-query';
+import { useDeliveriesQuery, useDriversQuery } from '@/hooks/queries';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { safeInvalidateSize } from '@/lib/leafletSafe';
@@ -163,6 +164,55 @@ export default function TrackingPage() {
   const [pharmacyCoords, setPharmacyCoords] = useState(null);
   const mapKey = useRef(`map-${Date.now()}`);
 
+  const queryClient = useQueryClient();
+  // Letture dalla cache condivisa; lo stato locale resta la fonte per gli
+  // aggiornamenti live del websocket (posizioni dei fattorini).
+  const {
+    data: driversCache,
+    isLoading: driversLoading,
+    isError: driversError,
+  } = useDriversQuery();
+  const {
+    data: activeDeliveriesCache,
+    isLoading: activeDeliveriesLoading,
+  } = useDeliveriesQuery('active');
+
+  useEffect(() => {
+    if (!driversCache) return;
+    setDrivers(ensureArray(driversCache));
+  }, [driversCache]);
+
+  const mapCenteredOnDriver = useRef(false);
+  useEffect(() => {
+    if (mapCenteredOnDriver.current) return;
+    const driverWithLocation = ensureArray(drivers).find((driver) => driver.current_lat && driver.current_lng);
+    if (!driverWithLocation) return;
+    mapCenteredOnDriver.current = true;
+    setMapCenter([driverWithLocation.current_lat, driverWithLocation.current_lng]);
+  }, [drivers]);
+
+  useEffect(() => {
+    if (!activeDeliveriesCache) return;
+    const list = ensureArray(activeDeliveriesCache);
+    setDeliveries(list);
+    setDeliveryCoords({});
+    list
+      .filter((delivery) => ['assigned', 'picked_up', 'in_transit'].includes(delivery.status))
+      .slice(0, 10)
+      .forEach((delivery) => {
+        loadDeliveryCoordinates(delivery).catch(() => null);
+      });
+  }, [activeDeliveriesCache]);
+
+  useEffect(() => {
+    if (driversLoading || activeDeliveriesLoading) return;
+    if (driversError) {
+      setLoading(false);
+      return;
+    }
+    setLoading(false);
+  }, [driversLoading, activeDeliveriesLoading, driversError]);
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -222,26 +272,10 @@ export default function TrackingPage() {
 
   const fetchData = async () => {
     try {
-      const [driversRes, deliveriesRes] = await Promise.all([
-        axios.get(`${API}/drivers`, { withCredentials: true }),
-        axios.get(`${API}/deliveries?status=active`, { withCredentials: true }),
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['drivers'] }),
+        queryClient.invalidateQueries({ queryKey: ['deliveries'] }),
       ]);
-
-      const safeDrivers = ensureArray(driversRes.data);
-      const safeDeliveries = ensureArray(deliveriesRes.data);
-      setDrivers(safeDrivers);
-      setDeliveries(safeDeliveries);
-      setDeliveryCoords({});
-
-      const activeDeliveriesList = safeDeliveries.filter((delivery) => ['assigned', 'picked_up', 'in_transit'].includes(delivery.status));
-      activeDeliveriesList.slice(0, 10).forEach((delivery) => {
-        loadDeliveryCoordinates(delivery).catch(() => null);
-      });
-
-      const driverWithLocation = safeDrivers.find((driver) => driver.current_lat && driver.current_lng);
-      if (driverWithLocation) {
-        setMapCenter([driverWithLocation.current_lat, driverWithLocation.current_lng]);
-      }
     } catch {
       toast.error('Errore nel caricamento dati');
     } finally {
