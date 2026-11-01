@@ -2,6 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { API } from '@/lib/config';
+import { useQueryClient } from '@tanstack/react-query';
+import { useCustomersQuery, useDeliveriesQuery } from '@/hooks/queries';
 import AddressAutocomplete from '../components/AddressAutocomplete';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/ui/button';
@@ -15,6 +17,8 @@ const PRIORITIES = [
   { id: 'high', label: 'Alta', emoji: '🟡' },
   { id: 'urgent', label: 'Urgente', emoji: '🔴' },
 ];
+
+const ensureArrayLocal = (value) => (Array.isArray(value) ? value : []);
 
 export default function QuickAddPage() {
   const { user } = useAuth();
@@ -37,6 +41,18 @@ export default function QuickAddPage() {
   const [creating, setCreating] = useState(false);
   const [created, setCreated] = useState(null);
 
+  const queryClient = useQueryClient();
+  const { data: customersCache } = useCustomersQuery();
+  const { data: activeDeliveriesCache } = useDeliveriesQuery('active');
+
+  useEffect(() => {
+    if (customersCache) setCustomers(ensureArrayLocal(customersCache));
+  }, [customersCache]);
+
+  useEffect(() => {
+    if (activeDeliveriesCache) setDeliveries(ensureArrayLocal(activeDeliveriesCache));
+  }, [activeDeliveriesCache]);
+
   useEffect(() => { document.title = 'PharmaTrack · Quick'; }, []);
   useEffect(() => {
     const esc = (e) => { if (e.key === 'Escape' && !created) { try { window.close(); } catch { /* noop */ } } };
@@ -46,12 +62,10 @@ export default function QuickAddPage() {
 
   const load = async () => {
     try {
-      const [c, d] = await Promise.all([
-        axios.get(`${API}/customers`, { withCredentials: true }),
-        axios.get(`${API}/deliveries?status=active`, { withCredentials: true }),
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['customers'] }),
+        queryClient.invalidateQueries({ queryKey: ['deliveries'] }),
       ]);
-      setCustomers(c.data || []);
-      setDeliveries(d.data || []);
     } catch { toast.error('Errore di caricamento'); }
   };
   useEffect(() => { load(); }, []);
