@@ -37,6 +37,9 @@ jobs:
       - name: Lint (nomi non definiti e regole degli hook)
         working-directory: frontend
         run: npm run lint
+      - name: Test unitari
+        working-directory: frontend
+        run: npm test
       - name: Build di produzione
         working-directory: frontend
         run: npm run build
