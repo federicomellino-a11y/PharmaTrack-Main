@@ -1,4 +1,5 @@
-import React, { Suspense, lazy } from 'react'
+import { lazyWithRetry } from './lib/lazyWithRetry';
+import React, { Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClient } from './lib/queryClient'
@@ -12,35 +13,35 @@ import { SocketProvider } from './contexts/SocketContext'
 import ErrorBoundary from './components/ErrorBoundary'
 import './App.css'
 
-const LandingPage = lazy(() => import('./pages/LandingPage'))
-const LoginPage = lazy(() => import('./pages/LoginPage'))
-const RegisterPage = lazy(() => import('./pages/RegisterPage'))
-const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'))
-const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'))
-const VerifyEmailPage = lazy(() => import('./pages/VerifyEmail'))
-const QuickAddPage = lazy(() => import('./pages/QuickAdd'))
-const DockPage = lazy(() => import('./pages/DockPage'))
-const PublicTrackingPage = lazy(() => import('./pages/PublicTracking'))
-const PharmacyDashboard = lazy(() => import('./pages/pharmacy/Dashboard'))
-const CustomersPage = lazy(() => import('./pages/pharmacy/Customers'))
-const DeliveriesPage = lazy(() => import('./pages/pharmacy/Deliveries'))
-const DriversPage = lazy(() => import('./pages/pharmacy/Drivers'))
-const ChatPage = lazy(() => import('./pages/pharmacy/Chat'))
-const ArchivePage = lazy(() => import('./pages/pharmacy/Archive'))
-const SettingsPage = lazy(() => import('./pages/pharmacy/Settings'))
+const LandingPage = lazyWithRetry(() => import('./pages/LandingPage'))
+const LoginPage = lazyWithRetry(() => import('./pages/LoginPage'))
+const RegisterPage = lazyWithRetry(() => import('./pages/RegisterPage'))
+const ForgotPasswordPage = lazyWithRetry(() => import('./pages/ForgotPasswordPage'))
+const ResetPasswordPage = lazyWithRetry(() => import('./pages/ResetPasswordPage'))
+const VerifyEmailPage = lazyWithRetry(() => import('./pages/VerifyEmail'))
+const QuickAddPage = lazyWithRetry(() => import('./pages/QuickAdd'))
+const DockPage = lazyWithRetry(() => import('./pages/DockPage'))
+const PublicTrackingPage = lazyWithRetry(() => import('./pages/PublicTracking'))
+const PharmacyDashboard = lazyWithRetry(() => import('./pages/pharmacy/Dashboard'))
+const CustomersPage = lazyWithRetry(() => import('./pages/pharmacy/Customers'))
+const DeliveriesPage = lazyWithRetry(() => import('./pages/pharmacy/Deliveries'))
+const DriversPage = lazyWithRetry(() => import('./pages/pharmacy/Drivers'))
+const ChatPage = lazyWithRetry(() => import('./pages/pharmacy/Chat'))
+const ArchivePage = lazyWithRetry(() => import('./pages/pharmacy/Archive'))
+const SettingsPage = lazyWithRetry(() => import('./pages/pharmacy/Settings'))
 import TrackingPage from './pages/pharmacy/Tracking'
-const ReportsPage = lazy(() => import('./pages/pharmacy/Reports'))
-const DoctorsPage = lazy(() => import('./pages/pharmacy/Doctors'))
-const UsefulNumbersPage = lazy(() => import('./pages/pharmacy/UsefulNumbers'))
-const NotesPage = lazy(() => import('./pages/pharmacy/Notes'))
-const ShiftsPage = lazy(() => import('./pages/pharmacy/Shifts'))
-const IntegrationsPage = lazy(() => import('./pages/pharmacy/Integrations'))
-const DriverLogin = lazy(() => import('./pages/driver/Login'))
-const DriverDashboard = lazy(() => import('./pages/driver/Dashboard'))
-const DriverDeliveryDetail = lazy(() => import('./pages/driver/DeliveryDetail'))
-const DriverChat = lazy(() => import('./pages/driver/Chat'))
-const AdminLoginPage = lazy(() => import('./pages/admin/Login'))
-const AdminDashboardPage = lazy(() => import('./pages/admin/Dashboard'))
+const ReportsPage = lazyWithRetry(() => import('./pages/pharmacy/Reports'))
+const DoctorsPage = lazyWithRetry(() => import('./pages/pharmacy/Doctors'))
+const UsefulNumbersPage = lazyWithRetry(() => import('./pages/pharmacy/UsefulNumbers'))
+const NotesPage = lazyWithRetry(() => import('./pages/pharmacy/Notes'))
+const ShiftsPage = lazyWithRetry(() => import('./pages/pharmacy/Shifts'))
+const IntegrationsPage = lazyWithRetry(() => import('./pages/pharmacy/Integrations'))
+const DriverLogin = lazyWithRetry(() => import('./pages/driver/Login'))
+const DriverDashboard = lazyWithRetry(() => import('./pages/driver/Dashboard'))
+const DriverDeliveryDetail = lazyWithRetry(() => import('./pages/driver/DeliveryDetail'))
+const DriverChat = lazyWithRetry(() => import('./pages/driver/Chat'))
+const AdminLoginPage = lazyWithRetry(() => import('./pages/admin/Login'))
+const AdminDashboardPage = lazyWithRetry(() => import('./pages/admin/Dashboard'))
 
 const FullscreenLoader = () => (
   <div className="min-h-screen flex items-center justify-center bg-background">
