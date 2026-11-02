@@ -37,16 +37,9 @@ updates:
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-major", "version-update:semver-minor"]
-      # google-generativeai 0.8.6 la inchioda a 0.6.15: alzarla rende il
-      # requirements irrisolvibile e il build Render fallisce (successo il 2/11
-      # con il gruppo patch, che l'aveva portata a 0.6.18).
-      - dependency-name: "google-ai-generativelanguage"
-      - dependency-name: "google-generativeai"
-      # litellm e openai sono accoppiati: litellm 1.80.17 pretende
-      # openai>=2.8.0, che sbarca con il pin openai==1.99.9. Vanno alzati
-      # insieme, a mano, con la verifica dei pin.
-      - dependency-name: "litellm"
-      - dependency-name: "openai"
+      # Gli ignore su litellm, openai e google-generativeai sono spariti con
+      # la potatura del 2/11: quei pacchetti non erano importati da nessun
+      # file del backend e non sono piu' dichiarati.
 
   # Le action della CI vanno tenute aggiornate: sono eseguite sul repository.
   - package-ecosystem: "github-actions"
