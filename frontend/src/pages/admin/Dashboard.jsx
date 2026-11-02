@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import axios from 'axios'
+import { useQueryClient } from '@tanstack/react-query'
 import { API } from '@/lib/config'
 import {
   ShieldCheck,
@@ -32,6 +33,12 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { useAdminAuth } from '../../contexts/AdminAuthContext'
 import { toast } from 'sonner'
 import { ensureArray, ensureObject } from '@/lib/collections'
+import {
+  useAdminOverviewQuery,
+  useAdminUsersQuery,
+  useAdminDatabaseStatsQuery,
+  useAdminDatabaseHealthQuery,
+} from '@/hooks/queries'
 
 const formatDate = (value) => (value ? new Date(value).toLocaleString('it-IT') : '-')
 const formatCurrency = (value) => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(Number(value || 0))
@@ -46,12 +53,22 @@ const deliveryStatusLabel = {
 
 export default function AdminDashboardPage() {
   const { admin, logout } = useAdminAuth()
-  const [overview, setOverview] = useState(null)
-  const [databaseStats, setDatabaseStats] = useState(null)
-  const [databaseHealth, setDatabaseHealth] = useState(null)
-  const [users, setUsers] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
+  const queryClient = useQueryClient()
+  const overviewQuery = useAdminOverviewQuery()
+  const usersQuery = useAdminUsersQuery()
+  const databaseStatsQuery = useAdminDatabaseStatsQuery()
+  const databaseHealthQuery = useAdminDatabaseHealthQuery()
+
+  const overview = ensureObject(overviewQuery.data)
+  const databaseStats = ensureObject(databaseStatsQuery.data)
+  const databaseHealth = ensureObject(databaseHealthQuery.data)
+  const users = ensureArray(usersQuery.data)
+
+  const adminQueries = [overviewQuery, usersQuery, databaseStatsQuery, databaseHealthQuery]
+  const loading = adminQueries.some((query) => query.isLoading)
+  const refreshing = adminQueries.some((query) => query.isFetching)
+  const loadError = adminQueries.find((query) => query.error)?.error
+
   const [search, setSearch] = useState('')
   const [deletingUserId, setDeletingUserId] = useState(null)
   const [togglingUserId, setTogglingUserId] = useState(null)
@@ -61,32 +78,16 @@ export default function AdminDashboardPage() {
   const [selectedUserDetails, setSelectedUserDetails] = useState(null)
   const [detailsLoading, setDetailsLoading] = useState(false)
 
-  const fetchData = async ({ silent = false } = {}) => {
-    if (!silent) setRefreshing(true)
-
-    try {
-      const [overviewRes, usersRes, dbStatsRes, dbHealthRes] = await Promise.all([
-        axios.get(`${API}/admin/overview`, { withCredentials: true }),
-        axios.get(`${API}/admin/users`, { withCredentials: true }),
-        axios.get(`${API}/admin/database/stats`, { withCredentials: true }),
-        axios.get(`${API}/admin/database/health`, { withCredentials: true }),
-      ])
-
-      setOverview(ensureObject(overviewRes.data))
-      setUsers(ensureArray(usersRes.data))
-      setDatabaseStats(ensureObject(dbStatsRes.data))
-      setDatabaseHealth(ensureObject(dbHealthRes.data))
-    } catch (err) {
-      toast.error(err.response?.data?.detail || 'Errore caricamento console admin')
-    } finally {
-      setLoading(false)
-      setRefreshing(false)
-    }
+  // Una sola invalidazione per tutte e quattro le letture: la cache condivisa
+  // sostituisce il vecchio fetch manuale con quattro axios in parallelo.
+  const fetchData = async () => {
+    await queryClient.invalidateQueries({ queryKey: ['admin'] })
   }
 
   useEffect(() => {
-    fetchData({ silent: true })
-  }, [])
+    if (!loadError) return
+    toast.error(loadError.response?.data?.detail || 'Errore caricamento console admin')
+  }, [loadError])
 
   const filteredUsers = useMemo(() => {
     const safeUsers = ensureArray(users)
@@ -128,7 +129,7 @@ export default function AdminDashboardPage() {
         setSelectedUser(null)
         setSelectedUserDetails(null)
       }
-      await fetchData({ silent: true })
+      await fetchData()
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Errore eliminazione utente')
     } finally {
@@ -146,7 +147,7 @@ export default function AdminDashboardPage() {
         { is_active: nextStatus },
         { withCredentials: true },
       )
-      setUsers((prev) => ensureArray(prev).map((item) => (item.user_id === user.user_id ? { ...item, ...response.data } : item)))
+      await queryClient.invalidateQueries({ queryKey: ['admin'] })
       if (selectedUser?.user_id === user.user_id && selectedUserDetails?.user) {
         setSelectedUserDetails((prev) => prev ? ({ ...prev, user: response.data }) : prev)
       }
@@ -163,7 +164,7 @@ export default function AdminDashboardPage() {
     try {
       const response = await axios.post(`${API}/admin/database/cleanup-sessions`, {}, { withCredentials: true })
       toast.success(response.data?.message || 'Pulizia sessioni completata')
-      await fetchData({ silent: true })
+      await fetchData()
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Errore durante la pulizia sessioni')
     } finally {

@@ -194,7 +194,10 @@ export const SocketProvider = ({ children, userId, userType, settings = {} }) =>
         'tvT18AAAAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA');
       audio.volume = 0.25;
       audio.play().catch(() => null);
-    } catch {}
+    } catch {
+      // Il browser blocca il suono senza interazione (autoplay): e' previsto,
+      // non va segnalato.
+    }
   }, [soundEnabled]);
 
   const pushBufferedMessage = useCallback((message) => {
