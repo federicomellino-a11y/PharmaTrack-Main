@@ -1,11 +1,11 @@
 import os
 import uuid
 import logging
-import bcrypt
 from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, HTTPException, Depends, Request, Response
 
 from app.core.database import db
+from app.core.passwords import hash_password, needs_rehash, verify_password
 from app.core.config import APP_BASE_URL, FORGOT_RATE_LIMIT, LOGIN_RATE_LIMIT, REGISTER_RATE_LIMIT, os
 from app.core.security import (
     get_current_user, clear_cookie_variants, delete_pharmacy_account_data,
@@ -59,7 +59,7 @@ async def register(request: Request, data: PharmacyRegister, response: Response)
     if existing:
         raise HTTPException(status_code=400, detail="Email già registrata")
     
-    password_hash = bcrypt.hashpw(data.password.encode(), bcrypt.gensalt()).decode()
+    password_hash = hash_password(data.password)
     user_id = f"user_{uuid.uuid4().hex[:12]}"
     
     new_user = {
@@ -107,8 +107,18 @@ async def login(request: Request, data: PharmacyLogin, response: Response):
     if not user:
         raise HTTPException(status_code=401, detail="Credenziali non valide")
     
-    if not bcrypt.checkpw(data.password.encode(), user["password_hash"].encode()):
+    if not verify_password(data.password, user.get("password_hash", "")):
         raise HTTPException(status_code=401, detail="Credenziali non valide")
+    # Ri-hash trasparente: un hash con costo vecchio viene aggiornato adesso che
+    # la password in chiaro e' disponibile, senza disturbare l'utente.
+    if needs_rehash(user.get("password_hash", "")):
+        try:
+            await db.users.update_one(
+                {"user_id": user["user_id"]},
+                {"$set": {"password_hash": hash_password(data.password)}},
+            )
+        except Exception:
+            logger.exception("ri-hash della password fallito per %s", user.get("user_id"))
     if user.get("is_active", True) is False:
         raise HTTPException(status_code=403, detail="Account disattivato")
     
@@ -195,7 +205,7 @@ async def reset_password(data: ResetPasswordRequest):
     if len(data.new_password) < 8:
         raise HTTPException(status_code=422, detail="La password deve contenere almeno 8 caratteri")
 
-    new_hash = bcrypt.hashpw(data.new_password.encode(), bcrypt.gensalt()).decode()
+    new_hash = hash_password(data.new_password)
     await db.users.update_one({"user_id": record["user_id"]}, {"$set": {"password_hash": new_hash}})
     await db.password_reset_tokens.delete_one({"token": data.token})
     await db.user_sessions.delete_many({"user_id": record["user_id"]})

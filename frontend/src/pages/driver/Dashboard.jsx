@@ -116,10 +116,23 @@ export default function DriverDashboard() {
       toast.success('La farmacia ha confermato il turno');
     };
 
+    // La farmacia puo' annullare o ripristinare una consegna mentre il
+    // fattorino ha la dashboard aperta: senza questo listener il suo elenco
+    // resta indietro e si ritrova una consegna che non esiste piu'.
+    const handleDeliveryUpdate = (event) => {
+      const stato = event?.detail?.status;
+      fetchDeliveries();
+      fetchShift();
+      if (stato === 'cancelled') toast.info('Una consegna e\' stata annullata dalla farmacia');
+      else if (event?.detail?.reason === 'restored') toast.success('Una consegna e\' tornata nel tuo giro');
+    };
+
     window.addEventListener('new_delivery', handleNewDelivery);
+    window.addEventListener('delivery_update', handleDeliveryUpdate);
     window.addEventListener('shift_settled', handleShiftSettled);
     return () => {
       window.removeEventListener('new_delivery', handleNewDelivery);
+      window.removeEventListener('delivery_update', handleDeliveryUpdate);
       window.removeEventListener('shift_settled', handleShiftSettled);
     };
   }, []);

@@ -5,7 +5,7 @@ import hashlib
 import secrets
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List
-from fastapi import APIRouter, HTTPException, Depends, Response
+from fastapi import APIRouter, HTTPException, Depends, Response, Body
 
 from app.core.database import db
 from app.core.websocket import manager
@@ -18,6 +18,14 @@ from app.core.notifications import (
 )
 from app.core.shifts_service import (
     _attach_delivery_to_open_shift,
+)
+from app.core.delivery_lifecycle import (
+    build_cancel_updates,
+    build_restore_updates,
+    can_cancel,
+    can_hard_delete,
+    can_restore,
+    resolve_restore_target,
 )
 from app.models.schemas import DeliveryCreate, DeliveryUpdate, List, Optional
 
@@ -359,56 +367,128 @@ async def update_delivery(delivery_id: str, update: DeliveryUpdate, user: dict =
 
 @router.post("/deliveries/{delivery_id}/restore")
 async def restore_delivery(delivery_id: str, user: dict = Depends(get_current_user)):
-    """Riporta una consegna annullata allo stato precedente (di norma 'pronta')."""
+    """Riporta in giro una consegna archiviata.
+
+    Vale anche per una consegna segnata "consegnata" per sbaglio: prima era
+    rifiutato, quindi l'errore piu' comune in farmacia (chiudere la consegna
+    sbagliata) non si poteva correggere e falsava il fatturato del giorno.
+    """
     delivery = await db.deliveries.find_one(
         {"delivery_id": delivery_id, "pharmacy_id": user["user_id"]}, {"_id": 0}
     )
     if not delivery:
         raise HTTPException(status_code=404, detail="Consegna non trovata")
-    if delivery.get("status") not in ("cancelled", "not_delivered"):
-        raise HTTPException(status_code=400, detail="Solo le consegne annullate o non consegnate possono essere ripristinate")
-
-    previous = delivery.get("previous_status") or "pronta"
-    if previous in ("cancelled", "delivered", "not_delivered"):
-        previous = "pronta"
-    if previous in ("assigned", "picked_up", "in_transit") and not delivery.get("driver_id"):
-        previous = "pronta"
+    if not can_restore(delivery.get("status")):
+        raise HTTPException(
+            status_code=400,
+            detail="Solo le consegne in archivio (consegnate, annullate o non consegnate) possono essere ripristinate",
+        )
 
     now = datetime.now(timezone.utc).isoformat()
-    updates = {
-        "status": previous,
-        "updated_at": now,
-        "restored_at": now,
-        "previous_status": None,
-        "cancelled_at": None,
-        "failure_reason": None,
-    }
+    target = resolve_restore_target(delivery)
+    updates = build_restore_updates(delivery, target, now)
     await db.deliveries.update_one(
         {"delivery_id": delivery_id, "pharmacy_id": user["user_id"]}, {"$set": updates}
     )
-    await db.audit_log.insert_one({
-        "audit_id": f"aud_{uuid.uuid4().hex[:12]}",
-        "entity": "delivery", "entity_id": delivery_id,
-        "action": "delivery_restored", "actor": user["user_id"], "actor_role": "pharmacy",
-        "detail": {"from": "cancelled", "to": previous},
-        "created_at": now,
-    })
+    ripristinata = await db.deliveries.find_one({"delivery_id": delivery_id}, {"_id": 0})
+    await _log_delivery_audit(
+        ripristinata or delivery, "pharmacy", user["user_id"], "restore",
+        {"from_status": delivery.get("status"), "to_status": target},
+    )
     if delivery.get("driver_id"):
         await manager.send_personal_message(
-            {"type": "delivery_restored", "delivery_id": delivery_id}, delivery["driver_id"], "driver"
+            {"type": "delivery_update", "delivery_id": delivery_id, "status": target, "reason": "restored"},
+            delivery["driver_id"], "driver",
         )
         await create_notification_internal(
             delivery["driver_id"], "driver", "Consegna ripristinata",
-            f"La consegna per {delivery.get('customer_name')} è di nuovo attiva",
+            f"La consegna per {delivery.get('customer_name')} e' di nuovo attiva",
             "delivery", {"delivery_id": delivery_id},
         )
-    return await db.deliveries.find_one({"delivery_id": delivery_id}, {"_id": 0})
+    return ripristinata
+
+
+@router.post("/deliveries/{delivery_id}/cancel")
+async def cancel_delivery(
+    delivery_id: str,
+    payload: Optional[dict] = Body(default=None),
+    user: dict = Depends(get_current_user),
+):
+    """Annulla una consegna conservando stato precedente e motivo.
+
+    E' la via "morbida" alla cancellazione: la riga resta in archivio con
+    l'etichetta "annullata", esce da report e statistiche, e il fattorino
+    viene avvisato subito invece di ritrovarsi una consegna fantasma.
+    """
+    delivery = await db.deliveries.find_one(
+        {"delivery_id": delivery_id, "pharmacy_id": user["user_id"]}, {"_id": 0}
+    )
+    if not delivery:
+        raise HTTPException(status_code=404, detail="Consegna non trovata")
+    if not can_cancel(delivery.get("status")):
+        raise HTTPException(status_code=400, detail="Questa consegna non puo' essere annullata")
+
+    motivo = (payload or {}).get("reason") if isinstance(payload, dict) else None
+    now = datetime.now(timezone.utc).isoformat()
+    updates = build_cancel_updates(delivery, motivo, now, user["user_id"])
+    await db.deliveries.update_one(
+        {"delivery_id": delivery_id, "pharmacy_id": user["user_id"]}, {"$set": updates}
+    )
+    annullata = await db.deliveries.find_one({"delivery_id": delivery_id}, {"_id": 0})
+    await _log_delivery_audit(
+        annullata or delivery, "pharmacy", user["user_id"], "cancel",
+        {"from_status": delivery.get("status"), "to_status": "cancelled", "reason": updates.get("cancellation_reason")},
+    )
+    if delivery.get("driver_id"):
+        await manager.send_personal_message(
+            {"type": "delivery_update", "delivery_id": delivery_id, "status": "cancelled", "reason": "cancelled"},
+            delivery["driver_id"], "driver",
+        )
+        await create_notification_internal(
+            delivery["driver_id"], "driver", "Consegna annullata",
+            f"La consegna per {delivery.get('customer_name')} e' stata annullata dalla farmacia",
+            "delivery", {"delivery_id": delivery_id},
+        )
+    return annullata
+
 
 @router.delete("/deliveries/{delivery_id}")
 async def delete_delivery(delivery_id: str, user: dict = Depends(get_current_user)):
-    result = await db.deliveries.delete_one({"delivery_id": delivery_id, "pharmacy_id": user["user_id"]})
+    """Cancella davvero una consegna, ma solo se e' gia' chiusa.
+
+    Una consegna ancora in giro non si elimina: prima si annulla, cosi' il
+    fattorino lo sa e i report si aggiornano. La riga eliminata lascia una
+    traccia nell'audit, perche' sparisce da ogni elenco e nessuno saprebbe piu'
+    che esisteva.
+    """
+    delivery = await db.deliveries.find_one(
+        {"delivery_id": delivery_id, "pharmacy_id": user["user_id"]}, {"_id": 0}
+    )
+    if not delivery:
+        raise HTTPException(status_code=404, detail="Consegna non trovata")
+    if not can_hard_delete(delivery.get("status")):
+        raise HTTPException(
+            status_code=400,
+            detail="Solo le consegne annullate o non consegnate possono essere eliminate: annulla prima quella attiva",
+        )
+    await _log_delivery_audit(
+        delivery, "pharmacy", user["user_id"], "delete",
+        {
+            "customer_name": delivery.get("customer_name"),
+            "status": delivery.get("status"),
+            "amount": delivery.get("amount"),
+            "driver_id": delivery.get("driver_id"),
+        },
+    )
+    result = await db.deliveries.delete_one(
+        {"delivery_id": delivery_id, "pharmacy_id": user["user_id"]}
+    )
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Consegna non trovata")
+    if delivery.get("driver_id"):
+        await manager.send_personal_message(
+            {"type": "delivery_removed", "delivery_id": delivery_id}, delivery["driver_id"], "driver"
+        )
     return {"message": "Consegna eliminata"}
 
 
