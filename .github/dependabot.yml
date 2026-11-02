@@ -37,6 +37,11 @@ updates:
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      # google-generativeai 0.8.6 la inchioda a 0.6.15: alzarla rende il
+      # requirements irrisolvibile e il build Render fallisce (successo il 2/11
+      # con il gruppo patch, che l'aveva portata a 0.6.18).
+      - dependency-name: "google-ai-generativelanguage"
+      - dependency-name: "google-generativeai"
 
   # Le action della CI vanno tenute aggiornate: sono eseguite sul repository.
   - package-ecosystem: "github-actions"
