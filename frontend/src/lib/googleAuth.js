@@ -31,6 +31,10 @@ async function fetchGoogleClientId() {
 
 function _runInitialize() {
   if (!window.google?.accounts?.id || !GOOGLE_CLIENT_ID) return;
+  // initialize() va chiamata una volta sola: richiamarla a ogni render fa
+  // comparire in console "is called multiple times" e Google tiene solo
+  // l'ultima configurazione, con comportamenti imprevedibili sul callback.
+  if (_initialized) return;
   window.google.accounts.id.initialize({
     client_id: GOOGLE_CLIENT_ID,
     callback: (res) => {
@@ -38,6 +42,9 @@ function _runInitialize() {
     },
     auto_select: false,
     cancel_on_tap_outside: true,
+    // One Tap passa a FedCM: senza questo flag i metodi di stato del prompt
+    // smetteranno di funzionare quando FedCM diventa obbligatorio.
+    use_fedcm_for_prompt: true,
   });
   _initialized = true;
 }
@@ -90,15 +97,10 @@ export function loadGoogleSignIn() {
 }
 
 export function setGoogleCredentialCallback(cb) {
+  // Basta aggiornare il riferimento: la callback registrata in initialize()
+  // legge sempre _callback, quindi non serve reinizializzare (era la causa
+  // del warning "initialize() is called multiple times").
   _callback = cb;
-  if (_initialized && window.google?.accounts?.id) {
-    window.google.accounts.id.initialize({
-      client_id: GOOGLE_CLIENT_ID,
-      callback: (res) => { if (_callback) _callback(res.credential); },
-      auto_select: false,
-      cancel_on_tap_outside: true,
-    });
-  }
 }
 
 export function promptGoogleSignIn(onNotDisplayed, onIssue) {
