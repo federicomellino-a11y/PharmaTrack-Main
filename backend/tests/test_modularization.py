@@ -21,8 +21,8 @@ if not BASE_URL:
 BASE_URL = (BASE_URL or "").rstrip("/")
 API = f"{BASE_URL}/api"
 
-PHARMA_EMAIL = "test@farmaciaprova.it"
-PHARMA_PASS = "Test1234!"
+PHARMA_EMAIL = os.environ.get("PT_TEST_EMAIL")
+PHARMA_PASS = os.environ.get("PT_TEST_PASSWORD")
 ADMIN_EMAIL = "Admin@superadmin.it"
 ADMIN_PASS = "Admin"
 

@@ -76,3 +76,25 @@ jobs:
           name: playwright-report
           path: frontend/playwright-report
           retention-days: 7
+
+  backend-test:
+    name: Backend (dipendenze + test unitari)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      # Installa davvero requirements.txt: e' il passo che il 1 novembre e'
+      # fallito su Render lasciando il backend giu' per un'ora, e da qui lo
+      # vediamo prima del merge invece che in produzione.
+      - name: Installa le dipendenze del backend
+        run: pip install -r backend/requirements.txt
+      - name: Verifica che l'app si importi
+        working-directory: backend
+        run: python -c "import app.core.reporting, app.core.security, app.routers.deliveries"
+      - name: Test unitari (senza rete e senza database)
+        working-directory: backend
+        run: python -m pytest tests/unit -q
