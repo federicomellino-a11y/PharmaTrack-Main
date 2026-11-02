@@ -55,7 +55,10 @@ export default function DriverChat() {
   const markMessagesRead = useCallback(async () => {
     try {
       await axios.put(`${API}/driver/messages/read`, {}, { withCredentials: true });
-    } catch {}
+    } catch {
+      // Marcatura di lettura in sottofondo: se fallisce il badge resta, non
+      // serve un errore in faccia al fattorino.
+    }
   }, []);
 
   const fetchMessages = useCallback(async () => {

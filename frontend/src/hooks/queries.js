@@ -50,6 +50,21 @@ export const useConversationsQuery = (options = {}) =>
 export const useWinfarmStatusQuery = (options = {}) =>
   useQuery({ queryKey: ['winfarm-status'], queryFn: getObj('/integrations/winfarm/status'), ...options });
 
+// Console super admin: quattro letture indipendenti con chiavi separate, cosi'
+// il refresh di una non ricarica le altre. Il dettaglio utente resta una
+// lettura on-demand (axios) perche' si apre solo dal dialogo.
+export const useAdminOverviewQuery = (options = {}) =>
+  useQuery({ queryKey: ['admin', 'overview'], queryFn: getObj('/admin/overview'), ...options });
+
+export const useAdminUsersQuery = (options = {}) =>
+  useQuery({ queryKey: ['admin', 'users'], queryFn: getList('/admin/users'), ...options });
+
+export const useAdminDatabaseStatsQuery = (options = {}) =>
+  useQuery({ queryKey: ['admin', 'database-stats'], queryFn: getObj('/admin/database/stats'), ...options });
+
+export const useAdminDatabaseHealthQuery = (options = {}) =>
+  useQuery({ queryKey: ['admin', 'database-health'], queryFn: getObj('/admin/database/health'), ...options });
+
 // App fattorino: stessi pattern della farmacia, pronti per il cablaggio delle
 // pagine senza toccare la logica realtime (posizione e stato via websocket).
 export const useDriverDeliveriesQuery = (options = {}) =>

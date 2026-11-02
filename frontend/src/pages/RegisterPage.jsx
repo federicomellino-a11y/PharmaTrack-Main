@@ -108,7 +108,10 @@ export default function RegisterPage() {
         await login(form.email, form.password);
         navigate('/dashboard');
         return;
-      } catch {}
+      } catch {
+        // Il login di ripiego e' fallito: mostriamo l'errore della
+        // registrazione, che e' quello che l'utente deve leggere.
+      }
       const msg = err.response?.data?.detail;
       if (msg === 'Email già registrata') {
         setErrors({ email: 'Questa email è già registrata' });

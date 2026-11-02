@@ -111,7 +111,9 @@ export default function ChatPage() {
     if (!selectedDriverId) return;
     try {
       await axios.put(`${API}/messages/${selectedDriverId}/read`, {}, { withCredentials: true });
-    } catch {}
+    } catch {
+      // Come sopra: il contatore dei non letti si riallinea al prossimo giro.
+    }
     updateConversationList((prev) => prev.map((conversation) => (
       conversation.driver_id === selectedDriverId
         ? { ...conversation, unread_count: 0 }
