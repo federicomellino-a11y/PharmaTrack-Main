@@ -49,3 +49,36 @@ describe('reloadOnceForChunkError', () => {
     expect(window.sessionStorage.getItem(CHUNK_RELOAD_KEY)).toBe('1234567');
   });
 });
+
+describe('loadChunk', () => {
+  beforeEach(() => {
+    window.sessionStorage.clear();
+    hardReload.mockClear();
+  });
+
+  it('se la ricarica parte, la promessa resta in sospeso: nessuna schermata di errore', async () => {
+    const { loadChunk } = await import('../lazyWithRetry');
+    const factory = vi.fn().mockRejectedValue(new Error('chunk 404'));
+    const esito = await Promise.race([
+      loadChunk(factory).then(() => 'risolto').catch(() => 'respinto'),
+      new Promise((r) => setTimeout(() => r('in-sospeso'), 60)),
+    ]);
+    expect(esito).toBe('in-sospeso');
+    expect(hardReload).toHaveBeenCalledTimes(1);
+  });
+
+  it('se la guardia blocca la ricarica, l errore risale al boundary', async () => {
+    const { loadChunk, CHUNK_RELOAD_KEY } = await import('../lazyWithRetry');
+    window.sessionStorage.setItem(CHUNK_RELOAD_KEY, String(Date.now()));
+    const factory = vi.fn().mockRejectedValue(new Error('chunk 404'));
+    await expect(loadChunk(factory)).rejects.toThrow('chunk 404');
+    expect(hardReload).not.toHaveBeenCalled();
+  });
+
+  it('se il chunk si carica non succede nulla', async () => {
+    const { loadChunk } = await import('../lazyWithRetry');
+    const modulo = { default: () => null };
+    await expect(loadChunk(async () => modulo)).resolves.toBe(modulo);
+    expect(hardReload).not.toHaveBeenCalled();
+  });
+});

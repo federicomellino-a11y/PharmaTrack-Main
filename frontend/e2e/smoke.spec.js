@@ -16,6 +16,8 @@ const PAGES = [
   // La pagina Impostazioni e' quella che ha rotto con i chunk mancanti:
   // se il suo chunk non si carica, qui si vede subito.
   { path: '/settings', nome: 'Impostazioni', atteso: /Impostazioni|Farmacia|Account/i },
+  // Report ha un chunk proprio: se l'hash resta indietro, qui si vede.
+  { path: '/reports', nome: 'Report', atteso: /Report|Nessun dato|Fatturato|Consegne/i },
 ];
 
 test.beforeEach(async ({ page }) => {

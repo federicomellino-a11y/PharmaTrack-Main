@@ -25,13 +25,21 @@ export function reloadOnceForChunkError(now = Date.now()) {
   return true;
 }
 
-export function lazyWithRetry(factory) {
-  return lazy(async () => {
-    try {
-      return await factory();
-    } catch (error) {
-      reloadOnceForChunkError();
-      throw error;
+export async function loadChunk(factory) {
+  try {
+    return await factory();
+  } catch (error) {
+    if (reloadOnceForChunkError()) {
+        // La ricarica e' gia' partita: NON rilanciamo l'errore, altrimenti il
+        // boundary mostra la schermata di guasto per un istante prima che la
+        // pagina si ricarichi. Restando in attesa, l'utente continua a vedere
+        // lo spinner finche' il browser non ha la versione nuova.
+      return new Promise(() => {});
     }
-  });
+    throw error;
+  }
+}
+
+export function lazyWithRetry(factory) {
+  return lazy(() => loadChunk(factory));
 }
