@@ -1,6 +1,7 @@
 import os
 import logging
 import uuid
+from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 
 from fastapi import FastAPI, APIRouter, WebSocket, WebSocketDisconnect
@@ -29,6 +30,22 @@ from middleware_security import SecurityHeadersMiddleware
 setup_logging()
 init_sentry()
 logger = logging.getLogger(__name__)
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    """Avvio e spegnimento dell'applicazione.
+
+    Sostituisce i due @app.on_event, deprecati da FastAPI 0.93 e ancora
+    supportati solo per compatibilita': ogni avvio stampava una
+    DeprecationWarning. Il corpo resta identico, indici e pulizie all'avvio e
+    chiusura del client Mongo allo spegnimento.
+    """
+    await setup_indexes()
+    try:
+        yield
+    finally:
+        client.close()
+
 
 app = FastAPI(
     title="PharmaTrack API",
@@ -63,6 +80,7 @@ app = FastAPI(
         {"name": "shifts", "description": "Turni fattorino e riconciliazione cassa."},
         {"name": "analytics", "description": "KPI aggregati e trend (cache opzionale Redis)."},
     ],
+    lifespan=lifespan,
 )
 
 # Rate limiting (anti brute-force su login)
@@ -175,7 +193,6 @@ async def safe_create_index(collection, keys, **kwargs):
             logger.warning("Index creation skipped (%s.%s): %s", collection.name, name or "?", exc)
 
 
-@app.on_event("startup")
 async def setup_indexes():
     import pymongo
 
@@ -315,6 +332,4 @@ async def setup_indexes():
     logger.info("MongoDB indexes setup complete.")
 
 
-@app.on_event("shutdown")
-async def shutdown_db_client():
-    client.close()
+
