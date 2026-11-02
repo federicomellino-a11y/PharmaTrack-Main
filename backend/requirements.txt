@@ -77,7 +77,7 @@ propcache==0.4.1
 proto-plus==1.27.2
 protobuf==5.29.6
 py-vapid==1.9.4
-pyasn1==0.6.3
+pyasn1==0.6.5
 pyasn1_modules==0.4.2
 pycodestyle==2.14.0
 pycparser==3.0
