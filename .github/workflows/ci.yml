@@ -37,6 +37,9 @@ jobs:
       - name: Lint (nomi non definiti e regole degli hook)
         working-directory: frontend
         run: npm run lint
+      - name: Controllo dei tipi (tsc, copre anche .tsx)
+        working-directory: frontend
+        run: npm run typecheck
       - name: Test unitari
         working-directory: frontend
         run: npm test

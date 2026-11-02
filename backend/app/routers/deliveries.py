@@ -293,6 +293,16 @@ async def update_delivery(delivery_id: str, update: DeliveryUpdate, user: dict =
         raise HTTPException(status_code=404, detail="Consegna non trovata")
     update_data = {"updated_at": datetime.now(timezone.utc).isoformat()}
     if update.driver_id is not None:
+        # Il fattorino deve appartenere a QUESTA farmacia: senza il controllo
+        # una farmacia poteva assegnare una consegna al fattorino di un'altra,
+        # che si sarebbe ritrovato nome, telefono e indirizzo del paziente
+        # altrui nella propria lista.
+        own_driver = await db.drivers.find_one(
+            {"driver_id": update.driver_id, "pharmacy_id": user["user_id"]},
+            {"_id": 0, "driver_id": 1},
+        )
+        if not own_driver:
+            raise HTTPException(status_code=400, detail="Fattorino non valido per questa farmacia")
         update_data["driver_id"] = update.driver_id
         if delivery["status"] in ["pending", "da_preparare", "pronta"]:
             update_data["status"] = "assigned"
