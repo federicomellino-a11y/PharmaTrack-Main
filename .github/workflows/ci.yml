@@ -94,7 +94,14 @@ jobs:
         run: pip install -r backend/requirements.txt
       - name: Verifica che l'app si importi
         working-directory: backend
-        run: python -c "import app.core.reporting, app.core.security, app.routers.deliveries"
+        env:
+          # Valori finti: servono solo a soddisfare la configurazione, non si
+          # collega a niente. Il database non viene mai interrogato.
+          MONGO_URL: "mongodb://127.0.0.1:27017"
+          DB_NAME: pharmatrack_ci
+          JWT_SECRET: ci-placeholder
+          SECRET_KEY: ci-placeholder
+        run: python -c "import app.core.reporting, app.core.security, app.routers.deliveries, app.routers.drivers"
       - name: Test unitari (senza rete e senza database)
         working-directory: backend
         run: python -m pytest tests/unit -q
