@@ -1,10 +1,10 @@
 import uuid
 import logging
-import bcrypt
 from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, HTTPException, Depends, Request
 
 from app.core.database import db
+from app.core.passwords import hash_password
 # (nessun uso di app.core.config)
 from app.core.security import (
     get_current_user,
@@ -25,7 +25,7 @@ async def create_driver(driver: DriverCreate, user: dict = Depends(get_current_u
     existing = await db.drivers.find_one({"email": driver.email})
     if existing:
         raise HTTPException(status_code=400, detail="Email già in uso")
-    password_hash = bcrypt.hashpw(driver.password.encode(), bcrypt.gensalt()).decode()
+    password_hash = hash_password(driver.password)
     driver_data = {
         "driver_id": f"drv_{uuid.uuid4().hex[:12]}",
         "pharmacy_id": user["user_id"],
@@ -169,7 +169,7 @@ async def update_driver(driver_id: str, request: Request, user: dict = Depends(g
     body = await request.json()
     update_data = {f: body[f] for f in ["name", "phone", "vehicle_type", "is_active"] if f in body}
     if "password" in body and body["password"]:
-        update_data["password_hash"] = bcrypt.hashpw(body["password"].encode(), bcrypt.gensalt()).decode()
+        update_data["password_hash"] = hash_password(body["password"])
     if update_data:
         result = await db.drivers.update_one({"driver_id": driver_id, "pharmacy_id": user["user_id"]}, {"$set": update_data})
         if result.matched_count == 0:

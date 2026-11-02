@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
+import { queryClient } from '@/lib/queryClient';
 import { API } from '@/lib/config';
 
 const AuthContext = createContext(null);
@@ -53,6 +54,16 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     const response = await axios.post(`${API}/auth/login`, { email, password }, { withCredentials: true });
     setUser(response.data);
+    // Il login costa ~0,5s di hashing: nel frattempo chiediamo i dati della
+    // dashboard, cosi' la prima schermata non aspetta due volte di fila.
+    // Fire-and-forget: se il prefetch fallisce, le pagine lo richiedono da sole.
+    ['/statistics', '/deliveries?status=active', '/customers'].forEach((path) => {
+      queryClient.prefetchQuery({
+        queryKey: ['prefetch', path],
+        queryFn: async () => (await axios.get(`${API}${path}`, { withCredentials: true })).data,
+        staleTime: 15_000,
+      }).catch(() => {});
+    });
     return response.data;
   };
 

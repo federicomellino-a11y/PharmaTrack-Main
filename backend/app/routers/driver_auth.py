@@ -1,10 +1,10 @@
 import uuid
 import logging
-import bcrypt
 from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, HTTPException, Depends, Request, Response
 
 from app.core.database import db
+from app.core.passwords import needs_rehash, verify_password, hash_password
 from app.core.websocket import manager
 from app.core.config import LOGIN_RATE_LIMIT
 from app.core.security import (
@@ -30,8 +30,16 @@ async def driver_login(request: Request, response: Response):
     driver = await db.drivers.find_one({"email": email}, {"_id": 0})
     if not driver:
         raise HTTPException(status_code=401, detail="Credenziali non valide")
-    if not bcrypt.checkpw(password.encode(), driver["password_hash"].encode()):
+    if not verify_password(password, driver.get("password_hash", "")):
         raise HTTPException(status_code=401, detail="Credenziali non valide")
+    if needs_rehash(driver.get("password_hash", "")):
+        try:
+            await db.drivers.update_one(
+                {"driver_id": driver["driver_id"]},
+                {"$set": {"password_hash": hash_password(password)}},
+            )
+        except Exception:
+            logger.exception("ri-hash della password fattorino fallito per %s", driver.get("driver_id"))
     if not driver.get("is_active", True):
         raise HTTPException(status_code=403, detail="Account disattivato")
 
