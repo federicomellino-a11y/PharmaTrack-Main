@@ -20,6 +20,12 @@ if (typeof window !== 'undefined') {
       hardReload();
     }
   });
+
+  // Se l'app resta in piedi 15 secondi, il caricamento e' sano: azzeriamo la
+  // guardia cosi' un guasto futuro (altro deploy) puo' ancora recuperare.
+  window.setTimeout(() => {
+    try { window.sessionStorage.removeItem('pt_chunk_reload_at'); } catch { /* storage non disponibile */ }
+  }, 15000);
 }
 
 

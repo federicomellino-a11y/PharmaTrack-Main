@@ -13,6 +13,9 @@ const PAGES = [
   { path: '/customers', nome: 'Clienti', atteso: /Clienti|Cerca/i },
   { path: '/drivers', nome: 'Fattorini', atteso: /Fattorin|Aggiungi/i },
   { path: '/archive', nome: 'Archivio', atteso: /Archivio|Nessuna/i },
+  // La pagina Impostazioni e' quella che ha rotto con i chunk mancanti:
+  // se il suo chunk non si carica, qui si vede subito.
+  { path: '/settings', nome: 'Impostazioni', atteso: /Impostazioni|Farmacia|Account/i },
 ];
 
 test.beforeEach(async ({ page }) => {
