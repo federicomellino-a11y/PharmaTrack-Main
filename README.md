@@ -134,13 +134,13 @@ Endpoint REST anche disponibile: `POST /api/integrations/winfarm/import` (dettag
 ```
 .
 ├── backend/                # FastAPI + MongoDB
-│   ├── server.py           # 2500+ righe, monolite
+│   ├── server.py           # entry FastAPI (~320 righe), logica in app/
+│   ├── app/                # routers/ + core/ + models/
 │   ├── seed_data.py        # dati di test
-│   ├── requirements.txt
-│   ├── Procfile            # comando start per Render
+│   ├── requirements.txt    # 19 dipendenze dirette pinnate
 │   ├── runtime.txt         # Python 3.11.9
 │   ├── .env.example
-│   └── tests/              # pytest
+│   └── tests/              # pytest (unit + contratto)
 │
 ├── frontend/               # React + Vite + Tailwind 4
 │   ├── src/
