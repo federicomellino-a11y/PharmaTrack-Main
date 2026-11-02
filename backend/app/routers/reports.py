@@ -3,12 +3,14 @@ from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Depends
 
 from app.core.database import db
+from app.core.reporting import aggregate_report_totals
 from app.core.security import (
     get_current_user,
 )
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
 
 
 @router.get("/reports")

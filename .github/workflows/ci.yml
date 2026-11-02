@@ -76,3 +76,32 @@ jobs:
           name: playwright-report
           path: frontend/playwright-report
           retention-days: 7
+
+  backend-test:
+    name: Backend (dipendenze + test unitari)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      # Installa davvero requirements.txt: e' il passo che il 1 novembre e'
+      # fallito su Render lasciando il backend giu' per un'ora, e da qui lo
+      # vediamo prima del merge invece che in produzione.
+      - name: Installa le dipendenze del backend
+        run: pip install -r backend/requirements.txt
+      - name: Verifica che l'app si importi
+        working-directory: backend
+        env:
+          # Valori finti: servono solo a soddisfare la configurazione, non si
+          # collega a niente. Il database non viene mai interrogato.
+          MONGO_URL: "mongodb://127.0.0.1:27017"
+          DB_NAME: pharmatrack_ci
+          JWT_SECRET: ci-placeholder
+          SECRET_KEY: ci-placeholder
+        run: python -c "import app.core.reporting, app.core.security, app.routers.deliveries, app.routers.drivers"
+      - name: Test unitari (senza rete e senza database)
+        working-directory: backend
+        run: python -m pytest tests/unit -q
