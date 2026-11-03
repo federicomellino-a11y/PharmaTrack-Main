@@ -179,7 +179,7 @@ export const SocketProvider = ({ children, userId, userType, settings = {} }) =>
     try {
       const notification = new Notification(title, {
         body,
-        icon: '/logo.png',
+        icon: '/icons/icon-192.png',
       });
       setTimeout(() => notification.close(), 5000);
     } catch (err) {

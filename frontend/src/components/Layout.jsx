@@ -115,7 +115,7 @@ export const Layout = ({ children, title }) => {
         {/* Logo */}
         <div className="h-16 flex items-center justify-between px-5 border-b border-border shrink-0">
           <Link to="/dashboard" onClick={() => setSidebarOpen(false)}>
-            <img src="/logo.png" alt="PharmaTrack" className="h-9 w-auto" />
+            <img src="/logo.webp" alt="PharmaTrack" width="400" height="153" className="h-9 w-auto" />
           </Link>
           <button className="lg:hidden p-1 rounded-lg hover:bg-secondary"
             onClick={() => setSidebarOpen(false)}>
