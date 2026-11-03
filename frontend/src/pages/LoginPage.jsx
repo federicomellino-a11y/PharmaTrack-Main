@@ -117,7 +117,7 @@ export default function LoginPage() {
       <div className="flex-1 flex items-center justify-center px-4 py-8">
         <Card className="w-full max-w-md shadow-lg">
           <CardHeader className="text-center pb-4">
-            <img src="/logo.png" alt="PharmaTrack" className="h-14 w-auto mx-auto mb-4" />
+            <img src="/logo.webp" alt="PharmaTrack" width="400" height="153" className="h-14 w-auto mx-auto mb-4" />
             <CardTitle className="text-2xl">Bentornato!</CardTitle>
             <CardDescription>Accedi alla tua farmacia</CardDescription>
           </CardHeader>

@@ -115,7 +115,7 @@ export default function LandingPage() {
       {/* ── Navbar ── */}
       <header className="fixed top-0 inset-x-0 z-50 border-b border-border/50 backdrop-blur-xl bg-background/80">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
-          <img src="/logo.png" alt="PharmaTrack" className="h-9 w-auto" />
+          <img src="/logo.webp" alt="PharmaTrack" width="400" height="153" className="h-9 w-auto" />
           <nav className="flex items-center gap-1 sm:gap-2">
             {isInstallable && (
               <Button variant="ghost" size="sm" className="hidden md:flex gap-1.5" onClick={install}>
@@ -384,7 +384,7 @@ export default function LandingPage() {
               <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-blue-500/5 pointer-events-none" />
               <div className="absolute -top-24 -right-24 w-64 h-64 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
 
-              <img src="/logo.png" alt="PharmaTrack" className="h-14 w-auto mx-auto mb-7 animate-float" />
+              <img src="/logo.webp" alt="PharmaTrack" width="400" height="153" className="h-14 w-auto mx-auto mb-7 animate-float" />
 
               <h2
                 className="text-3xl sm:text-5xl font-extrabold mb-4 text-foreground"
@@ -412,7 +412,7 @@ export default function LandingPage() {
       {/* ── Footer ── */}
       <footer className="py-10 px-4 border-t border-border">
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-6">
-          <img src="/logo.png" alt="PharmaTrack" className="h-8 w-auto opacity-60" />
+          <img src="/logo.webp" alt="PharmaTrack" width="400" height="153" className="h-8 w-auto opacity-60" />
           <div className="flex items-center gap-6 text-sm text-muted-foreground">
             <Link to="/login" className="hover:text-foreground transition-colors">Accedi</Link>
             <Link to="/register" className="hover:text-foreground transition-colors">Registrati</Link>
