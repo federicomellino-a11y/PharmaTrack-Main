@@ -95,10 +95,16 @@ def valida_ordinamento(grezzo: str | None) -> list[tuple[str, int]]:
     return [(campo, direzione)]
 
 
-def valida_campi(grezzo: str | None) -> dict | None:
-    """Trasforma `a,b,c` nella proiezione di Mongo, togliendo i campi riservati."""
+def valida_campi(grezzo: str | None) -> dict:
+    """Trasforma `a,b,c` nella proiezione di Mongo, togliendo i campi riservati.
+
+    `_id` esce sempre: e' un ObjectId di BSON, che FastAPI non sa trasformare
+    in JSON. Senza questa esclusione la risposta diventa un errore 500, ed e'
+    esattamente quello che succedeva leggendo le collezioni senza indicare i
+    campi.
+    """
     if not grezzo:
-        return None
+        return {"_id": 0}
     campi = [c.strip() for c in grezzo.split(",") if c.strip()]
     if not campi or len(campi) > 40:
         raise _errore("Elenco di campi non valido")
