@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Download, Share2, MoreVertical, MonitorDown, CheckCircle2, Smartphone } from 'lucide-react';
+import React, { useCallback, useState } from 'react';
+import { Download, Share2, MoreVertical, MonitorDown, Smartphone } from 'lucide-react';
 import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
 import { usePWAInstall } from '@/hooks/usePWAInstall';
@@ -15,30 +15,28 @@ const isIos = () => {
 
 const isAndroid = () => typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent || '');
 
+// Su Android e desktop il prompt e' l'unico modo per installare con un tocco:
+// nessuna API permette a un sito di installarsi da solo. Se il browser non lo
+// concede (succede dopo una disinstallazione, finche' non tornano i suoi
+// criteri) l'unica strada resta il menu del browser: una riga, non un dialogo.
+const messaggioMenu = () => (isAndroid()
+  ? 'Per installarla: menu ⋮ di Chrome, poi "Installa app"'
+  : 'Per installarla: icona di installazione nella barra degli indirizzi, oppure menu del browser');
+
 /**
- * Istruzioni manuali quando il browser non concede beforeinstallprompt.
- * Succede su iOS (dove il prompt non esiste) e su Chrome dopo una
- * disinstallazione, quando il browser aspetta di nuovo i suoi criteri di
- * coinvolgimento prima di riproporre l'installazione. Il pulsante nativo e'
- * la via principale; questo e' il piano B sempre disponibile.
+ * Istruzioni passo-passo, usate solo su iOS dove il prompt non esiste.
  */
 export function InstallInstructions({ open, onOpenChange }) {
   const ios = isIos();
-  const android = isAndroid();
   const steps = ios
     ? [
         { icon: Share2, testo: 'Tocca l\'icona Condividi nella barra di Safari.' },
         { icon: Smartphone, testo: 'Scorri e scegli "Aggiungi a Home", poi conferma con "Aggiungi".' },
       ]
-    : android
-      ? [
-          { icon: MoreVertical, testo: 'Apri il menu con i tre puntini in alto a destra in Chrome.' },
-          { icon: Download, testo: 'Tocca "Installa app" (su alcuni telefoni "Aggiungi a schermata Home").' },
-        ]
-      : [
-          { icon: MonitorDown, testo: 'Su Chrome o Edge guarda l\'icona di installazione nella barra degli indirizzi, a destra dell\'URL.' },
-          { icon: Download, testo: 'In alternativa: menu del browser, poi "Installa PharmaTrack".' },
-        ];
+    : [
+        { icon: MoreVertical, testo: 'Apri il menu del browser (⋮ o i tre puntini).' },
+        { icon: Download, testo: 'Scegli "Installa app".' },
+      ];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -46,11 +44,7 @@ export function InstallInstructions({ open, onOpenChange }) {
         <DialogHeader>
           <DialogTitle>Installare PharmaTrack</DialogTitle>
           <DialogDescription>
-            {ios
-              ? 'Su iPhone e iPad l\'installazione si fa da Safari, in due tocchi.'
-              : android
-                ? 'Su Android Chrome si installa dal menu del browser.'
-                : 'Dal browser del computer si installa in un passaggio.'}
+            {ios ? 'Su iPhone e iPad si installa da Safari, in due tocchi.' : 'Dal browser si installa in un passaggio.'}
           </DialogDescription>
         </DialogHeader>
         <ol className="space-y-3 text-sm">
@@ -63,42 +57,37 @@ export function InstallInstructions({ open, onOpenChange }) {
             </li>
           ))}
         </ol>
-        <p className="text-xs text-muted-foreground">
-          Se il browser non mostra "Installa", chiudi tutte le schede di PharmaTrack e riprova: dopo una
-          disinstallazione Chrome aspetta un po' prima di riproporre il prompt, ma il menu resta disponibile.
-        </p>
       </DialogContent>
     </Dialog>
   );
 }
 
 /**
- * Pulsante di installazione. Se il browser ha già concesso il prompt nativo
- * (beforeinstallprompt) basta un tocco; altrimenti apre le istruzioni.
+ * Pulsante di installazione: un tocco quando il browser concede il prompt.
+ * Se l'app e' gia' installata non mostra niente.
  */
 export function InstallAppButton({ variant = 'outline', size = 'sm', className = '', showLabel = true, onDone }) {
   const { isInstallable, isInstalled, install } = usePWAInstall();
   const [busy, setBusy] = useState(false);
   const [hintOpen, setHintOpen] = useState(false);
 
-  useEffect(() => {
-    if (isInstalled && onDone) onDone();
-  }, [isInstalled, onDone]);
-
-  if (isInstalled) {
-    return (
-      <span className={`${className} inline-flex items-center gap-2 text-xs text-muted-foreground`}>
-        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-        {showLabel ? 'App installata' : null}
-      </span>
-    );
-  }
-
-  const handleClick = async () => {
+  const handleClick = useCallback(async () => {
     if (!isInstallable) {
-      setHintOpen(true);
+      // Prova a sbloccare il prompt: aggiornare il service worker e' cio' che
+      // serve quando il browser non ha ancora riletto il sw.js nuovo.
+      if (typeof navigator !== 'undefined' && navigator.serviceWorker?.getRegistrations) {
+        navigator.serviceWorker.getRegistrations()
+          .then((registrations) => registrations.forEach((registration) => registration.update?.()))
+          .catch(() => null);
+      }
+      if (isIos()) {
+        setHintOpen(true);
+      } else {
+        toast.message(messaggioMenu(), { duration: 7000 });
+      }
       return;
     }
+
     setBusy(true);
     try {
       const result = await install();
@@ -107,13 +96,14 @@ export function InstallAppButton({ variant = 'outline', size = 'sm', className =
         if (onDone) onDone();
       } else if (result?.outcome === 'dismissed') {
         toast.message('Installazione annullata');
-      } else {
-        setHintOpen(true);
       }
     } finally {
       setBusy(false);
     }
-  };
+  }, [install, isInstallable, onDone]);
+
+  // Installata: niente scritte, il pulsante sparisce.
+  if (isInstalled) return null;
 
   return (
     <>
@@ -129,9 +119,7 @@ export function InstallAppButton({ variant = 'outline', size = 'sm', className =
       >
         <Download className="w-4 h-4 sm:mr-2" />
         {showLabel ? (
-          <span className="hidden sm:inline">
-            {busy ? 'Preparazione...' : isInstallable ? 'Installa app' : 'Come installare'}
-          </span>
+          <span className="hidden sm:inline">{busy ? 'Preparazione...' : 'Installa app'}</span>
         ) : null}
       </Button>
       <InstallInstructions open={hintOpen} onOpenChange={setHintOpen} />
