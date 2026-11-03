@@ -1,4 +1,9 @@
 self.addEventListener('install', () => self.skipWaiting());
+
+// Handler fetch volutamente pass-through: non cachea niente (l'app deve sempre
+// vedere l'ultimo deploy), ma la sua presenza e' un criterio che Chrome usa per
+// considerare il sito installabile e per far scattare beforeinstallprompt.
+self.addEventListener('fetch', () => { /* lascia passare la richiesta di rete */ });
 self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
 
 self.addEventListener('push', function(e) {

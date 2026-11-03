@@ -35,6 +35,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { usePWAInstall } from '@/hooks/usePWAInstall';
+import { InstallAppButton } from '@/components/InstallAppButton';
 
 const buildFormData = (user) => ({
   pharmacy_name: user?.pharmacy_name || '',
@@ -413,13 +414,19 @@ export default function SettingsPage() {
                 </Badge>
               </div>
 
-              <div className="flex flex-wrap gap-2">
-                <Button type="button" onClick={handleInstallPwa} disabled={!isInstallable || installingPwa}>
-                  <Download className="w-4 h-4 mr-2" />
-                  {installingPwa ? 'Preparazione...' : isInstalled ? 'App già installata' : 'Installa app'}
-                </Button>
+              <div className="flex flex-wrap items-center gap-2">
+                {isInstallable ? (
+                  <Button type="button" onClick={handleInstallPwa} disabled={installingPwa}>
+                    <Download className="w-4 h-4 mr-2" />
+                    {installingPwa ? 'Preparazione...' : isInstalled ? 'App già installata' : 'Installa app'}
+                  </Button>
+                ) : (
+                  <InstallAppButton variant="default" size="sm" showLabel />
+                )}
                 {!isInstallable && !isInstalled && (
-                  <p className="text-xs text-muted-foreground self-center">Su iPhone usa Condividi → “Aggiungi a Home”.</p>
+                  <p className="text-xs text-muted-foreground">
+                    Il browser non ha ancora concesso il prompt di installazione: si può fare comunque dal suo menu.
+                  </p>
                 )}
               </div>
             </div>

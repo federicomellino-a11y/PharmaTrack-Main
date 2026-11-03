@@ -54,5 +54,12 @@
         }
       ]
     }
+  ],
+  "id": "/",
+  "scope": "/",
+  "prefer_related_applications": false,
+  "display_override": [
+    "standalone",
+    "minimal-ui"
   ]
 }
