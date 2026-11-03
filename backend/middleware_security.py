@@ -34,6 +34,10 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         # Referrer policy
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
 
+        # Forza HTTPS per un anno: l'API gira solo dietro TLS (Render) e senza
+        # questo header il primo accesso puo' viaggiare in chiaro.
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+
         # Disable dangerous browser features
         response.headers["Permissions-Policy"] = (
             "geolocation=(), camera=(), microphone=(), payment=()"

@@ -12,7 +12,7 @@ from slowapi.middleware import SlowAPIMiddleware
 from app.core.database import db, client
 from app.core.websocket import manager
 from app.core.security import normalize_session_expiry
-from app.core.config import ADMIN_EMAIL, ADMIN_PASSWORD
+from app.core.config import ADMIN_EMAIL, ADMIN_PASSWORD, IS_PRODUCTION
 from app.core.logging_config import setup_logging
 from app.core.errors import register_exception_handlers
 from app.core.limiter import limiter
@@ -50,9 +50,11 @@ async def lifespan(_app: FastAPI):
 app = FastAPI(
     title="PharmaTrack API",
     version="1.0.0",
-    docs_url="/api/docs",
-    redoc_url="/api/redoc",
-    openapi_url="/api/openapi.json",
+    # In produzione la documentazione non e' esposta: l'elenco delle 102 rotte
+    # con schemi e parametri e' informazione utile a chi cerca un appiglio.
+    docs_url=None if IS_PRODUCTION else "/api/docs",
+    redoc_url=None if IS_PRODUCTION else "/api/redoc",
+    openapi_url=None if IS_PRODUCTION else "/api/openapi.json",
     description=(
         "API per la gestione delle consegne a domicilio della farmacia: "
         "consegne, fattorini, clienti, turni & cassa, chat real-time, "
