@@ -23,6 +23,24 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist"),
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        // L'entry era un unico file da 785 kB che cambia a ogni deploy, quindi
+        // ogni rilascio costringeva a riscaricare anche React, Router e Leaflet
+        // che non erano cambiati. Separando i vendor in chunk propri il loro
+        // hash resta stabile fra un deploy e l'altro e il browser li riusa.
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return undefined;
+          // Solo le librerie grandi e autosufficienti hanno un chunk proprio:
+          // spezzare anche react, router e le utility crea cicli fra chunk
+          // (vendor -> vendor-utils -> vendor-react) che Rollup segnala e che
+          // possono rompere l'ordine di inizializzazione.
+          if (id.includes("leaflet")) return "vendor-leaflet";
+          if (id.includes("recharts") || id.includes("d3-") || id.includes("victory")) return "vendor-charts";
+          return "vendor";
+        },
+      },
+    },
   },
   server: {
     port,
