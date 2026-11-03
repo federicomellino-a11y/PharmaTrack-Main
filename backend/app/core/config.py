@@ -5,6 +5,10 @@ from dotenv import load_dotenv
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 load_dotenv(ROOT_DIR / '.env')
 
+# Stessa regola di app/core/sentry.py: su Render ENVIRONMENT vale "production".
+ENVIRONMENT = (os.getenv("ENVIRONMENT") or os.getenv("SENTRY_ENVIRONMENT") or "development").lower()
+IS_PRODUCTION = ENVIRONMENT in ("production", "prod")
+
 SMTP_HOST = os.getenv("SMTP_HOST")
 SMTP_PORT = int(os.getenv("SMTP_PORT", "465"))
 SMTP_USERNAME = os.getenv("SMTP_USERNAME")
