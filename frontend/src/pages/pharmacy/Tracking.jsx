@@ -353,7 +353,7 @@ export default function TrackingPage() {
 
         <div className="flex flex-col lg:flex-row gap-4 mobile-full-height">
           <Card className="flex-1 bg-card border-border overflow-hidden min-h-[50vh] lg:min-h-0">
-            <div className="h-full min-h-[300px] md:min-h-[400px] lg:min-h-full">
+            <div className="h-[50vh] min-h-[300px] md:h-[420px] lg:h-full">
               <MapContainer key={mapKey.current} center={mapCenter} zoom={13} className="h-full w-full" zoomControl>
                 <TileLayer attribution='&copy; OpenStreetMap contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                 <MapUpdater center={mapCenter} />

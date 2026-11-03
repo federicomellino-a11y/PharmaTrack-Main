@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useSocket } from '../contexts/SocketContext';
 import { useTheme } from '../contexts/ThemeContext';
+import { InstallAppButton } from './InstallAppButton';
 import { Button } from './ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import {
@@ -217,6 +218,9 @@ export const Layout = ({ children, title }) => {
               <span>Cerca…</span>
               <kbd className="ml-1 px-1.5 py-0.5 rounded bg-background border border-border text-[10px] font-mono">⌘K</kbd>
             </button>
+            {/* Installa l'app: su mobile e tablet, dove il prompt del browser
+                non sempre ricompare dopo una disinstallazione */}
+            <InstallAppButton variant="ghost" size="sm" className="rounded-xl lg:hidden" />
             {/* Notifications */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
