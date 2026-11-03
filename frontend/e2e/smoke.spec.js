@@ -18,6 +18,16 @@ const PAGES = [
   { path: '/settings', nome: 'Impostazioni', atteso: /Impostazioni|Farmacia|Account/i },
   // Report ha un chunk proprio: se l'hash resta indietro, qui si vede.
   { path: '/reports', nome: 'Report', atteso: /Report|Nessun dato|Fatturato|Consegne/i },
+  // Le pagine sotto hanno tutte un chunk proprio ed erano scoperte: sono
+  // quelle che si rompono in silenzio dopo un deploy con hash nuovi.
+  { path: '/quick', nome: 'Aggiungi consegna', atteso: /Cliente|Indirizzo|Consegna/i },
+  { path: '/chat', nome: 'Messaggi', atteso: /Messaggi|Chat|Fattorin|Nessun/i },
+  { path: '/shifts', nome: 'Turni', atteso: /Turni|Fattorin|Nessun/i },
+  { path: '/doctors', nome: 'Medici', atteso: /Medic|Dottor|Nessun|Aggiungi/i },
+  { path: '/integrations', nome: 'Integrazioni', atteso: /Integrazion|Winfarm|Bridge/i },
+  { path: '/notes', nome: 'Note', atteso: /Note|Nota|Nessun/i },
+  { path: '/useful-numbers', nome: 'Numeri utili', atteso: /Numeri|Chiama|Nessun/i },
+  { path: '/dock', nome: 'Dock', atteso: /Dock|Cattur|Vendita|Scontrino/i },
 ];
 
 test.beforeEach(async ({ page }) => {
@@ -62,11 +72,21 @@ for (const pagina of PAGES) {
 
     // Nessuna eccezione JavaScript non gestita durante il caricamento.
     expect(erroriPagina, `errori in console: ${erroriPagina.join(' | ')}`).toEqual([]);
+
+    // Una pagina puo' montare e restare muta se un dato non arriva: sotto i
+    // 120 caratteri visibili c'e' quasi sempre uno spinner o un errore.
+    const testoVisibile = (await page.locator('body').innerText()).trim();
+    expect(testoVisibile.length, `pagina ${pagina.path} quasi vuota`).toBeGreaterThan(120);
   });
 }
 
 test('la pagina di login si carica senza sessione', async ({ page }) => {
   await page.addInitScript(() => window.localStorage.clear());
+  // Il beforeAll di questo file finge un utente autenticato: qui serve il
+  // contrario, altrimenti la pagina di login rimanda alla dashboard e il test
+  // diventa intermittente invece di verificare la pagina pubblica.
+  await page.route('**/api/auth/me', (route) =>
+    route.fulfill({ status: 401, contentType: 'application/json', body: '{"detail":"non autenticato"}' }));
   await page.goto('/login', { waitUntil: 'domcontentloaded' });
   await expect(page.locator('body')).toContainText(/Accedi|Email|Password/i);
 });
