@@ -1,7 +1,17 @@
 """Endpoint che raccoglie le violazioni CSP in modalita' solo-segnalazione."""
-from fastapi.testclient import TestClient
+import os
 
-from app.routers.csp_reports import _estrai_report
+# Valori finti, solo per poter importare l'app: in CI non c'e' MONGO_URL e
+# senza queste righe la raccolta dei test si interrompe. Il database non viene
+# mai interrogato davvero, e se la scrittura fallisce l'endpoint la ignora.
+os.environ.setdefault("MONGO_URL", "mongodb://127.0.0.1:27017")
+os.environ.setdefault("DB_NAME", "pharmatrack_ci")
+os.environ.setdefault("JWT_SECRET", "ci-placeholder")
+os.environ.setdefault("SECRET_KEY", "ci-placeholder")
+
+from fastapi.testclient import TestClient  # noqa: E402
+
+from app.routers.csp_reports import _estrai_report  # noqa: E402
 
 
 def test_formato_csp_report():
