@@ -11,6 +11,7 @@ vi.mock('sonner', () => ({ toast: { success: vi.fn(), message: vi.fn(), error: v
 
 import { InstallAppButton } from '../InstallAppButton';
 import { usePWAInstall } from '@/hooks/usePWAInstall';
+import { toast } from 'sonner';
 
 const stato = (override = {}) => ({
   isSupported: true,
@@ -20,8 +21,13 @@ const stato = (override = {}) => ({
   ...override,
 });
 
+const impostaUserAgent = (ua) => {
+  Object.defineProperty(window.navigator, 'userAgent', { value: ua, configurable: true });
+};
+
 beforeEach(() => {
   usePWAInstall.mockReturnValue(stato());
+  impostaUserAgent('Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 Chrome/126 Mobile Safari/537.36');
 });
 
 afterEach(() => {
@@ -38,25 +44,35 @@ describe('InstallAppButton', () => {
     fireEvent.click(screen.getByTestId('install-app-button'));
 
     await waitFor(() => expect(install).toHaveBeenCalledTimes(1));
+    expect(toast.message).not.toHaveBeenCalled();
   });
 
-  it('senza prompt apre le istruzioni invece di restare inerte', async () => {
+  it('su Android senza prompt indica il menu del browser, senza dialogo', async () => {
     render(<InstallAppButton />);
+    fireEvent.click(screen.getByTestId('install-app-button'));
 
-    expect(screen.getByText(/Come installare/i)).toBeTruthy();
+    await waitFor(() => expect(toast.message).toHaveBeenCalled());
+    expect(String(toast.message.mock.calls[0][0])).toMatch(/menu/i);
+    expect(screen.queryByText(/Installare PharmaTrack/i)).toBeNull();
+  });
+
+  it('su iOS senza prompt apre le istruzioni, perché lì il prompt non esiste', async () => {
+    impostaUserAgent('Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 Safari/604.1');
+
+    render(<InstallAppButton />);
     fireEvent.click(screen.getByTestId('install-app-button'));
 
     await waitFor(() => expect(screen.getByText(/Installare PharmaTrack/i)).toBeTruthy());
+    expect(screen.getByText(/Aggiungi a Home/i)).toBeTruthy();
   });
 
-  it('se l app è già installata non mostra il pulsante', () => {
+  it('se l app è già installata non mostra niente', () => {
     usePWAInstall.mockReturnValue(stato({ isInstalled: true }));
-    const onDone = vi.fn();
 
-    render(<InstallAppButton onDone={onDone} />);
+    render(<InstallAppButton />);
 
     expect(screen.queryByTestId('install-app-button')).toBeNull();
-    expect(onDone).toHaveBeenCalled();
+    expect(screen.queryByText(/installata/i)).toBeNull();
   });
 
   it('un prompt rifiutato non lascia il pulsante in caricamento', async () => {
@@ -69,5 +85,6 @@ describe('InstallAppButton', () => {
 
     await waitFor(() => expect(button.disabled).toBe(false));
     expect(install).toHaveBeenCalledTimes(1);
+    expect(toast.message).toHaveBeenCalled();
   });
 });

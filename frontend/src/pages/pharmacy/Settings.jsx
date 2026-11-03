@@ -22,7 +22,6 @@ import {
   BellRing,
   Building2,
   Crown,
-  Download,
   Lock,
   MapPinned,
   Moon,
@@ -72,12 +71,11 @@ export default function SettingsPage() {
     enablePushNotifications,
     disablePushNotifications,
   } = useSocket();
-  const { isInstallable, isInstalled, isSupported: pwaSupported, install } = usePWAInstall();
+  const { isInstallable, isInstalled, isSupported: pwaSupported } = usePWAInstall();
 
   const [drivers, setDrivers] = useState([]);
   const [saving, setSaving] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
-  const [installingPwa, setInstallingPwa] = useState(false);
   const [formData, setFormData] = useState(() => buildFormData(user));
   const [settings, setSettings] = useState(() => buildSettingsData(user));
 
@@ -192,22 +190,6 @@ export default function SettingsPage() {
     toast.error(typeof result?.reason === 'string' ? result.reason : 'Disattivazione push non riuscita');
   };
 
-
-  const handleInstallPwa = async () => {
-    setInstallingPwa(true);
-    try {
-      const result = await install();
-      if (result?.outcome === 'accepted') {
-        toast.success('Installazione avviata');
-      } else if (result?.outcome === 'dismissed') {
-        toast.message('Installazione annullata');
-      } else {
-        toast.message('Prompt di installazione non disponibile su questo dispositivo');
-      }
-    } finally {
-      setInstallingPwa(false);
-    }
-  };
 
   return (
     <Layout title="Impostazioni">
@@ -415,17 +397,10 @@ export default function SettingsPage() {
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
-                {isInstallable ? (
-                  <Button type="button" onClick={handleInstallPwa} disabled={installingPwa}>
-                    <Download className="w-4 h-4 mr-2" />
-                    {installingPwa ? 'Preparazione...' : isInstalled ? 'App già installata' : 'Installa app'}
-                  </Button>
-                ) : (
-                  <InstallAppButton variant="default" size="sm" showLabel />
-                )}
+                <InstallAppButton variant="default" size="sm" showLabel />
                 {!isInstallable && !isInstalled && (
                   <p className="text-xs text-muted-foreground">
-                    Il browser non ha ancora concesso il prompt di installazione: si può fare comunque dal suo menu.
+                    Se il browser non apre il prompt, il pulsante spiega dove si trova l'installazione nel suo menu.
                   </p>
                 )}
               </div>
