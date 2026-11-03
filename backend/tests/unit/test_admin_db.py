@@ -68,6 +68,13 @@ def test_proiezione_toglie_i_campi_riservati():
     assert proiezione == {"_id": 0, "email": 1}
 
 
+def test_senza_campi_indicati_l_id_non_esce():
+    """L'_id di Mongo e' un ObjectId: in risposta farebbe fallire il JSON."""
+    assert valida_campi(None) == {"_id": 0}
+    assert valida_campi("") == {"_id": 0}
+    assert "_id" in valida_campi("email")
+
+
 def test_documento_ripulito_prima_di_uscire():
     documento = {"email": "a@b.it", "password_hash": "xxx", "session_token": "yyy"}
     assert _pulisci(documento) == {"email": "a@b.it"}
