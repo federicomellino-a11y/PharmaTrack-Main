@@ -58,6 +58,40 @@ async def admin_login(request: Request, data: AdminLoginLoose, response: Respons
     response.set_cookie(key="admin_session_token", value=session_token, httponly=True, secure=True, samesite="none", path="/", max_age=7*24*60*60)
     return {"email": ADMIN_EMAIL, "name": ADMIN_NAME}
 
+class AllarmeAdmin(BaseModel):
+    """Messaggio di allarme dagli automatismi (testo semplice, limitato)."""
+    oggetto: str
+    testo: str
+
+
+@router.post("/admin/alerts/notify")
+async def admin_allarme(data: AllarmeAdmin, admin: dict = Depends(get_current_admin)):
+    """Manda all'amministratore un allarme generato dagli automatismi.
+
+    GitHub Actions non puo' scrivere a Brevo: gli indirizzi dei runner non sono
+    in allowlist e cambiano a ogni esecuzione. Il backend invece ha un indirizzo
+    autorizzato, quindi l'allarme passa da qui.
+    """
+    oggetto = (data.oggetto or "").strip()[:150]
+    testo = (data.testo or "").strip()[:8000]
+    if not oggetto or not testo:
+        raise HTTPException(status_code=400, detail="Oggetto e testo sono obbligatori")
+    inviata = await send_transactional_email(ADMIN_EMAIL, oggetto, testo)
+    try:
+        await db.audit_log.insert_one({
+            "audit_id": f"aud_{datetime.now(timezone.utc).timestamp():.0f}",
+            "entity": "sistema", "entity_id": "allarme", "action": "alert_notify",
+            "actor": (admin or {}).get("email"), "actor_role": "super_admin",
+            "detail": {"oggetto": oggetto, "inviata": inviata},
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        })
+    except Exception:  # pragma: no cover
+        logger.warning("audit dell'allarme non registrato")
+    if not inviata:
+        raise HTTPException(status_code=502, detail="Invio non riuscito")
+    return {"inviata": True, "a": ADMIN_EMAIL}
+
+
 @router.get("/admin/email/status")
 async def admin_email_status(admin: dict = Depends(get_current_admin)):
     """Verifica dal vivo le credenziali del provider email, senza inviare nulla."""

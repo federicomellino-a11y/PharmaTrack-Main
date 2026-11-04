@@ -23,6 +23,7 @@ jobs:
       - name: Controlla API e automatismi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
-          ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
+          # L'allarme parte dal backend, che ha l'indirizzo autorizzato su Brevo.
+          ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
         run: python .github/scripts/allarmi.py
