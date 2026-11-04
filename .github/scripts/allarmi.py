@@ -22,9 +22,9 @@ from datetime import datetime, timezone
 API = "https://pharmatrack-api.onrender.com/api/health"
 REPO = os.environ.get("GITHUB_REPOSITORY", "federicomellino-a11y/PharmaTrack-Main")
 TOKEN = os.environ.get("GITHUB_TOKEN", "")
-BREVO = os.environ.get("BREVO_API_KEY", "")
-DESTINATARIO = os.environ.get("ALERT_EMAIL") or os.environ.get("SMTP_FROM") or "federicomellino@gmail.com"
-MITTENTE = os.environ.get("ALERT_FROM") or DESTINATARIO
+BASE = "https://pharmatrack-api.onrender.com"
+ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "")
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "")
 
 # nome workflow -> ore massime di silenzio tollerate
 ATTESI = {
@@ -90,6 +90,10 @@ def controlla_workflow():
             continue
         creato = datetime.fromisoformat(run["created_at"].replace("Z", "+00:00"))
         eta_ore = (datetime.now(timezone.utc) - creato).total_seconds() / 3600
+        in_corso = run.get("conclusion") is None
+        if in_corso and eta_ore <= 2:
+            print(f"{workflow}: in corso da {eta_ore * 60:.0f} minuti, aspetto")
+            continue
         if run.get("conclusion") not in ("success", "skipped"):
             problemi.append(
                 f"{workflow}: ultimo run {run.get('conclusion') or run.get('status')} "
@@ -103,21 +107,30 @@ def controlla_workflow():
 
 
 def manda_mail(oggetto, testo):
-    if not BREVO:
-        print("BREVO_API_KEY assente: allarme solo nei log", file=sys.stderr)
+    """L'allarme parte dal backend: i runner GitHub non sono in allowlist Brevo."""
+    if not (ADMIN_EMAIL and ADMIN_PASSWORD):
+        print("ADMIN_EMAIL/ADMIN_PASSWORD assenti: allarme solo nei log", file=sys.stderr)
         return False
-    corpo = json.dumps({
-        "sender": {"name": "PharmaTrack", "email": MITTENTE},
-        "to": [{"email": DESTINATARIO}],
-        "subject": oggetto,
-        "textContent": testo,
-    }).encode()
-    richiesta = urllib.request.Request(
-        "https://api.brevo.com/v3/smtp/email", data=corpo, method="POST",
-        headers={"api-key": BREVO, "Content-Type": "application/json"})
+
+    corpo_login = json.dumps({"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD}).encode()
+    richiesta = urllib.request.Request(f"{BASE}/api/admin/login", data=corpo_login, method="POST",
+                                       headers={"Content-Type": "application/json"})
     try:
         with urllib.request.urlopen(richiesta, timeout=30) as risposta:
-            return risposta.status in (200, 201)
+            cookie = risposta.headers.get("set-cookie", "").split(";")[0]
+    except Exception as errore:
+        print(f"login admin per l'allarme fallito: {errore}", file=sys.stderr)
+        return False
+    if not cookie:
+        print("login admin senza cookie di sessione", file=sys.stderr)
+        return False
+
+    corpo = json.dumps({"oggetto": oggetto, "testo": testo}).encode()
+    richiesta = urllib.request.Request(f"{BASE}/api/admin/alerts/notify", data=corpo, method="POST",
+                                       headers={"Content-Type": "application/json", "Cookie": cookie})
+    try:
+        with urllib.request.urlopen(richiesta, timeout=30) as risposta:
+            return risposta.status == 200
     except Exception as errore:
         print(f"invio dell'allarme fallito: {errore}", file=sys.stderr)
         return False
