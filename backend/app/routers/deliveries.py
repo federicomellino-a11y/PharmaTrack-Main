@@ -8,6 +8,7 @@ from typing import Optional, List
 from fastapi import APIRouter, HTTPException, Depends, Response, Body
 
 from app.core.database import db
+from cloudinary_config import PhotoManager
 from app.core.websocket import manager
 # (nessun uso di app.core.config)
 from app.core.security import (
@@ -21,6 +22,7 @@ from app.core.shifts_service import (
 )
 from app.core.delivery_lifecycle import (
     build_cancel_updates,
+    build_photo_cleanup,
     build_restore_updates,
     can_cancel,
     can_hard_delete,
@@ -480,6 +482,21 @@ async def delete_delivery(delivery_id: str, user: dict = Depends(get_current_use
             "driver_id": delivery.get("driver_id"),
         },
     )
+    # Le foto vanno portate via insieme alla consegna: senza questo passaggio
+    # la riga in delivery_photos e il file su Cloudinary restano orfani e
+    # nessuno li cancella piu'.
+    foto = await db.delivery_photos.find({"delivery_id": delivery_id}, {"_id": 0}).to_list(200)
+    pulizia = build_photo_cleanup(foto)
+    for public_id in pulizia["public_ids"]:
+        try:
+            await PhotoManager.delete_delivery_photo(
+                public_id=public_id, pharmacy_id=user["user_id"],
+            )
+        except Exception as e:  # noqa: BLE001 — un errore di Cloudinary non deve bloccare la cancellazione
+            logger.warning(f"Cloudinary delete failed for delivery {delivery_id}: {e}")
+    if pulizia["righe"]:
+        await db.delivery_photos.delete_many({"delivery_id": delivery_id})
+
     result = await db.deliveries.delete_one(
         {"delivery_id": delivery_id, "pharmacy_id": user["user_id"]}
     )

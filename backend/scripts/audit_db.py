@@ -260,7 +260,12 @@ def main():
             orfani = 0
             esempi = []
             for doc in dbase[nome].find({campo: {"$exists": True, "$ne": None}}, {campo: 1}):
-                if doc.get(campo) not in validi:
+                valore = doc.get(campo)
+                # l'audit_log salva l'email quando ad agire e' un amministratore:
+                # non e' un id mancante, e' un attore di tipo diverso.
+                if isinstance(valore, str) and "@" in valore:
+                    continue
+                if valore not in validi:
                     orfani += 1
                     if len(esempi) < 3:
                         esempi.append(maschera(doc.get(campo)))
@@ -318,7 +323,7 @@ def main():
         for c in out.get("collezioni", []):
             print(f"\n{c['collezione']} ({c['documenti']} documenti)")
             print("  indici:", "; ".join(
-                f"{i['nome']}[{','.join(i['campi'])}]{' unico' if i['unico'] else ''}{' ttl' if i['ttl'] else ''}"
+                f"{i['nome']}[{','.join(i['campi'])}]{' unico' if i['unico'] else ''}{(' ttl=' + str(i['ttl'])) if i['ttl'] is not None else ''}"
                 for i in c["indici"]) or "NESSUNO")
             print("  campi:", ", ".join(f"{k}({v['in']}%,{v['tipo']})" for k, v in list(c["campi"].items())[:12]))
         if out.get("indici_mancanti"):
