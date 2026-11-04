@@ -1,63 +1,57 @@
-# Dipendenze
-node_modules/
-.pnp
-.pnp.js
-__pycache__/
-*.pyc
-*.pyo
-.venv/
-venv/
-env/
 
 # Build
-frontend/dist/
-frontend/build/
-backend/dist/
-*.egg-info/
-
+# Dipendenze
+# Emergent / Replit specifico
 # Env (NON committare mai)
-.env
-.env.local
-.env.*.local
-**/.env
-backend/.env
-frontend/.env
-
 # IDE
-.vscode/
-.idea/
+# Logs / runtime
+# Playwright
+# Temp
+# Test reports
+**/.env
+*.bak
+*.egg-info/
+*.env
+*.key
+*.log
+*.pem
+*.pyc
+*.pyo
 *.swp
 .DS_Store
-
-# Logs / runtime
-*.log
-.pytest_cache/
-.coverage
-htmlcov/
-
-# Emergent / Replit specifico
-.emergent/
-.replit
-replit.nix
-.upm/
 .config/
-
-# Test reports
-test_reports/
-test-results/
-playwright-report/
-
-# Temp
-/tmp/
-*.bak
-.env.*
-*.env
-credentials.json
-*.pem
-*.key
+.coverage
 .credentials
-
-# Playwright
-frontend/test-results/
-frontend/playwright-report/
+.emergent/
+.env
+.env.*
+.env.*.local
+.env.local
+.idea/
+.pnp
+.pnp.js
+.pytest_cache/
+.replit
+.upm/
+.venv/
+.vscode/
+/tmp/
+__pycache__/
+backend/.env
+backend/dist/
+credentials.json
+env/
+frontend/.env
 frontend/.playwright/
+frontend/build/
+frontend/dist/
+frontend/playwright-report/
+frontend/test-results/
+htmlcov/
+memory/
+node_modules/
+playwright-report/
+replit.nix
+test-results/
+test_reports/
+venv/
