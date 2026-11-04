@@ -91,6 +91,9 @@ app.add_exception_handler(RateLimitExceeded, rate_limit_handler)
 app.add_middleware(SlowAPIMiddleware)
 # Security headers from PR blocco-1: wired so they actually apply (were dead code)
 app.add_middleware(SecurityHeadersMiddleware)
+# Difesa CSRF: l'origine delle richieste che scrivono deve essere una delle nostre.
+from middleware_security import OriginCheckMiddleware, origini_consentite  # noqa: E402
+app.add_middleware(OriginCheckMiddleware, consentite=origini_consentite(os.environ.get("CORS_ORIGINS")))
 
 # Gestione errori standardizzata
 register_exception_handlers(app)
@@ -209,6 +212,24 @@ async def setup_indexes():
 
         await collection.delete_many({"expires_at": {"$lt": now}})
         await safe_create_index(collection, [("expires_at", pymongo.ASCENDING)], expireAfterSeconds=0, name=f"{collection.name}_expires_ttl", background=True)
+
+    # ── Collezioni alimentate da endpoint pubblici: non devono crescere per sempre ──
+    # I report CSP hanno un campo data vero, quindi si possono far scadere da soli.
+    await safe_create_index(db.csp_reports, [("ultima_volta", pymongo.ASCENDING)],
+                            expireAfterSeconds=60 * 60 * 24 * 30,
+                            name="csp_reports_ttl", background=True)
+    try:
+        # Gli errori del browser hanno la data come testo (ISO), quindi il TTL di
+        # Mongo non li tocca: si ripuliscono all'avvio, insieme ai report orfani.
+        limite = datetime.now(timezone.utc)
+        vecchi = (limite - timedelta(days=30)).isoformat()
+        rimossi_errori = await db.client_errors.delete_many({"created_at": {"$lt": vecchi}})
+        rimossi_report = await db.csp_reports.delete_many({"ultima_volta": {"$lt": limite - timedelta(days=30)}})
+        if rimossi_errori.deleted_count or rimossi_report.deleted_count:
+            logger.info("Pulizia residui pubblici: %d errori client, %d report CSP",
+                        rimossi_errori.deleted_count, rimossi_report.deleted_count)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Pulizia residui pubblici non completata: %s", exc)
 
     # ── Notifiche: indici e pulizia (le notifiche non devono crescere senza limite) ──
     await safe_create_index(db.notifications, [("user_id", pymongo.ASCENDING), ("user_type", pymongo.ASCENDING), ("created_at", pymongo.DESCENDING)], name="notifications_user_created_idx", background=True)

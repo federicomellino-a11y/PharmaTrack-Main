@@ -11,7 +11,9 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, Request
 
+from app.core.config import CSP_REPORT_RATE_LIMIT
 from app.core.database import db
+from app.core.limiter import limiter
 from app.core.security import get_current_admin
 
 logger = logging.getLogger(__name__)
@@ -38,6 +40,7 @@ def _testo(valore) -> str:
 
 
 @router.post("/csp-report")
+@limiter.limit(CSP_REPORT_RATE_LIMIT)
 async def csp_report(request: Request) -> dict:
     """Endpoint pubblico: il browser non manda credenziali utili qui."""
     try:

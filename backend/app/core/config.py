@@ -30,3 +30,9 @@ APP_BASE_URL = (os.getenv("APP_BASE_URL") or os.getenv("FRONTEND_URL") or "http:
 LOGIN_RATE_LIMIT = os.getenv("LOGIN_RATE_LIMIT", "5/minute")
 REGISTER_RATE_LIMIT = os.getenv("REGISTER_RATE_LIMIT", "3/minute")
 FORGOT_RATE_LIMIT = os.getenv("FORGOT_RATE_LIMIT", "3/minute")
+# I due endpoint pubblici che scrivono sul database: senza limite, chiunque puo'
+# riempire le collezioni a colpi di POST.
+PUBLIC_WRITE_RATE_LIMIT = os.getenv("PUBLIC_WRITE_RATE_LIMIT", "20/minute")
+CSP_REPORT_RATE_LIMIT = os.getenv("CSP_REPORT_RATE_LIMIT", "60/minute")
+# Secondo fattore della console admin: se valorizzato, il login chiede le 6 cifre.
+ADMIN_TOTP_SECRET = os.getenv("ADMIN_TOTP_SECRET", "").strip()

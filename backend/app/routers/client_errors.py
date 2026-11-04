@@ -10,7 +10,9 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Request
 
+from app.core.config import PUBLIC_WRITE_RATE_LIMIT
 from app.core.database import db
+from app.core.limiter import limiter
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -19,6 +21,7 @@ MAX_FIELD = 4000
 
 
 @router.post("/client-error")
+@limiter.limit(PUBLIC_WRITE_RATE_LIMIT)
 async def report_client_error(request: Request) -> dict:
     """Riceve un errore dal frontend (endpoint pubblico, payload già limitato)."""
     try:

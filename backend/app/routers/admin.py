@@ -5,7 +5,10 @@ from fastapi import APIRouter, HTTPException, Depends, Request, Response
 
 from app.core.database import db
 from app.core.websocket import manager
-from app.core.config import ADMIN_EMAIL, ADMIN_NAME, ADMIN_PASSWORD, LOGIN_RATE_LIMIT
+from app.core.config import (
+    ADMIN_EMAIL, ADMIN_NAME, ADMIN_PASSWORD, LOGIN_RATE_LIMIT, ADMIN_TOTP_SECRET,
+)
+from app.core.totp import verifica_codice
 from app.core.security import (
     get_current_admin, normalize_session_expiry, clear_cookie_variants,
     delete_pharmacy_account_data,
@@ -23,6 +26,8 @@ class AdminLoginLoose(BaseModel):
     """Login admin: nessuna validazione di formato, la password e' quella configurata."""
     email: str
     password: str
+    # Secondo fattore: obbligatorio solo se ADMIN_TOTP_SECRET e' impostato.
+    totp: str = ""
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -35,6 +40,11 @@ async def admin_login(request: Request, data: AdminLoginLoose, response: Respons
         raise HTTPException(status_code=503, detail="Super amministratore non configurato")
     if data.email != ADMIN_EMAIL or data.password != ADMIN_PASSWORD:
         raise HTTPException(status_code=401, detail="Credenziali admin non valide")
+    if ADMIN_TOTP_SECRET and not verifica_codice(ADMIN_TOTP_SECRET, data.totp):
+        raise HTTPException(
+            status_code=401,
+            detail="Codice di verifica a 6 cifre mancante o non valido",
+        )
 
     session_token = f"adm_sess_{uuid.uuid4().hex}"
     expires_at = datetime.now(timezone.utc) + timedelta(days=7)

@@ -60,3 +60,58 @@ def test_ambiente_locale_non_e_produzione(monkeypatch):
         assert ricaricato.ENVIRONMENT == "development"
     finally:
         importlib.reload(config)
+
+
+# ── Difesa CSRF: l'origine delle richieste che scrivono ──────────────────────
+
+from middleware_security import OriginCheckMiddleware, origine_ammessa, origini_consentite  # noqa: E402
+
+
+def _app_con_origine(consentite=None):
+    app = FastAPI()
+    app.add_middleware(OriginCheckMiddleware, consentite=consentite)
+
+    @app.post("/scrive")
+    def scrive():
+        return {"ok": True}
+
+    @app.get("/legge")
+    def legge():
+        return {"ok": True}
+
+    return TestClient(app)
+
+
+def test_origine_nostra_passa():
+    client = _app_con_origine(["https://pharmatrack-zeta.vercel.app"])
+    risposta = client.post("/scrive", headers={"Origin": "https://pharmatrack-zeta.vercel.app"})
+    assert risposta.status_code == 200
+
+
+def test_origine_estranea_rifiutata_su_post():
+    client = _app_con_origine(["https://pharmatrack-zeta.vercel.app"])
+    risposta = client.post("/scrive", headers={"Origin": "https://evil.example"})
+    assert risposta.status_code == 403
+
+
+def test_origine_estranea_ignorata_su_lettura():
+    """Una GET non modifica niente: bloccarla romperebbe solo i browser."""
+    client = _app_con_origine(["https://pharmatrack-zeta.vercel.app"])
+    assert client.get("/legge", headers={"Origin": "https://evil.example"}).status_code == 200
+
+
+def test_senza_origine_passa():
+    """curl e i job non mandano Origin e non possono fare CSRF."""
+    client = _app_con_origine(["https://pharmatrack-zeta.vercel.app"])
+    assert client.post("/scrive").status_code == 200
+
+
+def test_senza_elenco_passa_tutto():
+    client = _app_con_origine(origini_consentite("*"))
+    assert client.post("/scrive", headers={"Origin": "https://qualsiasi.example"}).status_code == 200
+
+
+def test_elenco_origini_con_spazi_e_slash():
+    assert origini_consentite("https://a.example, https://b.example/") == ["https://a.example", "https://b.example"]
+    assert origine_ammessa("https://b.example/", ["https://a.example", "https://b.example"]) is True
+    assert origine_ammessa("https://c.example", ["https://a.example"]) is False
