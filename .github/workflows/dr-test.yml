@@ -1,0 +1,125 @@
+name: Prova di ripristino del backup
+
+# Il backup notturno non serve a niente se nessuno ha mai verificato che si
+# possa ripristinare. Questo lo fa davvero: scarica i dati con l'utente di
+# sola lettura, li cifra come fa il backup, li decifra, li ripristina in un
+# MongoDB locale al runner e confronta i conteggi con la sorgente. Non tocca
+# il cluster: la scrittura avviene solo nel contenitore del runner.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 4 1 * *"   # il primo di ogni mese alle 04:00 UTC
+
+jobs:
+  ripristino:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      mongodb:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.runCommand({ping:1}).ok'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Strumenti MongoDB
+        run: |
+          set -euo pipefail
+          curl -fsSL https://fastdl.mongodb.org/tools/db/mongodb-database-tools-ubuntu2404-x86_64-100.12.0.tgz -o /tmp/tools.tgz
+          tar -xzf /tmp/tools.tgz -C /tmp
+          sudo cp /tmp/mongodb-database-tools-*/bin/mongo* /usr/local/bin/
+          mongodump --version | head -1
+          mongorestore --version | head -1
+
+      - name: Scarica i dati (utente di sola lettura)
+        env:
+          MONGO_URL_BACKUP: ${{ secrets.MONGO_URL_BACKUP }}
+        run: |
+          set -euo pipefail
+          if [ -z "${MONGO_URL_BACKUP:-}" ]; then echo "::error::Manca MONGO_URL_BACKUP"; exit 1; fi
+          mongodump --uri="$MONGO_URL_BACKUP" --archive=/tmp/dump.gz --gzip --quiet
+          BYTES=$(stat -c%s /tmp/dump.gz)
+          echo "dump: $BYTES byte"
+          if [ "$BYTES" -lt 20000 ]; then echo "::error::Dump troppo piccolo ($BYTES byte): il backup non conterrebbe i dati"; exit 1; fi
+
+      - name: Cifra e decifra come fa il backup notturno
+        env:
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          if [ -z "${BACKUP_PASSPHRASE:-}" ]; then echo "::error::Manca BACKUP_PASSPHRASE"; exit 1; fi
+          openssl enc -aes-256-cbc -pbkdf2 -salt -pass env:BACKUP_PASSPHRASE -in /tmp/dump.gz -out /tmp/dump.enc
+          rm /tmp/dump.gz
+          openssl enc -d -aes-256-cbc -pbkdf2 -pass env:BACKUP_PASSPHRASE -in /tmp/dump.enc -out /tmp/dump.gz
+          echo "cifratura e decifratura riuscite, $(stat -c%s /tmp/dump.enc) byte cifrati"
+
+      - name: Ripristina nel MongoDB del runner
+        run: |
+          set -euo pipefail
+          mongorestore --uri="mongodb://localhost:27017" --archive=/tmp/dump.gz --gzip --quiet
+          echo "ripristino completato"
+
+      - name: Confronta sorgente e ripristino
+        env:
+          MONGO_URL_BACKUP: ${{ secrets.MONGO_URL_BACKUP }}
+        run: |
+          set -euo pipefail
+          pip install --quiet pymongo
+          python3 - <<'PY'
+          import os, sys
+          from pymongo import MongoClient
+
+          SISTEMA = {"admin", "local", "config"}
+          CORE = ["users", "customers", "deliveries", "drivers", "notifications"]
+
+          sorgente = MongoClient(os.environ["MONGO_URL_BACKUP"], serverSelectionTimeoutMS=30000)
+          ripristino = MongoClient("mongodb://localhost:27017", serverSelectionTimeoutMS=10000)
+
+          def inventario(client):
+              fuori = {}
+              for db in client.list_database_names():
+                  if db in SISTEMA:
+                      continue
+                  for coll in client[db].list_collection_names():
+                      if coll.startswith("system."):
+                          continue
+                      fuori[f"{db}.{coll}"] = client[db][coll].count_documents({})
+              return fuori
+
+          a, b = inventario(sorgente), inventario(ripristino)
+          problemi = []
+          for nome, quanti in sorted(a.items()):
+              if quanti == 0:
+                  continue
+              if nome not in b:
+                  problemi.append(f"{nome}: presente nella sorgente ({quanti}) e assente nel ripristino")
+              elif b[nome] != quanti:
+                  problemi.append(f"{nome}: {quanti} nella sorgente, {b[nome]} nel ripristino")
+
+          for coll in CORE:
+              if not any(k.endswith("." + coll) for k in a):
+                  continue
+              if not any(k.endswith("." + coll) and b.get(k, 0) > 0 for k in b):
+                  problemi.append(f"{coll}: collezione fondamentale vuota dopo il ripristino")
+
+          totale = sum(b.values())
+          print(f"collezioni ripristinate: {len(b)}, documenti: {totale}")
+          for nome, quanti in sorted(b.items()):
+              if quanti:
+                  print(f"  {nome}: {quanti}")
+          if problemi:
+              print("\nPROBLEMI:")
+              for p in problemi:
+                  print("  !", p)
+              sys.exit(1)
+          print("\nIl backup si ripristina e i conteggi coincidono.")
+          PY
