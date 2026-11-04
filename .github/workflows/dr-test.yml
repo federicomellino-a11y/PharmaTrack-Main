@@ -75,7 +75,7 @@ jobs:
           set -euo pipefail
           pip install --quiet pymongo
           python3 - <<'PY'
-          import os, sys
+          import hashlib, json, os, sys
           from pymongo import MongoClient
 
           SISTEMA = {"admin", "local", "config"}
@@ -84,7 +84,14 @@ jobs:
           sorgente = MongoClient(os.environ["MONGO_URL_BACKUP"], serverSelectionTimeoutMS=30000)
           ripristino = MongoClient("mongodb://localhost:27017", serverSelectionTimeoutMS=10000)
 
+
           def inventario(client):
+              """Conteggio e impronta del contenuto, collezione per collezione.
+
+              Il solo conteggio non basta: 100 clienti sbagliati hanno lo stesso
+              numero di 100 clienti giusti. L'impronta e' lo sha256 dei documenti
+              ordinati per _id, quindi cambia se cambia un solo campo.
+              """
               fuori = {}
               for db in client.list_database_names():
                   if db in SISTEMA:
@@ -92,34 +99,45 @@ jobs:
                   for coll in client[db].list_collection_names():
                       if coll.startswith("system."):
                           continue
-                      fuori[f"{db}.{coll}"] = client[db][coll].count_documents({})
+                      documenti = list(client[db][coll].find({}).sort("_id", 1))
+                      righe = [json.dumps(d, sort_keys=True, default=str) for d in documenti]
+                      fuori[f"{db}.{coll}"] = {
+                          "documenti": len(righe),
+                          "impronta": hashlib.sha256("\n".join(righe).encode()).hexdigest()[:16],
+                      }
               return fuori
+
 
           a, b = inventario(sorgente), inventario(ripristino)
           problemi = []
-          for nome, quanti in sorted(a.items()):
-              if quanti == 0:
+
+          for nome, dati in sorted(a.items()):
+              if dati["documenti"] == 0:
                   continue
               if nome not in b:
-                  problemi.append(f"{nome}: presente nella sorgente ({quanti}) e assente nel ripristino")
-              elif b[nome] != quanti:
-                  problemi.append(f"{nome}: {quanti} nella sorgente, {b[nome]} nel ripristino")
+                  problemi.append(f"{nome}: {dati['documenti']} documenti nella sorgente, collezione assente nel ripristino")
+                  continue
+              if b[nome]["documenti"] != dati["documenti"]:
+                  problemi.append(f"{nome}: {dati['documenti']} nella sorgente, {b[nome]['documenti']} nel ripristino")
+              elif b[nome]["impronta"] != dati["impronta"]:
+                  problemi.append(f"{nome}: stesso numero di documenti ma contenuto diverso "
+                                  f"({dati['impronta']} contro {b[nome]['impronta']})")
 
           for coll in CORE:
               if not any(k.endswith("." + coll) for k in a):
                   continue
-              if not any(k.endswith("." + coll) and b.get(k, 0) > 0 for k in b):
+              if not any(k.endswith("." + coll) and b.get(k, {}).get("documenti", 0) > 0 for k in b):
                   problemi.append(f"{coll}: collezione fondamentale vuota dopo il ripristino")
 
-          totale = sum(b.values())
+          totale = sum(v["documenti"] for v in b.values())
           print(f"collezioni ripristinate: {len(b)}, documenti: {totale}")
-          for nome, quanti in sorted(b.items()):
-              if quanti:
-                  print(f"  {nome}: {quanti}")
+          for nome, v in sorted(b.items()):
+              if v["documenti"]:
+                  print(f"  {nome}: {v['documenti']} documenti, impronta {v['impronta']}")
           if problemi:
               print("\nPROBLEMI:")
               for p in problemi:
                   print("  !", p)
               sys.exit(1)
-          print("\nIl backup si ripristina e i conteggi coincidono.")
+          print("\nIl backup si ripristina e il contenuto coincide documento per documento.")
           PY

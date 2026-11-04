@@ -137,3 +137,46 @@ class InputSanitizationMiddleware(BaseHTTPMiddleware):
 
         response = await call_next(request)
         return response
+
+
+def origini_consentite(valore: str | None) -> list[str] | None:
+    """Legge CORS_ORIGINS. None significa "qualsiasi" (solo sviluppo locale)."""
+    grezzo = (valore or "").strip()
+    if not grezzo or grezzo == "*":
+        return None
+    return [o.strip().rstrip("/") for o in grezzo.split(",") if o.strip()]
+
+
+def origine_ammessa(origine: str, consentite: list[str] | None) -> bool:
+    """Confronta un'origine con l'elenco ammesso. Senza elenco passa tutto."""
+    if consentite is None:
+        return True
+    return (origine or "").rstrip("/") in consentite
+
+
+class OriginCheckMiddleware(BaseHTTPMiddleware):
+    """Difesa CSRF: una richiesta che modifica dati deve venire da un'origine nostra.
+
+    Il cookie di sessione e SameSite=None, quindi il browser lo manda anche su
+    richieste che partono da un altro sito. Qui si guarda l'header Origin che il
+    browser aggiunge da solo e che una pagina altrui non puo' falsificare. Le
+    richieste senza Origin (curl, job, test) restano ammesse: non sono CSRF,
+    perche' un CSRF ha sempre un browser dietro.
+    """
+
+    METODI_CHE_SCRIVONO = {"POST", "PUT", "PATCH", "DELETE"}
+
+    def __init__(self, app, consentite=None):
+        super().__init__(app)
+        self.consentite = consentite
+
+    async def dispatch(self, request: Request, call_next):
+        if request.method in self.METODI_CHE_SCRIVONO:
+            origine = request.headers.get("origin")
+            if origine and not origine_ammessa(origine, self.consentite):
+                logger.warning("Origine rifiutata su %s %s: %s", request.method, request.url.path, origine)
+                return JSONResponse(
+                    status_code=403,
+                    content={"detail": "Origine non ammessa"},
+                )
+        return await call_next(request)
