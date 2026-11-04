@@ -1,0 +1,52 @@
+name: Test di integrazione
+
+# I test in backend/tests (isolamento tra farmacie, validazioni, codici di
+# errore) girano contro l'API viva e non stanno in CI, quindi non li eseguiva
+# nessuno: l'isolamento tra farmacie e' il controllo di sicurezza piu'
+# importante del gestionale e finora era affidato alla memoria di chi lo ha
+# scritto. Qui girano ogni notte.
+on:
+  schedule:
+    # 03:00 UTC, dopo il backup delle 01:30
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+jobs:
+  integrazione:
+    name: Contratto e isolamento tra farmacie
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      REACT_APP_BACKEND_URL: https://pharmatrack-api.onrender.com/api
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Dipendenze dei test
+        run: pip install --quiet pytest requests
+
+      # Render sul piano free dorme: senza questa sveglia il primo test
+      # fallirebbe per timeout e sembrerebbe un guasto dell'app.
+      - name: Sveglia il backend
+        run: |
+          curl -sS -m 120 --retry 3 --retry-delay 10 -o /dev/null -w 'health: %{http_code} in %{time_total}s\n' \
+            "$REACT_APP_BACKEND_URL/health"
+
+      - name: Test di isolamento tra farmacie
+        env:
+          PT_TEST_EMAIL: ${{ secrets.PT_TEST_EMAIL }}
+          PT_TEST_PASSWORD: ${{ secrets.PT_TEST_PASSWORD }}
+        working-directory: backend
+        run: |
+          if [ -z "$PT_TEST_EMAIL" ] || [ -z "$PT_TEST_PASSWORD" ]; then
+            echo "::error::Mancano i secret PT_TEST_EMAIL / PT_TEST_PASSWORD: i test si salterebbero tutti."
+            exit 1
+          fi
+          python -m pytest tests/test_tenant_isolation.py -q --no-header
+
+      - name: Test di contratto
+        working-directory: backend
+        run: python -m pytest tests/test_new_features.py -q --no-header
