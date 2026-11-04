@@ -12,6 +12,8 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 from app.routers.admin_db import (  # noqa: E402
     _controlla_nodi,
+    AZIONI_DI_PULIZIA,
+    valida_azione_pulizia,
     _pulisci,
     valida_campi,
     valida_filtro,
@@ -102,3 +104,30 @@ def test_nome_di_collezione_ostile_rifiutato():
     # l'autenticazione: senza sessione resta comunque 401
     risposta = client.get("/api/admin/db/collections/$occhio/documents")
     assert risposta.status_code in (401, 400, 503)
+
+
+def test_pulizie_ammesse_sono_solo_due():
+    assert AZIONI_DI_PULIZIA == ("foto_orfane", "csp_reports")
+
+
+@pytest.mark.parametrize("buona", ["foto_orfane", "csp_reports"])
+def test_azione_di_pulizia_valida_passa(buona):
+    assert valida_azione_pulizia(buona) == buona
+
+
+@pytest.mark.parametrize("ostile", [
+    "deliveries", "users", "tutto", "", "*", "foto_orfane; drop",
+])
+def test_azione_di_pulizia_sconosciuta_rifiutata(ostile):
+    with pytest.raises(HTTPException) as info:
+        valida_azione_pulizia(ostile)
+    assert info.value.status_code == 400
+
+
+def test_pulizia_senza_sessione_admin_non_tocca_niente():
+    import server
+
+    client = TestClient(server.app, raise_server_exceptions=False)
+    for azione in AZIONI_DI_PULIZIA:
+        risposta = client.post(f"/api/admin/db/cleanup?azione={azione}")
+        assert risposta.status_code in (401, 503), azione

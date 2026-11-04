@@ -17,6 +17,12 @@ updates:
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
+      # minimatch arriva da eslint 9 (via typescript-eslint), che la tiene
+      # alla 3.x: la correzione e' nella 11.x con un'API diversa, quindi
+      # ogni tentativo di aggiornarla rompe il lint. E' una catena di soli
+      # strumenti di sviluppo, non finisce nel bundle.
+      - dependency-name: "minimatch"
+        update-types: ["version-update:semver-major"]
 
   # Backend: requirements.txt e' pinnato, quindi gli aggiornamenti sono
   # mirati e leggibili.

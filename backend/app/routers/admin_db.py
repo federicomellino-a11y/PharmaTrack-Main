@@ -6,7 +6,9 @@ ripristino abbia riportato i numeri giusti, senza aprire una shell sul
 database e senza esporre la porta 27017.
 
 Qui non si scrive niente e non si esegue niente: solo `find` e conteggi con
-un filtro validato. Mongo accetta nei filtri operatori che eseguono codice
+un filtro validato. L'unica eccezione sono due pulizie nominate in fondo al
+file (`foto_orfane`, `csp_reports`): non accettano filtri e fanno ognuna una
+cosa sola, perche' quei residui non hanno altro modo di essere rimossi. Mongo accetta nei filtri operatori che eseguono codice
 (`$where`, `$function`, `$accumulator`): un filtro costruito male, o scritto
 da un client compromesso, diventerebbe esecuzione arbitraria sul database.
 Per questo gli operatori sono un elenco chiuso e tutto il resto viene
@@ -237,3 +239,79 @@ async def _registra_lettura(request: Request, admin: dict, nome: str, query: dic
         })
     except Exception:  # pragma: no cover - la lettura non deve fallire per l'audit
         logger.warning("audit della lettura database non registrato per %s", nome)
+
+
+# ---------------------------------------------------------------------------
+# Manutenzione: due pulizie nominate, niente di piu'.
+#
+# Una foto il cui ordine non esiste piu' e i report CSP di prova non hanno
+# nessun percorso di cancellazione dentro l'app, e dalla produzione non c'e'
+# altro modo di toccare il database. Sono due nomi chiusi e non un "cancella
+# dove ti dico": non accettano filtri, non accettano nomi di collezione, e
+# ognuna fa una cosa sola che si spiega in una riga.
+# ---------------------------------------------------------------------------
+
+AZIONI_DI_PULIZIA = ("foto_orfane", "csp_reports")
+
+
+def valida_azione_pulizia(azione: str) -> str:
+    """Accetta solo le due pulizie previste: tutto il resto e' un errore."""
+    if azione not in AZIONI_DI_PULIZIA:
+        raise _errore(
+            f"azione sconosciuta: {azione!r}. Ammesse: {', '.join(AZIONI_DI_PULIZIA)}"
+        )
+    return azione
+
+
+async def _rimuovi_foto_orfane() -> dict:
+    """Foto dell'archivio il cui ordine non esiste piu'."""
+    consegne = set()
+    async for ordine in db.deliveries.find({}, {"_id": 0, "delivery_id": 1}):
+        if ordine.get("delivery_id"):
+            consegne.add(ordine["delivery_id"])
+
+    orfane = []
+    dettaglio = []
+    async for foto in db.delivery_photos.find({}, {"delivery_id": 1, "photo_id": 1}):
+        if foto.get("delivery_id") not in consegne:
+            orfane.append(foto["_id"])
+            dettaglio.append({"photo_id": foto.get("photo_id"),
+                              "delivery_id": foto.get("delivery_id")})
+
+    rimossi = 0
+    if orfane:
+        esito = await db.delivery_photos.delete_many({"_id": {"$in": orfane}})
+        rimossi = esito.deleted_count
+    return {"rimossi": rimossi, "dettaglio": dettaglio}
+
+
+@router.post("/admin/db/cleanup")
+async def pulisci_residui(
+    request: Request,
+    azione: str = Query(..., description="foto_orfane | csp_reports"),
+    admin: dict = Depends(get_current_admin),
+):
+    """Rimuove uno dei due tipi di residuo e lo registra nell'audit log."""
+    azione = valida_azione_pulizia(azione)
+
+    if azione == "foto_orfane":
+        esito = await _rimuovi_foto_orfane()
+    else:
+        cancellati = await db.csp_reports.delete_many({})
+        esito = {"rimossi": cancellati.deleted_count, "dettaglio": []}
+
+    try:
+        await db.audit_log.insert_one({
+            "audit_id": f"aud_{datetime.now(timezone.utc).timestamp():.0f}",
+            "entity": "database", "entity_id": azione, "action": "db_cleanup",
+            "actor": (admin or {}).get("email"), "actor_role": "super_admin",
+            "detail": {"rimossi": esito["rimossi"], "dettaglio": esito["dettaglio"],
+                       "ip": request.client.host if request.client else None},
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        })
+    except Exception:  # pragma: no cover - la pulizia non deve fallire per l'audit
+        logger.warning("audit della pulizia %s non registrato", azione)
+
+    return {"azione": azione, "rimossi": esito["rimossi"],
+            "dettaglio": esito["dettaglio"],
+            "eseguito_il": datetime.now(timezone.utc).isoformat()}
