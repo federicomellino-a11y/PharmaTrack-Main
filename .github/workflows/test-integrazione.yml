@@ -47,6 +47,13 @@ jobs:
           fi
           python -m pytest tests/test_tenant_isolation.py -q --no-header
 
+      - name: Sicurezza della sessione
+        env:
+          PT_TEST_EMAIL: ${{ secrets.PT_TEST_EMAIL }}
+          PT_TEST_PASSWORD: ${{ secrets.PT_TEST_PASSWORD }}
+        working-directory: backend
+        run: python -m pytest tests/test_session_security.py -q --no-header
+
       - name: Test di contratto
         working-directory: backend
         run: python -m pytest tests/test_new_features.py -q --no-header

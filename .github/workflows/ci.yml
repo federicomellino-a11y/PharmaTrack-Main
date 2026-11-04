@@ -102,6 +102,15 @@ jobs:
           JWT_SECRET: ci-placeholder
           SECRET_KEY: ci-placeholder
         run: python -c "import app.core.reporting, app.core.security, app.routers.deliveries, app.routers.drivers"
+      - name: Dipendenze senza vulnerabilita' note
+        working-directory: backend
+        run: |
+          pip install --quiet pip-audit
+          # Blocca il merge se una dipendenza di produzione ha una
+          # vulnerabilita' pubblicata. Oggi e' verde: se diventa rosso
+          # significa che e' uscito un advisory vero sui nostri pin.
+          pip-audit -r requirements.txt --progress-spinner off
+
       - name: Test unitari (senza rete e senza database)
         working-directory: backend
         run: python -m pytest tests/unit -q
