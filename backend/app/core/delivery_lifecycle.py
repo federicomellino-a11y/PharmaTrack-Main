@@ -105,3 +105,23 @@ def archive_marker(delivery: dict) -> str | None:
     if delivery.get("restored_at"):
         return "ripristinata"
     return None
+
+
+def build_photo_cleanup(photos: list[dict] | None) -> dict:
+    """Cosa va cancellato quando una consegna viene eliminata davvero.
+
+    Le foto di una consegna cancellata restano altrimenti per sempre: la riga
+    in delivery_photos e il file su Cloudinary continuano a occupare spazio e
+    non c'e' piu' niente che li colleghi a qualcosa. Restituisce gli
+    identificativi dei file e quante righe aspettarsi, cosi' chi cancella sa
+    cosa sta per sparire prima di farlo.
+    """
+    elenco = photos or []
+    return {
+        "public_ids": [
+            f["cloudinary_public_id"]
+            for f in elenco
+            if isinstance(f, dict) and f.get("cloudinary_public_id")
+        ],
+        "righe": len(elenco),
+    }

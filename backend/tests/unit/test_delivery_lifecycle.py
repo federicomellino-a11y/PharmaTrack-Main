@@ -11,6 +11,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 from app.core.delivery_lifecycle import (  # noqa: E402
     archive_marker,
+    build_photo_cleanup,
     build_cancel_updates,
     build_restore_updates,
     can_cancel,
@@ -94,3 +95,25 @@ def test_etichetta_archivio():
     assert archive_marker({"status": "cancelled"}) == "annullata"
     assert archive_marker({"status": "delivered", "restored_at": NOW}) == "ripristinata"
     assert archive_marker({"status": "delivered"}) is None
+
+
+def test_eliminare_una_consegna_porta_via_le_foto():
+    foto = [
+        {"photo_id": "photo_1", "cloudinary_public_id": "poddocs/farmacia/1"},
+        {"photo_id": "photo_2", "cloudinary_public_id": "poddocs/farmacia/2"},
+    ]
+    pulizia = build_photo_cleanup(foto)
+    assert pulizia["righe"] == 2
+    assert pulizia["public_ids"] == ["poddocs/farmacia/1", "poddocs/farmacia/2"]
+
+
+def test_foto_senza_identificativo_non_blocca_la_cancellazione():
+    """Una riga sbagliata non deve impedire di eliminare la consegna."""
+    pulizia = build_photo_cleanup([{"photo_id": "photo_1"}, None, {"cloudinary_public_id": "x"}])
+    assert pulizia["righe"] == 3
+    assert pulizia["public_ids"] == ["x"]
+
+
+def test_consegna_senza_foto_non_fa_niente():
+    assert build_photo_cleanup([]) == {"public_ids": [], "righe": 0}
+    assert build_photo_cleanup(None) == {"public_ids": [], "righe": 0}
