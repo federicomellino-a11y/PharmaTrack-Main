@@ -34,6 +34,16 @@ jobs:
       - name: Installa le dipendenze
         working-directory: frontend
         run: npm ci
+      # Bloccante solo su high/critical nelle dipendenze di produzione: una
+      # advisory moderata in un pacchetto di sviluppo non deve fermare un
+      # rilascio, ma una grave che finisce nel bundle si'.
+      - name: Vulnerabilita' note nelle dipendenze di produzione
+        working-directory: frontend
+        run: npm audit --omit=dev --audit-level=high
+      - name: Vulnerabilita' note, quadro completo (non bloccante)
+        working-directory: frontend
+        continue-on-error: true
+        run: npm audit || true
       - name: Lint (nomi non definiti e regole degli hook)
         working-directory: frontend
         run: npm run lint
