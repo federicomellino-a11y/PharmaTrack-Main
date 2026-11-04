@@ -28,6 +28,94 @@ except Exception:  # pragma: no cover
 
 logger = logging.getLogger(__name__)
 
+# Ultimo esito di invio, per non lasciare che un provider morto passi in silenzio:
+# prima l'unica traccia era una riga di log che nessuno leggeva.
+STATO_EMAIL = {"ultimo_errore": None, "ultimo_successo": None}
+
+
+def email_provider() -> str:
+    """Quale strada usa l'invio: chiave API Brevo, chiave SMTP Brevo, SMTP generico o niente."""
+    chiave = SMTP_PASSWORD or ""
+    if chiave.startswith("xkeysib-"):
+        return "brevo-api"
+    if chiave.startswith("xsmtpsib-"):
+        return "brevo-smtp"
+    if SMTP_HOST and SMTP_USERNAME and chiave:
+        return "smtp"
+    return "non configurato"
+
+
+def brevo_verdict(status_code: Optional[int], body: Optional[str]) -> dict:
+    """Interpreta la risposta di /v3/account. Separata dalla rete per poterla testare."""
+    if status_code == 200:
+        return {"ok": True, "stato": 200, "errore": None}
+    testo = (body or "").strip()[:200]
+    if status_code == 401:
+        return {
+            "ok": False,
+            "stato": 401,
+            "errore": "Brevo rifiuta la chiave API (401)" + (": " + testo if testo else ""),
+        }
+    if status_code is None:
+        return {"ok": False, "stato": None, "errore": "Brevo non raggiungibile" + (": " + testo if testo else "")}
+    return {"ok": False, "stato": status_code, "errore": f"Brevo ha risposto {status_code}" + (": " + testo if testo else "")}
+
+
+def registra_esito_email(ok: bool, dettaglio: Optional[str] = None) -> None:
+    adesso = datetime.now(timezone.utc).isoformat()
+    if ok:
+        STATO_EMAIL["ultimo_successo"] = adesso
+        STATO_EMAIL["ultimo_errore"] = None
+    else:
+        STATO_EMAIL["ultimo_errore"] = {"quando": adesso, "errore": (dettaglio or "")[:300]}
+
+
+def _smtp_login_ok() -> bool:
+    contesto = ssl.create_default_context()
+    try:
+        if SMTP_USE_SSL:
+            with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, context=contesto, timeout=10) as server:
+                server.login(SMTP_USERNAME, SMTP_PASSWORD)
+        else:
+            with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=10) as server:
+                if SMTP_USE_TLS:
+                    server.starttls(context=contesto)
+                server.login(SMTP_USERNAME, SMTP_PASSWORD)
+        return True
+    except Exception as exc:
+        logger.warning("Login SMTP di verifica fallito: %s", exc)
+        return False
+
+
+async def check_email_provider() -> dict:
+    """Chiede al provider se le credenziali valgono davvero, senza mandare nessuna email."""
+    provider = email_provider()
+    if provider == "brevo-api":
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.get(
+                    "https://api.brevo.com/v3/account", headers={"api-key": SMTP_PASSWORD}
+                )
+            esito = brevo_verdict(resp.status_code, resp.text)
+        except Exception as exc:
+            esito = brevo_verdict(None, str(exc))
+        esito["provider"] = provider
+        return esito
+    if provider in ("brevo-smtp", "smtp"):
+        ok = await asyncio.to_thread(_smtp_login_ok)
+        return {
+            "provider": provider,
+            "ok": ok,
+            "stato": 200 if ok else 401,
+            "errore": None if ok else "Login SMTP rifiutato dal server",
+        }
+    return {
+        "provider": provider,
+        "ok": False,
+        "stato": None,
+        "errore": "Credenziali email non configurate (mancano SMTP_FROM o SMTP_PASSWORD)",
+    }
+
 
 def push_notifications_enabled() -> bool:
     return bool(webpush and VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY)
@@ -166,11 +254,14 @@ async def send_transactional_email(to_address: str, subject: str, text_body: str
                 )
             if resp.status_code in (200, 201):
                 logger.info("Email sent via Brevo API to %s (status %s)", to_address, resp.status_code)
+                registra_esito_email(True)
                 return True
             logger.error("Brevo API error to %s: %s %s", to_address, resp.status_code, resp.text)
+            registra_esito_email(False, f"Brevo {resp.status_code}: {resp.text}")
             return False
         except Exception as exc:
             logger.error("Brevo API exception to %s: %s", to_address, exc)
+            registra_esito_email(False, f"Brevo eccezione: {exc}")
             return False
 
     # Fallback: standard SMTP
