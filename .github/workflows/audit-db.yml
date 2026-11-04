@@ -20,11 +20,11 @@ jobs:
         run: pip install --quiet pymongo
       - name: Interroga il database
         env:
-          MONGO_URL: ${{ secrets.MONGO_URL_ADMIN }}
+          MONGO_URL: ${{ secrets.MONGO_URL_BACKUP }}
         run: |
           set -euo pipefail
           if [ -z "${MONGO_URL:-}" ]; then
-            echo "::error::Manca il secret MONGO_URL_ADMIN"; exit 1
+            echo "::error::Manca il secret MONGO_URL_BACKUP"; exit 1
           fi
           python3 backend/scripts/audit_db.py | tee audit.txt
       - name: Conserva il rapporto
