@@ -45,8 +45,7 @@ RIFERIMENTI = [
     ("drivers", "pharmacy_id", "users", "user_id"),
     ("customers", "pharmacy_id", "users", "user_id"),
     ("messages", "sender_id", None, None),
-    ("messages", "thread_id", "chat_threads", "thread_id"),
-    ("notifications", "user_id", "users", "user_id"),
+    ("messages", "conversation_id", "chat_threads", "conversation_id"),
     ("driver_shifts", "driver_id", "drivers", "driver_id"),
     ("driver_shifts", "pharmacy_id", "users", "user_id"),
     ("audit_log", "actor", "users", "user_id"),
@@ -55,12 +54,12 @@ RIFERIMENTI = [
 CAMPI_CHIAVE = {
     "users": ["user_id", "email", "role", "pharmacy_name"],
     "customers": ["customer_id", "name", "address", "pharmacy_id"],
-    "deliveries": ["delivery_id", "status", "customer_id", "pharmacy_id", "created_date"],
+    "deliveries": ["delivery_id", "status", "customer_id", "pharmacy_id", "created_at"],
     "drivers": ["driver_id", "name", "phone", "pharmacy_id"],
-    "driver_shifts": ["shift_id", "driver_id", "date"],
-    "notifications": ["notification_id", "user_id", "read"],
-    "chat_threads": ["thread_id", "pharmacy_id"],
-    "messages": ["thread_id", "content", "created_at"],
+    "driver_shifts": ["shift_id", "driver_id", "started_at", "status"],
+    "notifications": ["notification_id", "user_id", "user_type", "is_read"],
+    "chat_threads": ["conversation_id", "pharmacy_id"],
+    "messages": ["conversation_id", "content", "created_at"],
 }
 UNIVOCI = {
     "users": "user_id",
@@ -68,7 +67,7 @@ UNIVOCI = {
     "deliveries": "delivery_id",
     "drivers": "driver_id",
     "driver_shifts": "shift_id",
-    "chat_threads": "thread_id",
+    "chat_threads": "conversation_id",
 }
 # Campi che DEVONO stare sotto un indice, altrimenti la query peggiora con i dati
 QUERY_FREQUENTI = {
@@ -78,8 +77,8 @@ QUERY_FREQUENTI = {
     "deliveries": ["pharmacy_id", "status", "driver_id"],
     "drivers": ["pharmacy_id"],
     "customers": ["pharmacy_id"],
-    "notifications": ["user_id"],
-    "messages": ["thread_id"],
+    "notifications": ["user_id", "user_type"],
+    "messages": ["conversation_id"],
     "audit_log": ["entity_id"],
 }
 
@@ -125,12 +124,42 @@ def analizza_documenti(collezione, limite=3000):
     return totale, campi
 
 
+INDICI_SICURI = {
+    # collezione: [(campi, unico)]
+    "audit_log": [([("entity_id", 1), ("created_at", -1)], False), ([("delivery_id", 1)], False)],
+    "client_errors": [([("created_at", -1)], False)],
+    "delivery_photos": [([("delivery_id", 1)], False), ([("pharmacy_id", 1), ("uploaded_at", -1)], False)],
+    "password_reset_tokens": [([("token", 1)], True), ([("user_id", 1)], False)],
+}
+
+
+def crea_indici(client, nomi_db):
+    """Aggiunge solo indici che mancano. Non tocca documenti."""
+    for nome_db in nomi_db:
+        d = client[nome_db]
+        presenti = set(d.list_collection_names())
+        for coll, elenco in INDICI_SICURI.items():
+            if coll not in presenti:
+                continue
+            esistenti = [" ".join(k for k, _ in defn["key"]) for defn in d[coll].index_information().values()]
+            for campi, unico in elenco:
+                firma = " ".join(k for k, _ in campi)
+                if firma in esistenti:
+                    continue
+                nome = coll + "_" + "_".join(k for k, _ in campi) + "_idx"
+                d[coll].create_index(campi, name=nome[:120], unique=unico, background=True)
+                print(f"indice creato: {nome_db}.{coll} su {firma}{' (unico)' if unico else ''}")
+
+
 def main():
     url = os.environ.get("MONGO_URL", "")
     if not url:
         sys.exit("Manca MONGO_URL")
     client = MongoClient(url, serverSelectionTimeoutMS=20000)
     out = {"quando": datetime.now(timezone.utc).isoformat(), "problemi": [], "note": []}
+    if "--crea-indici" in sys.argv:
+        crea_indici(client, [n for n in client.list_database_names()
+                             if n not in ("admin", "local", "config")])
     problema = out["problemi"].append
 
     nomi_db = [n for n in client.list_database_names() if n not in ("admin", "local", "config")]
@@ -238,6 +267,41 @@ def main():
             if orfani:
                 problema(f"{nome_db}.{nome}.{campo}: {orfani} riferimenti a {coll_dest} inesistenti "
                          f"({', '.join(map(str, esempi))})")
+
+    # fotografie rimaste senza la loro consegna (la cancellazione non le tocca)
+    for nome_db in nomi_db:
+        d = client[nome_db]
+        if "delivery_photos" in d.list_collection_names() and "deliveries" in d.list_collection_names():
+            vive = set(d.deliveries.distinct("delivery_id"))
+            orfane = [p for p in d.delivery_photos.distinct("delivery_id") if p not in vive]
+            if orfane:
+                problema(f"{nome_db}.delivery_photos: {len(orfane)} foto di consegne cancellate "
+                         f"({', '.join(map(str, orfane[:3]))}): il file resta occupando spazio")
+
+    # turni chiusi senza ora di fine
+    for nome_db in nomi_db:
+        d = client[nome_db]
+        if "driver_shifts" in d.list_collection_names():
+            incoerenti = d.driver_shifts.count_documents({
+                "status": {"$in": ["closed", "settled"]},
+                "ended_at": None,
+            })
+            if incoerenti:
+                problema(f"{nome_db}.driver_shifts: {incoerenti} turni chiusi senza ended_at "
+                         f"(i conti tornano ma la durata del turno è ignota)")
+
+    # token e sessioni scaduti rimasti in giro (le date sono stringhe, niente TTL)
+    for nome_db in nomi_db:
+        d = client[nome_db]
+        for nome in ("password_reset_tokens", "email_verifications"):
+            if nome not in d.list_collection_names():
+                continue
+            adesso = datetime.now(timezone.utc).isoformat()
+            vecchi = d[nome].count_documents({"expires_at": {"$lt": adesso}})
+            if vecchi:
+                out["note"].append(f"{nome_db}.{nome}: {vecchi} righe scadute ancora presenti "
+                                   f"(la scadenza è controllata in lettura, quindi non sono un "
+                                   f"pericolo, ma la tabella cresce senza pulizia)")
 
     # collezioni attese che non esistono
     for nome_db in nomi_db:

@@ -1,0 +1,26 @@
+name: Crea gli indici mancanti
+
+# Usa e getta: crea gli indici che il controllo del database segnala come
+# mancanti. Va lanciato a mano, una volta, e poi rimosso insieme al secret di
+# scrittura, per non lasciare in giro credenziali che possono modificare.
+on:
+  workflow_dispatch:
+
+jobs:
+  indici:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Strumenti
+        run: pip install --quiet pymongo
+      - name: Crea gli indici
+        env:
+          MONGO_URL: ${{ secrets.MONGO_URL_WRITE }}
+        run: |
+          set -euo pipefail
+          if [ -z "${MONGO_URL:-}" ]; then echo "::error::Manca MONGO_URL_WRITE"; exit 1; fi
+          python3 backend/scripts/audit_db.py --crea-indici
