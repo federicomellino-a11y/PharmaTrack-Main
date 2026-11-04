@@ -11,7 +11,7 @@ from app.core.security import (
     delete_pharmacy_account_data,
 )
 from app.core.notifications import (
-    send_transactional_email, push_notifications_enabled,
+    send_transactional_email, push_notifications_enabled, check_email_provider,
 )
 from app.models.schemas import AdminUserStatusUpdate, BaseModel
 
@@ -47,6 +47,12 @@ async def admin_login(request: Request, data: AdminLoginLoose, response: Respons
     })
     response.set_cookie(key="admin_session_token", value=session_token, httponly=True, secure=True, samesite="none", path="/", max_age=7*24*60*60)
     return {"email": ADMIN_EMAIL, "name": ADMIN_NAME}
+
+@router.get("/admin/email/status")
+async def admin_email_status(admin: dict = Depends(get_current_admin)):
+    """Verifica dal vivo le credenziali del provider email, senza inviare nulla."""
+    return await check_email_provider()
+
 
 @router.get("/admin/me")
 async def admin_me(admin: dict = Depends(get_current_admin)):

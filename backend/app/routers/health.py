@@ -7,6 +7,8 @@ from app.core.database import db, database_name
 from app.core.config import ADMIN_EMAIL, ADMIN_PASSWORD, SMTP_FROM, SMTP_PASSWORD, VAPID_PUBLIC_KEY, VAPID_SUBJECT, os
 from app.core.notifications import (
     push_notifications_enabled,
+    email_provider,
+    STATO_EMAIL,
 )
 # (nessun uso di app.models.schemas)
 
@@ -23,6 +25,11 @@ async def public_health():
         "admin_configured": bool(ADMIN_EMAIL and ADMIN_PASSWORD),
         "push_configured": push_notifications_enabled(),
         "smtp_configured": bool(SMTP_FROM and SMTP_PASSWORD),
+        # smtp_configured dice solo che le variabili ci sono; questo dice se l'ultimo
+        # tentativo vero e' andato a buon fine (una chiave revocata prima passava liscia).
+        "email_provider": email_provider(),
+        "email_ultimo_errore": STATO_EMAIL["ultimo_errore"],
+        "email_ultimo_successo": STATO_EMAIL["ultimo_successo"],
         "google_auth_configured": bool(os.getenv("GOOGLE_CLIENT_ID") or os.getenv("VITE_GOOGLE_CLIENT_ID")),
         "sentry_configured": bool(os.getenv("SENTRY_DSN")),
         "sentry_environment": (os.getenv("SENTRY_ENVIRONMENT") or os.getenv("ENVIRONMENT") or "") or None,
