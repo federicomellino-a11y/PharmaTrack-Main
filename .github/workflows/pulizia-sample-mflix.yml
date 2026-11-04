@@ -1,0 +1,70 @@
+name: Pulizia dati di esempio
+
+# Cancella il database sample_mflix (il dataset di esempio di MongoDB), che su
+# un piano da 512 MB occupa il 99% dello spazio e finisce dentro ogni backup.
+# Solo avvio manuale, e solo se si passa la conferma esplicita.
+on:
+  workflow_dispatch:
+    inputs:
+      conferma:
+        description: 'Scrivi CANCELLA_SAMPLE_MFLIX per procedere'
+        required: true
+        type: string
+
+jobs:
+  pulizia:
+    name: Cancella sample_mflix
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Controlla la conferma
+        run: |
+          if [ "${{ inputs.conferma }}" != "CANCELLA_SAMPLE_MFLIX" ]; then
+            echo "::error::Conferma assente: non cancello niente."
+            exit 1
+          fi
+
+      - name: Installa il driver
+        run: pip install --quiet pymongo
+
+      - name: Elenca, verifica e cancella
+        env:
+          MONGO_URL: ${{ secrets.MONGO_URL_BACKUP }}
+        run: |
+          python3 - <<'PY'
+          import os
+          from pymongo import MongoClient
+
+          APP_DB = "Cluster0"        # dove scrive PharmaTrack: non si tocca
+          TARGET = "sample_mflix"    # dataset di esempio di MongoDB
+
+          client = MongoClient(os.environ["MONGO_URL"], serverSelectionTimeoutMS=20000)
+          esistenti = [n for n in client.list_database_names() if n not in ("admin", "local", "config")]
+          print("database presenti:", esistenti)
+
+          if TARGET not in esistenti:
+              print(f"{TARGET} non c'e': niente da fare")
+              raise SystemExit(0)
+          if TARGET == APP_DB:
+              raise SystemExit("Il bersaglio coincide col database applicativo: mi fermo")
+
+          db = client[TARGET]
+          nomi = sorted(db.list_collection_names())
+          conteggi = {n: db[n].estimated_document_count() for n in nomi}
+          print("da cancellare:", conteggi)
+
+          # Rete di sicurezza: se dentro il bersaglio compare una collezione
+          # che somiglia ai dati veri, mi fermo invece di cancellare.
+          sospette = {"deliveries", "customers", "driver_shifts", "driver_sessions",
+                      "admin_sessions", "audit_log", "chat_threads"}
+          trovate = sospette & set(nomi)
+          if trovate:
+              raise SystemExit(f"Collezioni applicative dentro {TARGET}: {trovate}. Mi fermo")
+
+          client.drop_database(TARGET)
+          rimasti = [n for n in client.list_database_names() if n not in ("admin", "local", "config")]
+          print("cancellato. database rimasti:", rimasti)
+          PY
+
+      - name: Riepilogo
+        run: echo "sample_mflix rimosso. I dati di PharmaTrack sono in Cluster0 e non sono stati toccati."
