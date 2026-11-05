@@ -7,8 +7,9 @@ import { Card, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import {
-  Pill, Download, CheckCircle2, Keyboard, Monitor, Zap, Loader2,
-  RefreshCw, CircleDot, ArrowRight, ExternalLink, FlaskConical, Code2,
+  Download, CheckCircle2, Keyboard, Monitor, Zap, Loader2, RefreshCw, CircleDot,
+  ArrowRight, ExternalLink, FlaskConical, Code2, KeyRound, FileSpreadsheet,
+  MessageCircle, CalendarClock, Receipt, Printer,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { API } from '@/lib/config';
@@ -37,17 +38,61 @@ async function scaricaFile(percorso, nomeFile, tipo) {
   window.URL.revokeObjectURL(url);
 }
 
-function Step({ n, title, children }) {
+function Passo({ n, children }) {
   return (
-    <div className="flex gap-3 rounded-xl border border-border bg-card p-4">
-      <div className="w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-sm shrink-0">{n}</div>
-      <div className="flex-1 min-w-0">
-        <h3 className="font-semibold text-sm mb-1.5">{title}</h3>
-        <div className="text-xs text-muted-foreground space-y-2">{children}</div>
-      </div>
+    <li className="flex gap-2">
+      <span className="w-4 h-4 rounded-full bg-secondary text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">
+        {n}
+      </span>
+      <span className="text-xs text-muted-foreground">{children}</span>
+    </li>
+  );
+}
+
+function Metrica({ etichetta, valore, sotto }) {
+  return (
+    <div>
+      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{etichetta}</p>
+      <p className="text-sm font-semibold mt-0.5">{valore}</p>
+      {sotto && <p className="text-[11px] text-muted-foreground leading-tight">{sotto}</p>}
     </div>
   );
 }
+
+// Integrazioni non ancora attive. Sono qui per dire dove si sta andando, con
+// la stessa sincerità del resto della pagina: nessun pulsante che non fa niente.
+const IDEE = [
+  {
+    icona: FileSpreadsheet,
+    titolo: 'Import da CSV o Excel',
+    testo: 'Per i gestionali che non si chiamano Winfarm: mappatura delle colonne e anteprima prima di creare le consegne.',
+    tag: 'Resa alta',
+  },
+  {
+    icona: MessageCircle,
+    titolo: 'Avviso al cliente su WhatsApp',
+    testo: 'Il cliente riceve il link di tracciamento da solo, senza che nessuno lo chiami dalla cassa.',
+    tag: 'Resa alta',
+  },
+  {
+    icona: CalendarClock,
+    titolo: 'Turni nel calendario',
+    testo: 'I turni dei fattorini finiscono nel calendario che hanno già sul telefono: niente più foto del foglio.',
+    tag: 'Resa media',
+  },
+  {
+    icona: Receipt,
+    titolo: 'Fatture a fine mese',
+    testo: 'Le consegne del mese diventano righe di fattura senza ricopiarle a mano nel programma di fatturazione.',
+    tag: 'Resa media',
+  },
+  {
+    icona: Printer,
+    titolo: 'Etichette per i colli',
+    testo: 'Etichetta con nome, indirizzo e numero d\'ordine stampata dalla coda, senza riscrivere niente.',
+    tag: 'Resa media',
+  },
+];
 
 export default function IntegrationsPage() {
   const [status, setStatus] = useState(null);
@@ -119,185 +164,285 @@ export default function IntegrationsPage() {
 
   return (
     <Layout title="Integrazioni">
-      <div className="space-y-5 animate-fade-in-up max-w-3xl" data-testid="integrations-page">
+      <div className="space-y-6 animate-fade-in-up max-w-3xl" data-testid="integrations-page">
         <div>
-          <h1 className="text-xl font-bold">Collega Winfarm</h1>
+          <h1 className="text-xl font-bold">Integrazioni</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Un file, un doppio click, una scorciatoia. Da lì in poi le vendite finiscono in PharmaTrack da sole.
+            Da qui entra il lavoro che fai già in Winfarm. Una vendita diventa una consegna senza riscriverla.
           </p>
         </div>
 
         {/* Stato */}
         <Card className={active ? 'border-emerald-500/30 bg-emerald-500/[0.04]' : 'border-primary/20 bg-primary/[0.03]'}>
-          <CardContent className="p-4 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${active ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : 'bg-primary/10 text-primary'}`}>
-                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <CircleDot className="w-5 h-5" />}
-              </div>
-              <div>
-                <p className="font-semibold text-sm">
-                  {loading ? 'Controllo stato…' : active ? 'Bridge attivo' : 'Pronto da configurare'}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {active
-                    ? `${status.imports_today} import oggi · ultima ${formatWhen(status.last_import)}`
-                    : 'Ti servono 60 secondi, qui sotto'}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Badge variant="outline" className={active ? 'border-emerald-500/40 text-emerald-600 dark:text-emerald-400' : ''}>
-                {active ? 'Collegato' : 'Non collegato'}
-              </Badge>
-              <Button variant="ghost" size="sm" onClick={loadStatus} aria-label="Aggiorna stato">
-                <RefreshCw className="w-4 h-4" />
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* 3 passi */}
-        <div className="space-y-2">
-          <Step n="1" title="Scarica il bridge già configurato">
-            <p>
-              Contiene già l'indirizzo della tua farmacia e la tua chiave: non devi modificare niente.
-            </p>
-            <div className="flex flex-wrap items-center gap-2 pt-1">
-              <Button size="sm" className="btn-primary gap-2" onClick={downloadBridge} disabled={downloading}>
-                {downloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                Scarica bridge
-              </Button>
-              <a
-                href="https://www.autohotkey.com/download/ahk-install.exe"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs underline underline-offset-2 inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
-              >
-                Serve AutoHotkey? Installalo una volta sola <ExternalLink className="w-3 h-3" />
-              </a>
-            </div>
-          </Step>
-
-          <Step n="2" title="Doppio click sul file">
-            <p>
-              Compare l'icona verde <strong>H</strong> vicino all'orologio: il bridge è in ascolto. Per averlo sempre attivo
-              metti il file nella cartella <code className="px-1 py-0.5 bg-secondary rounded">Esecuzione automatica</code> di Windows
-              (<span className="whitespace-nowrap">Win+R</span> → <code className="px-1 py-0.5 bg-secondary rounded">shell:startup</code>).
-            </p>
-          </Step>
-
-          <Step n="3" title="In Winfarm: seleziona la vendita e premi Alt+C">
-            <p className="flex flex-wrap items-center gap-1.5">
-              <kbd className="px-2 py-0.5 bg-secondary rounded text-xs font-mono inline-flex items-center gap-1"><Keyboard className="w-3 h-3" />Alt + C</kbd>
-              importa la consegna ·
-              <kbd className="px-2 py-0.5 bg-secondary rounded text-xs font-mono">Alt + D</kbd>
-              apre il Dock di banco
-            </p>
-            <p>La consegna arriva in coda “Da preparare” e il Dock si aggiorna in tempo reale. Se la selezione non viene riconosciuta, si apre il modulo già compilato.</p>
-          </Step>
-        </div>
-
-        {/* Pulsante magico */}
-        <Card>
-          <CardContent className="p-4 space-y-3">
-            <div className="flex flex-wrap items-start justify-between gap-3">
+          <CardContent className="p-4 space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                  <Monitor className="w-4 h-4" />
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${active ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : 'bg-primary/10 text-primary'}`}>
+                  {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <CircleDot className="w-5 h-5" />}
                 </div>
                 <div>
-                  <p className="font-medium text-sm">Pulsante magico (icona e tasto)</p>
+                  <p className="font-semibold text-sm">
+                    {loading ? 'Controllo stato…' : active ? 'Collegato a Winfarm' : 'Pronto da collegare'}
+                  </p>
                   <p className="text-xs text-muted-foreground">
-                    Legge la vendita da solo: niente selezione, niente Alt+C.
+                    {active
+                      ? `Ultimo import ${formatWhen(status.last_import)}${status.last_import_customer ? ` · ${status.last_import_customer}` : ''}`
+                      : 'Scegli una delle due strade qui sotto: servono due minuti'}
                   </p>
                 </div>
               </div>
-              <Button size="sm" variant="outline" className="gap-2" onClick={downloadTray} disabled={downloadingTray}>
-                {downloadingTray ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                Scarica pulsante magico
-              </Button>
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className={active ? 'border-emerald-500/40 text-emerald-600 dark:text-emerald-400' : ''}>
+                  {active ? 'Attivo' : 'Da attivare'}
+                </Badge>
+                <Button variant="ghost" size="sm" onClick={loadStatus} aria-label="Aggiorna stato">
+                  <RefreshCw className="w-4 h-4" />
+                </Button>
+              </div>
             </div>
-            <ul className="text-xs text-muted-foreground space-y-1.5 pl-1">
-              <li className="flex gap-2">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
-                <span>
-                  Gia configurato: indirizzo e chiave sono dentro al file. Si mette in una cartella fissa e si avvia
-                  con PowerShell: nessuna installazione, nessun AutoHotkey.
-                </span>
-              </li>
-              <li className="flex gap-2">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
-                <span className="flex flex-wrap items-center gap-1.5">
-                  In Winfarm premi
-                  <kbd className="px-2 py-0.5 bg-secondary rounded text-xs font-mono inline-flex items-center gap-1">
-                    <Keyboard className="w-3 h-3" />Ctrl + Shift + C
-                  </kbd>
-                  oppure doppio clic sull'icona vicino all'orologio.
-                </span>
-              </li>
-              <li className="flex gap-2">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
-                <span>
-                  Se cliente o totale non si leggono, non crea niente e te lo dice: meglio un errore chiaro di una
-                  consegna sbagliata.
-                </span>
-              </li>
-            </ul>
+            <div className="grid grid-cols-3 gap-3 pt-3 border-t border-border/60">
+              <Metrica etichetta="Oggi" valore={status?.imports_today ?? 0} sotto="importate" />
+              <Metrica etichetta="In totale" valore={status?.imports_total ?? 0} sotto="da sempre" />
+              <Metrica etichetta="Chiave del PC" valore={<span className="font-mono text-xs">{status?.token_preview || '—'}</span>} sotto="questo computer" />
+            </div>
           </CardContent>
         </Card>
 
-        {/* Prova */}
+        {/* Due modi */}
+        <div>
+          <h2 className="font-semibold text-sm">Come far entrare una vendita</h2>
+          <p className="text-xs text-muted-foreground mt-1">
+            Due strade, stesso risultato: la consegna nasce in coda “Da preparare”. Scegli quella che ti fa perdere meno tempo al banco.
+          </p>
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-2">
+          {/* Pulsante magico */}
+          <Card className="border-primary/30">
+            <CardContent className="p-4 flex flex-col gap-3 h-full">
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                  <Monitor className="w-4 h-4" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="font-semibold text-sm">Pulsante magico</p>
+                    <Badge className="text-[10px] px-1.5 py-0">Consigliato</Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Legge la vendita da solo. Niente selezione, niente AutoHotkey.
+                  </p>
+                </div>
+              </div>
+              <ul className="space-y-1.5 flex-1">
+                <Passo n="1">Scarica il file: indirizzo e chiave sono già dentro.</Passo>
+                <Passo n="2">
+                  Mettilo in una cartella fissa e avvialo con PowerShell: compare l’icona vicino all’orologio.
+                </Passo>
+                <Passo n="3">
+                  In Winfarm premi <kbd className="px-1 rounded bg-secondary text-[10px] font-mono">Ctrl+Shift+C</kbd> o fai doppio clic sull’icona.
+                </Passo>
+              </ul>
+              <Button size="sm" className="btn-primary gap-2 w-full" onClick={downloadTray} disabled={downloadingTray}>
+                {downloadingTray ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                Scarica pulsante magico
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Bridge Alt+C */}
+          <Card>
+            <CardContent className="p-4 flex flex-col gap-3 h-full">
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 rounded-lg bg-secondary flex items-center justify-center shrink-0">
+                  <Keyboard className="w-4 h-4" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-sm">Bridge Alt+C</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Il metodo collaudato: selezioni i dati in Winfarm e premi Alt+C.
+                  </p>
+                </div>
+              </div>
+              <ul className="space-y-1.5 flex-1">
+                <Passo n="1">Scarica il bridge: indirizzo e chiave sono già dentro.</Passo>
+                <Passo n="2">Serve AutoHotkey, una volta sola, e un doppio clic sul file.</Passo>
+                <Passo n="3">
+                  In Winfarm seleziona la vendita e premi <kbd className="px-1 rounded bg-secondary text-[10px] font-mono">Alt+C</kbd>.
+                </Passo>
+              </ul>
+              <div className="space-y-2">
+                <Button size="sm" variant="outline" className="gap-2 w-full" onClick={downloadBridge} disabled={downloading}>
+                  {downloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                  Scarica bridge
+                </Button>
+                <a
+                  href="https://www.autohotkey.com/download/ahk-install.exe"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[11px] underline underline-offset-2 inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
+                >
+                  Serve AutoHotkey? Installalo una volta sola <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Senza installare */}
         <Card>
           <CardContent className="p-4 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                <FlaskConical className="w-4 h-4" />
+              <div className="w-9 h-9 rounded-lg bg-secondary flex items-center justify-center shrink-0">
+                <Zap className="w-4 h-4" />
               </div>
               <div>
-                <p className="font-medium text-sm">Prova che tutto funzioni</p>
-                <p className="text-xs text-muted-foreground">Crea una consegna di prova: la trovi in Consegne, la cancelli in un click.</p>
+                <p className="font-medium text-sm">Non vuoi installare niente?</p>
+                <p className="text-xs text-muted-foreground">
+                  Apri il Dock accanto a Winfarm e inserisci la consegna a mano: stessa coda, stesso flusso.
+                </p>
               </div>
             </div>
-            <Button size="sm" variant="outline" className="gap-2" onClick={runTest} disabled={testing}>
-              {testing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
-              Crea consegna di prova
+            <Button size="sm" variant="outline" className="gap-2" asChild>
+              <a href="/dock">
+                Apri il Dock <ArrowRight className="w-3.5 h-3.5" />
+              </a>
             </Button>
           </CardContent>
         </Card>
 
-        {/* Senza installare nulla */}
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-start gap-3">
-              <div className="w-9 h-9 rounded-lg bg-secondary flex items-center justify-center shrink-0">
-                <Monitor className="w-4 h-4" />
-              </div>
-              <div className="flex-1">
-                <p className="font-medium text-sm">Non vuoi installare niente?</p>
-                <p className="text-xs text-muted-foreground mt-1 mb-2">
-                  Apri il Dock accanto a Winfarm e inserisci le consegne a mano: stessa coda, stesso flusso, zero installazioni.
-                </p>
-                <Button size="sm" variant="outline" className="gap-2" asChild>
-                  <a href="/dock">
-                    Apri il Dock <ArrowRight className="w-3.5 h-3.5" />
-                  </a>
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Verifiche */}
+        <div>
+          <h2 className="font-semibold text-sm">Due modi per verificare che funzioni</h2>
+          <p className="text-xs text-muted-foreground mt-1">
+            Il primo controlla che la strada sia aperta, senza toccare Winfarm. Il secondo controlla che le regole di
+            riconoscimento leggano giusto la vendita che hai davanti.
+          </p>
+        </div>
 
-        {/* Avanzate */}
+        <div className="grid gap-3 md:grid-cols-2">
+          <Card>
+            <CardContent className="p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <FlaskConical className="w-4 h-4 text-primary" />
+                <p className="font-medium text-sm">Consegna di prova</p>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Crea una consegna finta per vedere il giro completo. La trovi in Consegne e la cancelli in un click.
+              </p>
+              <Button size="sm" variant="outline" className="gap-2 w-full" onClick={runTest} disabled={testing}>
+                {testing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
+                Crea consegna di prova
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <CircleDot className="w-4 h-4 text-primary" />
+                <p className="font-medium text-sm">Riconoscimento da testo</p>
+              </div>
+              <textarea
+                value={testoProva}
+                onChange={(e) => setTestoProva(e.target.value)}
+                rows={4}
+                placeholder={'Cliente: Mario Rossi\nTotale: 18,50\nCodice fiscale: RSSMRA80A01F839X'}
+                className="w-full rounded-lg border border-input bg-background p-2 text-xs font-mono"
+              />
+              <div className="flex items-center justify-between gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={analizzando || !testoProva.trim()}
+                  onClick={async () => {
+                    setAnalizzando(true);
+                    try {
+                      const r = await axios.post(`${API}/integrations/winfarm/parse`,
+                        { testo: testoProva }, { withCredentials: true });
+                      setEsitoProva(r.data);
+                    } catch {
+                      toast.error('Riconoscimento non riuscito');
+                    } finally {
+                      setAnalizzando(false);
+                    }
+                  }}
+                >
+                  {analizzando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
+                  Analizza
+                </Button>
+                {esitoProva && (
+                  <span className={`text-[11px] font-medium ${esitoProva.utilizzabile ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
+                    {esitoProva.utilizzabile ? 'Vendita leggibile' : 'Manca qualcosa'}
+                  </span>
+                )}
+              </div>
+              {esitoProva && (
+                <div className="space-y-1 pt-1 border-t border-border/60">
+                  {[
+                    ['Cliente', esitoProva.campi.cliente],
+                    ['Codice fiscale', esitoProva.campi.codice_fiscale],
+                    ['Importo', esitoProva.campi.importo != null ? `€ ${Number(esitoProva.campi.importo).toFixed(2)}` : null],
+                    ['Telefono', esitoProva.campi.telefono],
+                  ].map(([etichetta, valore]) => (
+                    <div key={etichetta} className="flex items-baseline gap-2 text-xs">
+                      <span className="w-24 shrink-0 text-muted-foreground">{etichetta}</span>
+                      <span className={valore ? 'font-medium' : 'text-muted-foreground/60'}>
+                        {valore || 'non riconosciuto'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Per sviluppatori */}
         <details className="rounded-xl border border-border bg-card">
           <summary className="px-4 py-3 cursor-pointer text-sm font-medium flex items-center gap-2">
-            <Code2 className="w-4 h-4 text-muted-foreground" /> Per sviluppatori / altri gestionali
+            <Code2 className="w-4 h-4 text-muted-foreground" /> Per sviluppatori e altri gestionali
           </summary>
           <div className="px-4 pb-4 space-y-3 text-xs text-muted-foreground">
             <p>
-              Qualsiasi software può creare una consegna con una chiamata REST autenticata dalla sessione farmacia:
+              Tre endpoint, tutti sotto <code className="px-1 bg-secondary rounded">/api/integrations/winfarm</code>.
+              Il corpo va in JSON, non nella query string: i dati del cliente non finiscono nei log.
+            </p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead className="text-[11px] uppercase tracking-wide">
+                  <tr>
+                    <th className="py-1 pr-3 font-medium">Metodo</th>
+                    <th className="py-1 pr-3 font-medium">Endpoint</th>
+                    <th className="py-1 font-medium">Cosa fa</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className="border-t border-border/60">
+                    <td className="py-1.5 pr-3 font-mono">GET</td>
+                    <td className="py-1.5 pr-3 font-mono">/status</td>
+                    <td className="py-1.5">Stato del collegamento e conteggi</td>
+                  </tr>
+                  <tr className="border-t border-border/60">
+                    <td className="py-1.5 pr-3 font-mono">POST</td>
+                    <td className="py-1.5 pr-3 font-mono">/parse</td>
+                    <td className="py-1.5">Legge i testi di una vendita e restituisce i campi riconosciuti</td>
+                  </tr>
+                  <tr className="border-t border-border/60">
+                    <td className="py-1.5 pr-3 font-mono">POST</td>
+                    <td className="py-1.5 pr-3 font-mono">/import</td>
+                    <td className="py-1.5">Crea la consegna</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p>
+              <strong className="text-foreground">Autenticazione.</strong> Con la sessione della farmacia (cookie) oppure,
+              per i programmi che girano sul PC come il pulsante magico, con l’header
+              <code className="px-1 bg-secondary rounded mx-1">X-Bridge-Token</code> e la chiave del bridge.
             </p>
             <pre className="bg-secondary rounded-lg p-3 overflow-x-auto text-[11px] leading-relaxed">
-{`POST ${API}/integrations/winfarm/import
+{`POST /api/integrations/winfarm/import
 
 {
   "cliente": "ROSSI MARIO",
@@ -314,86 +459,40 @@ export default function IntegrationsPage() {
               <code>importo/amount</code>, <code>pagamento/payment_method</code>, <code>note/notes</code>.
               La consegna nasce in stato “Da preparare” e il cliente viene creato se non esiste.
             </p>
+            <p className="flex items-center gap-1.5">
+              <KeyRound className="w-3.5 h-3.5" />
+              Chiave di questa farmacia: <code className="px-1 bg-secondary rounded">{status?.token_preview || '—'}</code>
+              {status?.pharmacy_name ? ` · ${status.pharmacy_name}` : ''}
+            </p>
           </div>
         </details>
 
-        {/* Prova con una vendita vera: e' cosi' che si tarano le regole */}
-        <Card>
-          <CardContent className="p-4 space-y-3">
-            <div>
-              <h3 className="font-semibold text-sm flex items-center gap-2">
-                <FlaskConical className="w-4 h-4 text-primary" />
-                Prova con una vendita vera
-              </h3>
-              <p className="text-xs text-muted-foreground mt-1">
-                Apri una vendita in Winfarm, seleziona i dati del cliente e copiali qui con
-                {' '}<kbd className="px-1 rounded bg-secondary text-[10px]">Ctrl+C</kbd>. Ti dico cosa ho
-                riconosciuto, senza creare nessuna consegna.
-              </p>
-            </div>
-            <textarea
-              value={testoProva}
-              onChange={(e) => setTestoProva(e.target.value)}
-              rows={5}
-              placeholder={'Cliente: Mario Rossi\nIndirizzo: Via Roma 12, Napoli\nTelefono: 333 111 2233\nTotale: 18,50\nPagamento: Contanti'}
-              className="w-full rounded-lg border border-input bg-background p-2 text-xs font-mono"
-            />
-            <div className="flex items-center gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={analizzando || !testoProva.trim()}
-                onClick={async () => {
-                  setAnalizzando(true);
-                  try {
-                    const r = await axios.post(`${API}/integrations/winfarm/parse`,
-                      { testo: testoProva }, { withCredentials: true });
-                    setEsitoProva(r.data);
-                  } catch {
-                    toast.error('Riconoscimento non riuscito');
-                  } finally {
-                    setAnalizzando(false);
-                  }
-                }}
-              >
-                {analizzando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
-                Analizza
-              </Button>
-              {esitoProva && (
-                <span className={`text-xs font-medium ${esitoProva.utilizzabile ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
-                  {esitoProva.utilizzabile
-                    ? `${esitoProva.riconosciuti.length} campi riconosciuti`
-                    : 'Manca qualcosa per fare la consegna'}
-                </span>
-              )}
-            </div>
-            {esitoProva && (
-              <div className="space-y-1.5 pt-1">
-                {[
-                  ['Cliente', esitoProva.campi.cliente],
-                  ['Indirizzo', esitoProva.campi.indirizzo],
-                  ['Telefono', esitoProva.campi.telefono],
-                  ['Codice fiscale', esitoProva.campi.codice_fiscale],
-                  ['Importo', esitoProva.campi.importo != null ? `€ ${Number(esitoProva.campi.importo).toFixed(2)}` : null],
-                  ['Pagamento', esitoProva.campi.pagamento],
-                  ['Ricette', esitoProva.campi.ricette],
-                ].map(([etichetta, valore]) => (
-                  <div key={etichetta} className="flex items-baseline gap-2 text-xs">
-                    <span className="w-28 shrink-0 text-muted-foreground">{etichetta}</span>
-                    <span className={valore ? 'font-medium' : 'text-muted-foreground/60'}>
-                      {valore || 'non riconosciuto'}
-                    </span>
-                  </div>
-                ))}
+        {/* Idee */}
+        <div className="pt-1">
+          <h2 className="font-semibold text-sm">Altre integrazioni in valutazione</h2>
+          <p className="text-xs text-muted-foreground mt-1">
+            Non sono attive: sono le prossime candidate, in ordine di quanto toglierebbero di fatica al banco.
+          </p>
+        </div>
+        <div className="grid gap-2 md:grid-cols-2">
+          {IDEE.map(({ icona: Icona, titolo, testo, tag }) => (
+            <div key={titolo} className="rounded-xl border border-border bg-card p-3 flex gap-3">
+              <div className="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center shrink-0">
+                <Icona className="w-4 h-4 text-muted-foreground" />
               </div>
-            )}
-          </CardContent>
-        </Card>
-
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="font-medium text-sm">{titolo}</p>
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0">{tag}</Badge>
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">{testo}</p>
+              </div>
+            </div>
+          ))}
+        </div>
         <p className="text-[11px] text-muted-foreground flex items-center gap-1.5">
-          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-          Chiave bridge: <code className="px-1 bg-secondary rounded">{status?.token_preview || '—'}</code>
-          {status?.pharmacy_name ? ` · ${status.pharmacy_name}` : ''}
+          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+          Dimmi quale ti serve davvero e la metto in fila: si parte da quella che ti fa risparmiare più tempo.
         </p>
       </div>
     </Layout>
