@@ -89,7 +89,7 @@ jobs:
           sha256sum out/*.asc | tee out/SHA256.txt
 
       - name: Conserva l'artefatto
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: backup-${{ github.run_number }}
           path: out/
