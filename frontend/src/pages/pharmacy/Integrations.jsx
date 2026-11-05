@@ -23,6 +23,20 @@ const formatWhen = (iso) => {
   return sameDay ? `oggi alle ${time}` : `${d.toLocaleDateString('it-IT')} alle ${time}`;
 };
 
+// Download di un file dal backend. Unico punto della pagina che usa axios
+// direttamente: sono file, non letture di elenco, quindi non vanno in cache.
+async function scaricaFile(percorso, nomeFile, tipo) {
+  const res = await axios.get(`${API}${percorso}`, { withCredentials: true, responseType: 'blob' });
+  const url = window.URL.createObjectURL(new Blob([res.data], { type: tipo }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = nomeFile;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.URL.revokeObjectURL(url);
+}
+
 function Step({ n, title, children }) {
   return (
     <div className="flex gap-3 rounded-xl border border-border bg-card p-4">
@@ -39,6 +53,7 @@ export default function IntegrationsPage() {
   const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
+  const [downloadingTray, setDownloadingTray] = useState(false);
   const [testoProva, setTestoProva] = useState('');
   const [esitoProva, setEsitoProva] = useState(null);
   const [analizzando, setAnalizzando] = useState(false);
@@ -56,23 +71,28 @@ export default function IntegrationsPage() {
   const downloadBridge = async () => {
     setDownloading(true);
     try {
-      const base = window.location.origin;
-      const res = await axios.get(`${API}/integrations/winfarm/bridge/download?base=${encodeURIComponent(base)}`, {
-        withCredentials: true, responseType: 'blob',
-      });
-      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'text/plain;charset=utf-8' }));
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'pharmatrack-bridge-winfarm.ahk';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
+      const base = encodeURIComponent(window.location.origin);
+      await scaricaFile(`/integrations/winfarm/bridge/download?base=${base}`,
+        'pharmatrack-bridge-winfarm.ahk', 'text/plain;charset=utf-8');
       toast.success('Bridge scaricato: avvialo con doppio click');
     } catch {
       toast.error('Download non riuscito, riprova');
     } finally {
       setDownloading(false);
+    }
+  };
+
+  const downloadTray = async () => {
+    setDownloadingTray(true);
+    try {
+      const base = encodeURIComponent(window.location.origin);
+      await scaricaFile(`/integrations/winfarm/tray/download?base=${base}`,
+        'pharmatrack-pulsante-magico.ps1', 'application/octet-stream');
+      toast.success('Pulsante magico scaricato: mettilo in una cartella fissa e avvialo');
+    } catch {
+      toast.error('Download non riuscito, riprova');
+    } finally {
+      setDownloadingTray(false);
     }
   };
 
@@ -176,6 +196,55 @@ export default function IntegrationsPage() {
             <p>La consegna arriva in coda “Da preparare” e il Dock si aggiorna in tempo reale. Se la selezione non viene riconosciuta, si apre il modulo già compilato.</p>
           </Step>
         </div>
+
+        {/* Pulsante magico */}
+        <Card>
+          <CardContent className="p-4 space-y-3">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                  <Monitor className="w-4 h-4" />
+                </div>
+                <div>
+                  <p className="font-medium text-sm">Pulsante magico (icona e tasto)</p>
+                  <p className="text-xs text-muted-foreground">
+                    Legge la vendita da solo: niente selezione, niente Alt+C.
+                  </p>
+                </div>
+              </div>
+              <Button size="sm" variant="outline" className="gap-2" onClick={downloadTray} disabled={downloadingTray}>
+                {downloadingTray ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                Scarica pulsante magico
+              </Button>
+            </div>
+            <ul className="text-xs text-muted-foreground space-y-1.5 pl-1">
+              <li className="flex gap-2">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                <span>
+                  Gia configurato: indirizzo e chiave sono dentro al file. Si mette in una cartella fissa e si avvia
+                  con PowerShell: nessuna installazione, nessun AutoHotkey.
+                </span>
+              </li>
+              <li className="flex gap-2">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                <span className="flex flex-wrap items-center gap-1.5">
+                  In Winfarm premi
+                  <kbd className="px-2 py-0.5 bg-secondary rounded text-xs font-mono inline-flex items-center gap-1">
+                    <Keyboard className="w-3 h-3" />Ctrl + Shift + C
+                  </kbd>
+                  oppure doppio clic sull'icona vicino all'orologio.
+                </span>
+              </li>
+              <li className="flex gap-2">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                <span>
+                  Se cliente o totale non si leggono, non crea niente e te lo dice: meglio un errore chiaro di una
+                  consegna sbagliata.
+                </span>
+              </li>
+            </ul>
+          </CardContent>
+        </Card>
 
         {/* Prova */}
         <Card>
