@@ -4,6 +4,8 @@ import "@/index.css";
 import App from "@/App";
 import { installGlobalErrorHandlers } from "@/lib/errorReporter";
 import { hardReload } from "@/lib/hardReload";
+import { toast } from 'sonner';
+import { installaGestioneTelefono } from '@/lib/phoneLink';
 
 installGlobalErrorHandlers();
 
@@ -49,3 +51,12 @@ root.render(
     <App />
   </React.StrictMode>,
 );
+
+// Su desktop il link tel: non ha un programma a cui consegnare il numero e il
+// click resta muto: qui il numero viene copiato, cosi il pulsante serve a
+// qualcosa anche da computer.
+installaGestioneTelefono();
+window.addEventListener('pharmatrack:numero-copiato', (evento) => {
+  const numero = (evento as CustomEvent<string>).detail;
+  toast.success(`Numero copiato: ${numero}`);
+});

@@ -30,13 +30,28 @@ async def prune_notifications(user_id: str, user_type: str, keep: int = 100) -> 
 @router.post("/push/subscribe")
 async def subscribe_push_notifications(request: Request, user: dict = Depends(get_current_user)):
     body = await request.json()
-    return await upsert_push_subscription(user["user_id"], "pharmacy", body, request)
+    try:
+        return await upsert_push_subscription(user["user_id"], "pharmacy", body, request)
+    except HTTPException:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        # Un 500 non gestito arriva al browser senza intestazioni CORS e il
+        # messaggio che si legge e' "blocked by CORS policy", che manda fuori
+        # strada chiunque. Meglio un 503 esplicito, con l'intestazione giusta.
+        logger.exception("sottoscrizione push non salvata: %s", exc)
+        raise HTTPException(status_code=503, detail="Sottoscrizione push non salvata, riprova")
 
 
 @router.delete("/push/subscribe")
 async def unsubscribe_push_notifications(request: Request, user: dict = Depends(get_current_user)):
     body = await request.json() if request.headers.get("content-length") not in [None, "0"] else {}
-    return await remove_push_subscription(user["user_id"], "pharmacy", body)
+    try:
+        return await remove_push_subscription(user["user_id"], "pharmacy", body)
+    except HTTPException:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("sottoscrizione push non rimossa: %s", exc)
+        raise HTTPException(status_code=503, detail="Sottoscrizione push non rimossa, riprova")
 
 
 @router.get("/notifications")
@@ -78,7 +93,13 @@ async def send_test_notification(user: dict = Depends(get_current_user)):
 @router.post("/driver/push/subscribe")
 async def subscribe_driver_push_notifications(request: Request, driver: dict = Depends(get_current_driver)):
     body = await request.json()
-    return await upsert_push_subscription(driver["driver_id"], "driver", body, request)
+    try:
+        return await upsert_push_subscription(driver["driver_id"], "driver", body, request)
+    except HTTPException:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("sottoscrizione push fattorino non salvata: %s", exc)
+        raise HTTPException(status_code=503, detail="Sottoscrizione push non salvata, riprova")
 
 
 @router.delete("/driver/push/subscribe")
