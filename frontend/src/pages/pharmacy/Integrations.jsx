@@ -23,6 +23,20 @@ const formatWhen = (iso) => {
   return sameDay ? `oggi alle ${time}` : `${d.toLocaleDateString('it-IT')} alle ${time}`;
 };
 
+// Download di un file dal backend. Unico punto della pagina che usa axios
+// direttamente: sono file, non letture di elenco, quindi non vanno in cache.
+async function scaricaFile(percorso, nomeFile, tipo) {
+  const res = await axios.get(`${API}${percorso}`, { withCredentials: true, responseType: 'blob' });
+  const url = window.URL.createObjectURL(new Blob([res.data], { type: tipo }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = nomeFile;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.URL.revokeObjectURL(url);
+}
+
 function Step({ n, title, children }) {
   return (
     <div className="flex gap-3 rounded-xl border border-border bg-card p-4">
@@ -57,18 +71,9 @@ export default function IntegrationsPage() {
   const downloadBridge = async () => {
     setDownloading(true);
     try {
-      const base = window.location.origin;
-      const res = await axios.get(`${API}/integrations/winfarm/bridge/download?base=${encodeURIComponent(base)}`, {
-        withCredentials: true, responseType: 'blob',
-      });
-      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'text/plain;charset=utf-8' }));
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'pharmatrack-bridge-winfarm.ahk';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
+      const base = encodeURIComponent(window.location.origin);
+      await scaricaFile(`/integrations/winfarm/bridge/download?base=${base}`,
+        'pharmatrack-bridge-winfarm.ahk', 'text/plain;charset=utf-8');
       toast.success('Bridge scaricato: avvialo con doppio click');
     } catch {
       toast.error('Download non riuscito, riprova');
@@ -80,18 +85,9 @@ export default function IntegrationsPage() {
   const downloadTray = async () => {
     setDownloadingTray(true);
     try {
-      const base = window.location.origin;
-      const res = await axios.get(`${API}/integrations/winfarm/tray/download?base=${encodeURIComponent(base)}`, {
-        withCredentials: true, responseType: 'blob',
-      });
-      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/octet-stream' }));
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'pharmatrack-pulsante-magico.ps1';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
+      const base = encodeURIComponent(window.location.origin);
+      await scaricaFile(`/integrations/winfarm/tray/download?base=${base}`,
+        'pharmatrack-pulsante-magico.ps1', 'application/octet-stream');
       toast.success('Pulsante magico scaricato: mettilo in una cartella fissa e avvialo');
     } catch {
       toast.error('Download non riuscito, riprova');
