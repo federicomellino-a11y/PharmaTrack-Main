@@ -7,8 +7,12 @@ from app.core.database import db
 from app.core.websocket import manager
 from app.core.config import (
     ADMIN_EMAIL, ADMIN_NAME, ADMIN_PASSWORD, LOGIN_RATE_LIMIT, ADMIN_TOTP_SECRET, ALERT_EMAIL,
+    ADMIN_2FA_EMAIL,
 )
 from app.core.totp import verifica_codice
+from app.core.second_factor import (
+    TENTATIVI_MASSIMI, genera_codice, impronta_codice, nuovo_sale, scadenza, verdetto,
+)
 from app.core.security import (
     get_current_admin, normalize_session_expiry, clear_cookie_variants,
     delete_pharmacy_account_data,
@@ -29,6 +33,11 @@ class AdminLoginLoose(BaseModel):
     # Secondo fattore: obbligatorio solo se ADMIN_TOTP_SECRET e' impostato.
     totp: str = ""
 
+class AdminCodiceEmail(BaseModel):
+    """Secondo passo del login: solo il codice arrivato per email."""
+    codice: str
+
+
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
@@ -40,12 +49,23 @@ async def admin_login(request: Request, data: AdminLoginLoose, response: Respons
         raise HTTPException(status_code=503, detail="Super amministratore non configurato")
     if data.email != ADMIN_EMAIL or data.password != ADMIN_PASSWORD:
         raise HTTPException(status_code=401, detail="Credenziali admin non valide")
-    if ADMIN_TOTP_SECRET and not verifica_codice(ADMIN_TOTP_SECRET, data.totp):
-        raise HTTPException(
-            status_code=401,
-            detail="Codice di verifica a 6 cifre mancante o non valido",
-        )
+    # Secondo fattore. Tre modi, in ordine di preferenza:
+    # 1) TOTP configurato: il codice arriva dall'app, niente da spedire;
+    # 2) codice per email: si manda adesso e la sessione si crea al passo due;
+    # 3) niente di configurato: password e basta, come prima.
+    if ADMIN_TOTP_SECRET:
+        if not verifica_codice(ADMIN_TOTP_SECRET, data.totp):
+            raise HTTPException(
+                status_code=401,
+                detail="Codice di verifica a 6 cifre mancante o non valido",
+            )
+    elif ADMIN_2FA_EMAIL:
+        return await _manda_codice_email(response)
 
+    return await _crea_sessione_admin(response)
+
+
+async def _crea_sessione_admin(response: Response) -> dict:
     session_token = f"adm_sess_{uuid.uuid4().hex}"
     expires_at = datetime.now(timezone.utc) + timedelta(days=7)
     await db.admin_sessions.delete_many({"email": ADMIN_EMAIL})
@@ -91,6 +111,75 @@ async def admin_allarme(data: AllarmeAdmin, admin: dict = Depends(get_current_ad
     if not inviata:
         raise HTTPException(status_code=502, detail="Invio non riuscito")
     return {"inviata": True, "a": destinatario}
+
+
+async def _manda_codice_email(response: Response) -> dict:
+    """Genera il codice, lo manda per email e dice al client di attendere il passo due."""
+    if not (ALERT_EMAIL or ADMIN_EMAIL):
+        raise HTTPException(status_code=503, detail="Nessun indirizzo per il codice di verifica")
+    destinatario = ALERT_EMAIL or ADMIN_EMAIL
+    codice = genera_codice()
+    sale = nuovo_sale()
+    try:
+        await db.admin_2fa.delete_many({"admin_email": ADMIN_EMAIL})
+        await db.admin_2fa.insert_one({
+            "admin_email": ADMIN_EMAIL,
+            "sale": sale,
+            "impronta": impronta_codice(codice, sale),
+            "tentativi": 0,
+            "creato": datetime.now(timezone.utc),
+            "scade": scadenza(),
+        })
+    except Exception as exc:  # pragma: no cover - dipende dal database
+        logger.error("codice di verifica non salvato: %s", exc)
+        raise HTTPException(status_code=503, detail="Codice di verifica non disponibile")
+
+    testo = (
+        f"Il tuo codice di accesso a PharmaTrack e' {codice}.\n\n"
+        f"Vale {10} minuti e una sola volta. Se non hai provato ad accedere tu, "
+        "qualcuno ha la password della console: cambiala su Render."
+    )
+    inviata = await send_transactional_email(destinatario, "PharmaTrack: codice di accesso", testo)
+    if not inviata:
+        await db.admin_2fa.delete_many({"admin_email": ADMIN_EMAIL})
+        raise HTTPException(status_code=502, detail="Codice non inviato: posta non disponibile")
+
+    response.status_code = 202
+    return {"secondo_fattore": "email", "destinatario": destinatario}
+
+
+@router.post("/admin/login/2fa")
+@limiter.limit(LOGIN_RATE_LIMIT)
+async def admin_login_secondo_passo(
+    request: Request, data: AdminCodiceEmail, response: Response,
+):
+    """Secondo passo: verifica il codice e solo allora apre la sessione."""
+    if not ADMIN_2FA_EMAIL:
+        raise HTTPException(status_code=404, detail="Secondo fattore non attivo")
+
+    record = await db.admin_2fa.find_one({"admin_email": ADMIN_EMAIL}, {"_id": 0})
+    esito = verdetto(record, data.codice)
+
+    if esito == "ok":
+        await db.admin_2fa.delete_many({"admin_email": ADMIN_EMAIL})
+        return await _crea_sessione_admin(response)
+
+    if esito in ("assente", "scaduto", "tentativi"):
+        await db.admin_2fa.delete_many({"admin_email": ADMIN_EMAIL})
+        raise HTTPException(
+            status_code=401,
+            detail="Codice scaduto o non piu' valido: accedi di nuovo per riceverne un altro",
+        )
+
+    # codice sbagliato: il tentativo si conta, e al quinto il codice muore
+    await db.admin_2fa.update_one(
+        {"admin_email": ADMIN_EMAIL}, {"$inc": {"tentativi": 1}},
+    )
+    rimasti = max(0, TENTATIVI_MASSIMI - (int(record.get("tentativi") or 0) + 1))
+    raise HTTPException(
+        status_code=401,
+        detail=f"Codice non corretto. Tentativi rimasti: {rimasti}",
+    )
 
 
 @router.get("/admin/email/status")
