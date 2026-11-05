@@ -76,3 +76,89 @@ def test_via_senza_numero_non_e_un_indirizzo():
 
 def test_importo_assurdo_scartato():
     assert estrai_vendita("Totale: 999999")["campi"]["importo"] is None
+
+
+# Il testo qui sotto non e' inventato: e' quello letto via OCR da uno screenshot
+# vero della schermata di vendita di Winfarm (la riga in alto, la griglia, i
+# pannelli e i pulsanti in basso). Serve a verificare che il riconoscimento
+# regga il layout reale, comprese le sue stranezze.
+SCHERMATA_SENZA_CLIENTE = """Vendita del 05/11/2026 | Terminale SERVER | Operatore: OPERATORE GENERICO | Cliente: CLIENTE GENERICO
+89 | A | del 05/11/2026 | Scontrino Non Fiscale
+Check Ev. Ant. | Multipezzi | Gestione Resi | D.P.C. | Anomalie | Equivalenti | Non Ordinare | Prenotato | Sospeso
+Descrizione | Cl. | Cat. | Q.ta | Pre. | Ord. | G.T. | Listino EUR | Iva | Sconto EUR | Parziale EUR | Totale EUR | Tipo
+GASTROTUSS25STICK20MLSCIR | C | 0 | 1 | -1 | 21,80 | 10 | 0,00 | 21,80 | 21,80 | LIB
+In Corso [Vendita Libera] | 21,80
+Info Aggiuntive | Prezzo M.IMS | 20,59 | -6%
+Segnalazioni
+Costo Med. | 13,60 | C.F. | Cerca =
+31,38 %
+Pos. | ATC/GMP | 7BB1 | Codice | 952100295
+Regione Campania (15) | Docum. | Shopper | Quote | 0,00 | Ticket | 0,00
+Libera | 21,80
+Tipo | DISPOSITIVO MEDICO
+21,80
+Vendita Aperta | Cliente Aperto
+Totale Pezzi 1
+Storico Cliente
+Similari | Equivalenti | AIFA | Cancella | Canc.Tutto | Andam. | Info Prod. | Scontrino | Uscita"""
+
+SCHERMATA_CON_CLIENTE = SCHERMATA_SENZA_CLIENTE.replace(
+    "Cliente: CLIENTE GENERICO", "Cliente: ROSSI MARIO"
+).replace("C.F. | Cerca =", "C.F. | RSSMRA80A01F839X | Cerca =")
+
+
+def test_schermata_vera_senza_cliente():
+    esito = estrai_vendita(SCHERMATA_SENZA_CLIENTE)
+    campi = esito["campi"]
+    # "CLIENTE GENERICO" non e' un cliente: e' l'assenza di un cliente
+    assert campi["cliente"] is None
+    assert esito["utilizzabile"] is False
+    # il totale grande in basso, senza etichetta accanto
+    assert campi["importo"] == 21.80
+    assert campi["indirizzo"] is None
+    assert esito["intestazione"]["data_vendita"] == "05/11/2026"
+    assert esito["intestazione"]["terminale"] == "server"
+    assert esito["intestazione"]["vendita_libera"] is True
+
+
+def test_schermata_vera_con_cliente_e_cf():
+    esito = estrai_vendita(SCHERMATA_CON_CLIENTE)
+    campi = esito["campi"]
+    assert campi["cliente"] == "ROSSI MARIO"
+    # con cliente e importo la consegna si puo' fare: l'indirizzo arriva
+    # dall'anagrafica di PharmaTrack, non dalla schermata di Winfarm
+    assert esito["utilizzabile"] is True
+    assert esito["indirizzo_da_chiedere"] is True
+    assert campi["codice_fiscale"] == "RSSMRA80A01F839X"
+    assert campi["importo"] == 21.80
+
+
+def test_prezzi_della_griglia_non_diventano_il_totale():
+    """Senza i pulsanti di stato il numero isolato non basta: meglio niente che sbagliato."""
+    testo = "GASTROTUSS25STICK20MLSCIR | 21,80\nInfo Aggiuntive | Prezzo M.IMS | 20,59"
+    assert estrai_vendita(testo)["campi"]["importo"] is None
+
+
+def test_rumore_ocr_non_crea_un_cliente_inesistente():
+    """Il testo vero letto da uno screenshot a bassa risoluzione sbaglia le lettere.
+
+    Se l'OCR legge "CUENTE GENERICO" e lo si prende per buono, nasce una
+    consegna per un cliente che non esiste. Meglio nessun cliente che uno falso.
+    """
+    rumore = ("Vend ta de U5/11/2U2b | Terminsle SERVER | Operatore: OPERAIORE GENERICU "
+              "| Clienter CUENTE GENERICO\n21,80\nVendita Aperta | Cliente Aperto")
+    esito = estrai_vendita(rumore)
+    assert esito["campi"]["cliente"] is None
+    assert esito["utilizzabile"] is False
+    assert esito["campi"]["importo"] == 21.80
+
+
+def test_intestazione_di_colonna_non_e_un_numero_di_ricetta():
+    campi = estrai_vendita("Cat. Ricetta | Presc.\nCliente: ROSSI MARIO\nTotale: 5,00")["campi"]
+    assert campi["ricette"] is None
+
+
+def test_fiducia_usa_il_nome_del_campo():
+    esito = estrai_vendita("Cliente: ROSSI MARIO\nC.F. RSSMRA80A01F839X")
+    assert esito["fiducia"]["codice_fiscale"] == "alta"
+    assert "cf" not in esito["fiducia"]
