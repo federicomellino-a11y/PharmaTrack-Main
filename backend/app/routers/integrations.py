@@ -14,6 +14,7 @@ from app.core.notifications import (
     create_notification_internal,
 )
 from app.core.winfarm_bridge import render_bridge_script
+from app.core.winfarm_parse import estrai_vendita
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -191,6 +192,26 @@ async def winfarm_bridge_download(request: Request, user: dict = Depends(get_cur
         media_type="text/plain; charset=utf-8",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+@router.post("/integrations/winfarm/parse")
+async def winfarm_parse(request: Request, user: dict = Depends(get_current_user)):
+    """Legge il testo di una vendita e dice cosa ha riconosciuto. Non crea nulla.
+
+    Serve a due cose: far provare il riconoscimento alla farmacia con una
+    vendita vera, e dare al bridge un cervello che si migliora lato server
+    senza reinstallare niente sul PC. Il testo non viene salvato.
+    """
+    if len(await request.body()) > 40000:
+        raise HTTPException(status_code=413, detail="Testo troppo lungo")
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Payload non valido")
+    testo = str((body or {}).get("testo") or "")
+    if not testo.strip():
+        raise HTTPException(status_code=400, detail="Testo mancante")
+    return estrai_vendita(testo)
 
 
 @router.post("/integrations/winfarm/bridge")

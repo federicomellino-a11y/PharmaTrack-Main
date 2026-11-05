@@ -39,6 +39,9 @@ export default function IntegrationsPage() {
   const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
+  const [testoProva, setTestoProva] = useState('');
+  const [esitoProva, setEsitoProva] = useState(null);
+  const [analizzando, setAnalizzando] = useState(false);
   const [testing, setTesting] = useState(false);
 
   const queryClient = useQueryClient();
@@ -244,6 +247,79 @@ export default function IntegrationsPage() {
             </p>
           </div>
         </details>
+
+        {/* Prova con una vendita vera: e' cosi' che si tarano le regole */}
+        <Card>
+          <CardContent className="p-4 space-y-3">
+            <div>
+              <h3 className="font-semibold text-sm flex items-center gap-2">
+                <FlaskConical className="w-4 h-4 text-primary" />
+                Prova con una vendita vera
+              </h3>
+              <p className="text-xs text-muted-foreground mt-1">
+                Apri una vendita in Winfarm, seleziona i dati del cliente e copiali qui con
+                {' '}<kbd className="px-1 rounded bg-secondary text-[10px]">Ctrl+C</kbd>. Ti dico cosa ho
+                riconosciuto, senza creare nessuna consegna.
+              </p>
+            </div>
+            <textarea
+              value={testoProva}
+              onChange={(e) => setTestoProva(e.target.value)}
+              rows={5}
+              placeholder={'Cliente: Mario Rossi\nIndirizzo: Via Roma 12, Napoli\nTelefono: 333 111 2233\nTotale: 18,50\nPagamento: Contanti'}
+              className="w-full rounded-lg border border-input bg-background p-2 text-xs font-mono"
+            />
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={analizzando || !testoProva.trim()}
+                onClick={async () => {
+                  setAnalizzando(true);
+                  try {
+                    const r = await axios.post(`${API}/integrations/winfarm/parse`,
+                      { testo: testoProva }, { withCredentials: true });
+                    setEsitoProva(r.data);
+                  } catch {
+                    toast.error('Riconoscimento non riuscito');
+                  } finally {
+                    setAnalizzando(false);
+                  }
+                }}
+              >
+                {analizzando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
+                Analizza
+              </Button>
+              {esitoProva && (
+                <span className={`text-xs font-medium ${esitoProva.utilizzabile ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
+                  {esitoProva.utilizzabile
+                    ? `${esitoProva.riconosciuti.length} campi riconosciuti`
+                    : 'Manca qualcosa per fare la consegna'}
+                </span>
+              )}
+            </div>
+            {esitoProva && (
+              <div className="space-y-1.5 pt-1">
+                {[
+                  ['Cliente', esitoProva.campi.cliente],
+                  ['Indirizzo', esitoProva.campi.indirizzo],
+                  ['Telefono', esitoProva.campi.telefono],
+                  ['Codice fiscale', esitoProva.campi.codice_fiscale],
+                  ['Importo', esitoProva.campi.importo != null ? `€ ${Number(esitoProva.campi.importo).toFixed(2)}` : null],
+                  ['Pagamento', esitoProva.campi.pagamento],
+                  ['Ricette', esitoProva.campi.ricette],
+                ].map(([etichetta, valore]) => (
+                  <div key={etichetta} className="flex items-baseline gap-2 text-xs">
+                    <span className="w-28 shrink-0 text-muted-foreground">{etichetta}</span>
+                    <span className={valore ? 'font-medium' : 'text-muted-foreground/60'}>
+                      {valore || 'non riconosciuto'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         <p className="text-[11px] text-muted-foreground flex items-center gap-1.5">
           <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
