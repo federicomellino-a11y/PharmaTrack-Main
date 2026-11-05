@@ -14,6 +14,7 @@ from app.core.notifications import (
     create_notification_internal,
 )
 from app.core.winfarm_bridge import render_bridge_script
+from app.core.winfarm_tray import con_bom, render_tray_script
 from app.core.winfarm_parse import estrai_vendita, estrai_vendita_da_controlli
 
 logger = logging.getLogger(__name__)
@@ -191,6 +192,23 @@ async def winfarm_bridge_download(request: Request, user: dict = Depends(get_cur
         content=script,
         media_type="text/plain; charset=utf-8",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/integrations/winfarm/tray/download")
+async def winfarm_tray_download(request: Request, user: dict = Depends(get_current_user)):
+    """Pulsante magico (icona + tasto) gia' configurato con indirizzo e token."""
+    token = user.get("bridge_token")
+    if not token:
+        token = f"wf_{secrets.token_urlsafe(24)}"
+        await db.users.update_one({"user_id": user["user_id"]}, {"$set": {"bridge_token": token}})
+    base_url = (request.query_params.get("base") or request.headers.get("origin")
+                or os.environ.get("APP_BASE_URL") or "https://pharmatrack-zeta.vercel.app")
+    script = render_tray_script(base_url, token, user.get("pharmacy_name") or user.get("name") or "")
+    return Response(
+        content=con_bom(script),
+        media_type="application/octet-stream",
+        headers={"Content-Disposition": 'attachment; filename="pharmatrack-pulsante-magico.ps1"'},
     )
 
 
