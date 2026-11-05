@@ -1,0 +1,30 @@
+Vend ta de U5/11/2U2b [Terminsle SERVER] [Operatore: OPERAIORE GENERICU] [Clienter CUENTE GENERICO]
+89 | A | Di | N | E | del | 05/11/2026 |  Scontrino Non Flscale
+Avantl | Codc
+Check Ev. Ant. | Multipezzl | Gestlone Resi |  D.P.C. | Anomalle |  Equivalenti | Non Ordinare | Prenotato | Sospeso
+Descrizione | 'D | Cat. | Ao | Q.ta | Pre. | Ord. | G.T. | Listino E | Iva | Sconto E | Parziale E | Totale E | Tipo
+GASTROTUSS25STICK20MLSCIR | C | 0 | -1 | 21,8010 | 0,00 | 21,80 | 21,80 | LIB
+In Corso[Vendita Libera] | 21,80
+Info Aggiuntive | Prezzo M.IMS | 20,59 | -6%
+Giac. | 0 | 0 | Ord. 1 da GUACCl.
+Scorte
+D | 0 | Scadenza
+V. Oggi/R. Cli | 5ospesl | 0
+Segnalazioni | Regione Campania (15)
+Info | 国2 | Quote | 0,00
+Costo Med. | 13,60  | C.F. | Cerca = | Docum. | Shopper | Ticket | 0,00
+31,38 % | Ul. Ven./Ac. | 19/08/26 | 19/08/26 | DPC | Lbern | 21,80
+Pos. | ATC/GMP | 7BB1 | Scad. / Ubic. | Codice | 952100295 | 0,00
+Tipo | DISPOSITIVO MEDICO | Brevello | Altro | A.s.l. | Soonti | 0,00
+P.Alivo | NESSUN PRINCIPIO ATTIVO
+Dilla Prod. | D.M.G. ITALIA SRL | Conc. | NON CONCEDIBILE | 21,80
+Temp. | NON SUPERIOREA+30GRADI | Part.
+Nota Alim. | Senza Glutine; Senza Lattosio; | Stup.
+Cat. Ricetta | Presc. | Vendita Aperta | Cliente Aperto
+Totale Pezzi 1
+Storico Cliente | ?
+RSistema TS
+?
+Similari | ARP | 音Canc | x | ldr | DF | @F12 | Fedelta Paziente Cronico | 9F
+Equivalenti | AIFA | Cancella | Canc.Tutto | Andam. | Info Prof. | Info Prod. | New PrGal. | All Pr. Gal. | Scontrino
+8 | Wirnfarm Emluzio |  Winfarm Evolurin. |  Posta in arim (1. | emaciaAl | adl-uuurs. |   | k4 1625
