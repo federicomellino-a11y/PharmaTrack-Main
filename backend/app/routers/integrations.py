@@ -195,7 +195,7 @@ async def winfarm_bridge_download(request: Request, user: dict = Depends(get_cur
 
 
 @router.post("/integrations/winfarm/parse")
-async def winfarm_parse(request: Request, user: dict = Depends(get_current_user)):
+async def winfarm_parse(request: Request):
     """Legge una vendita e dice cosa ha riconosciuto. Non crea nulla.
 
     Due sorgenti, perche' i gestionali si leggono in due modi:
@@ -209,7 +209,16 @@ async def winfarm_parse(request: Request, user: dict = Depends(get_current_user)
     Serve a due cose: far provare il riconoscimento alla farmacia con una
     vendita vera, e dare al programma desktop un cervello che si migliora lato
     server senza reinstallare niente sul PC. Niente viene salvato.
+
+    Due modi per autenticarsi: la sessione della farmacia quando la prova parte
+    dalla pagina Integrazioni, oppure il token del bridge quando la chiamata
+    arriva dal programma sul PC. Senza il secondo, il pulsante magico dovrebbe
+    tenere aperto un browser solo per farsi leggere una schermata.
     """
+    if (request.headers.get("X-Bridge-Token") or "").strip():
+        await _bridge_pharmacy(request)
+    else:
+        await get_current_user(request)
     if len(await request.body()) > 40000:
         raise HTTPException(status_code=413, detail="Testo troppo lungo")
     try:
