@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, Depends, Request, Response
 from app.core.database import db
 from app.core.websocket import manager
 from app.core.config import (
-    ADMIN_EMAIL, ADMIN_NAME, ADMIN_PASSWORD, LOGIN_RATE_LIMIT, ADMIN_TOTP_SECRET,
+    ADMIN_EMAIL, ADMIN_NAME, ADMIN_PASSWORD, LOGIN_RATE_LIMIT, ADMIN_TOTP_SECRET, ALERT_EMAIL,
 )
 from app.core.totp import verifica_codice
 from app.core.security import (
@@ -76,20 +76,21 @@ async def admin_allarme(data: AllarmeAdmin, admin: dict = Depends(get_current_ad
     testo = (data.testo or "").strip()[:8000]
     if not oggetto or not testo:
         raise HTTPException(status_code=400, detail="Oggetto e testo sono obbligatori")
-    inviata = await send_transactional_email(ADMIN_EMAIL, oggetto, testo)
+    destinatario = ALERT_EMAIL or ADMIN_EMAIL
+    inviata = await send_transactional_email(destinatario, oggetto, testo)
     try:
         await db.audit_log.insert_one({
             "audit_id": f"aud_{datetime.now(timezone.utc).timestamp():.0f}",
             "entity": "sistema", "entity_id": "allarme", "action": "alert_notify",
             "actor": (admin or {}).get("email"), "actor_role": "super_admin",
-            "detail": {"oggetto": oggetto, "inviata": inviata},
+            "detail": {"oggetto": oggetto, "inviata": inviata, "a": destinatario},
             "created_at": datetime.now(timezone.utc).isoformat(),
         })
     except Exception:  # pragma: no cover
         logger.warning("audit dell'allarme non registrato")
     if not inviata:
         raise HTTPException(status_code=502, detail="Invio non riuscito")
-    return {"inviata": True, "a": ADMIN_EMAIL}
+    return {"inviata": True, "a": destinatario}
 
 
 @router.get("/admin/email/status")

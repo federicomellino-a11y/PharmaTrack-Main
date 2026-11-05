@@ -36,3 +36,7 @@ PUBLIC_WRITE_RATE_LIMIT = os.getenv("PUBLIC_WRITE_RATE_LIMIT", "20/minute")
 CSP_REPORT_RATE_LIMIT = os.getenv("CSP_REPORT_RATE_LIMIT", "60/minute")
 # Secondo fattore della console admin: se valorizzato, il login chiede le 6 cifre.
 ADMIN_TOTP_SECRET = os.getenv("ADMIN_TOTP_SECRET", "").strip()
+# Dove arrivano gli allarmi degli automatismi. Se non impostata si usa
+# ADMIN_EMAIL, che pero' e' un nome utente di configurazione e spesso
+# non e' una casella vera.
+ALERT_EMAIL = os.getenv("ALERT_EMAIL", "").strip()
