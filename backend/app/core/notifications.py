@@ -135,6 +135,30 @@ def build_notification_target_url(user_type: str, notif_type: str, data: Optiona
     return "/dashboard"
 
 
+def documento_sottoscrizione(user_id: str, user_type: str, endpoint: str,
+                              subscription: dict, user_agent: str | None,
+                              now: str | None = None) -> dict:
+    """Costruisce l'aggiornamento della sottoscrizione push.
+
+    `created_at` sta SOLO in `$setOnInsert`. Prima era anche in `$set` e Mongo
+    rispondeva "Updating the path 'created_at' would create a conflict at
+    'created_at'" con un 500: il browser lo mostrava come errore CORS, perche'
+    su un 500 non gestito il middleware CORS non aggiunge le intestazioni.
+    """
+    momento = now or datetime.now(timezone.utc).isoformat()
+    return {
+        "$set": {
+            "user_id": user_id,
+            "user_type": user_type,
+            "endpoint": endpoint,
+            "subscription": subscription,
+            "user_agent": user_agent,
+            "updated_at": momento,
+        },
+        "$setOnInsert": {"created_at": momento},
+    }
+
+
 async def upsert_push_subscription(user_id: str, user_type: str, payload: dict, request: Request) -> dict:
     subscription = payload.get("subscription") if isinstance(payload, dict) else None
     endpoint = subscription.get("endpoint") if isinstance(subscription, dict) else None
@@ -143,20 +167,12 @@ async def upsert_push_subscription(user_id: str, user_type: str, payload: dict, 
     if not endpoint or not isinstance(keys, dict) or not keys.get("p256dh") or not keys.get("auth"):
         raise HTTPException(status_code=400, detail="Sottoscrizione push non valida")
 
-    now = datetime.now(timezone.utc).isoformat()
-    document = {
-        "user_id": user_id,
-        "user_type": user_type,
-        "endpoint": endpoint,
-        "subscription": subscription,
-        "user_agent": request.headers.get("user-agent"),
-        "updated_at": now,
-        "created_at": now,
-    }
-
+    aggiornamento = documento_sottoscrizione(
+        user_id, user_type, endpoint, subscription, request.headers.get("user-agent"),
+    )
     await db.push_subscriptions.update_one(
         {"user_id": user_id, "user_type": user_type, "endpoint": endpoint},
-        {"$set": document, "$setOnInsert": {"created_at": now}},
+        aggiornamento,
         upsert=True,
     )
     return {"status": "subscribed", "endpoint": endpoint}
