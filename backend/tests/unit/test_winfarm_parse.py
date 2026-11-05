@@ -6,7 +6,7 @@ os.environ.setdefault("DB_NAME", "pharmatrack_ci")
 os.environ.setdefault("JWT_SECRET", "ci-placeholder")
 os.environ.setdefault("SECRET_KEY", "ci-placeholder")
 
-from app.core.winfarm_parse import estrai_vendita  # noqa: E402
+from app.core.winfarm_parse import estrai_vendita, estrai_vendita_da_controlli  # noqa: E402
 
 VENDITA_CON_ETICHETTE = """Cliente: Mario Rossi
 Indirizzo: Via Roma 12, Napoli
@@ -178,3 +178,56 @@ def test_testo_ocr_completo_della_schermata_vera():
     assert esito["campi"]["importo"] == 21.80
     assert esito["utilizzabile"] is False
     assert esito["indirizzo_da_chiedere"] is True
+
+
+# --- Lettura dall'accessibilita' di Windows ---------------------------------
+# Winfarm espone i testi dei controlli: questo e' il dump vero di una vendita
+# con cliente selezionato (115 controlli, 66 con un testo), catturato con
+# wf-probe.ps1 su una schermata di vendita reale.
+
+def _controlli_con_cliente() -> list[str]:
+    import json
+    from pathlib import Path
+
+    percorso = Path(__file__).parent / "fixtures" / "winfarm_controlli_cliente.json"
+    return json.loads(percorso.read_text(encoding="utf-8"))
+
+
+def test_accessibilita_legge_cliente_cf_e_totale():
+    esito = estrai_vendita_da_controlli(_controlli_con_cliente())
+    campi = esito["campi"]
+    assert campi["cliente"] == "MELLINO FEDERICO"
+    assert campi["codice_fiscale"] == "MLLFRC91D21F839X"
+    assert campi["importo"] == 14.90
+    assert esito["utilizzabile"] is True
+    assert esito["fonte"] == "accessibilita"
+    assert esito["intestazione"]["numero_cliente"] == "217"
+    assert esito["intestazione"]["totale_pezzi"] == 1
+    assert esito["intestazione"]["vendita_aperta"] is True
+
+
+def test_accessibilita_non_confonde_i_pulsanti_con_il_cliente():
+    """Senza cliente selezionato restano solo i pulsanti di stato."""
+    controlli = ["Vendita Aperta", "Cliente Aperto", "Cliente N. 217", "14,90"]
+    esito = estrai_vendita_da_controlli(controlli)
+    assert esito["campi"]["cliente"] is None
+    assert esito["utilizzabile"] is False
+    assert esito["intestazione"]["numero_cliente"] == "217"
+
+
+def test_accessibilita_ignora_i_prezzi_di_costo():
+    """I costi portano il simbolo € e le percentuali il %: non sono il totale."""
+    controlli = ["9,70 €", "28,41 %", "0,00", "14,90", "0,00"]
+    assert estrai_vendita_da_controlli(controlli)["campi"]["importo"] == 14.90
+
+
+def test_accessibilita_senza_numeri_non_inventa_un_importo():
+    esito = estrai_vendita_da_controlli(["Vendita Aperta", "Cliente Aperto"])
+    assert esito["campi"]["importo"] is None
+    assert esito["utilizzabile"] is False
+
+
+def test_accessibilita_vuota_non_esplode():
+    esito = estrai_vendita_da_controlli([])
+    assert esito["utilizzabile"] is False
+    assert esito["righe_lette"] == 0
