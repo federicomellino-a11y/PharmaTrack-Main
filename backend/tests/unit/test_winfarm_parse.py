@@ -162,3 +162,19 @@ def test_fiducia_usa_il_nome_del_campo():
     esito = estrai_vendita("Cliente: ROSSI MARIO\nC.F. RSSMRA80A01F839X")
     assert esito["fiducia"]["codice_fiscale"] == "alta"
     assert "cf" not in esito["fiducia"]
+
+
+def test_testo_ocr_completo_della_schermata_vera():
+    """Il transcript OCR integrale dello screenshot, congelato come prova.
+
+    Contiene anche righe come "Storico Cliente | ?": l'etichetta c'e' ma il
+    valore no, e non deve diventare un cliente chiamato "?".
+    """
+    from pathlib import Path
+
+    testo = (Path(__file__).parent / "fixtures" / "winfarm_vendita_ocr.txt").read_text(encoding="utf-8")
+    esito = estrai_vendita(testo)
+    assert esito["campi"]["cliente"] is None
+    assert esito["campi"]["importo"] == 21.80
+    assert esito["utilizzabile"] is False
+    assert esito["indirizzo_da_chiedere"] is True

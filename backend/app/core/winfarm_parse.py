@@ -52,6 +52,14 @@ ETICHETTE: dict[str, tuple[str, ...]] = {
 
 # Quando nessun cliente e' selezionato Winfarm scrive cosi'. Non e' un nome:
 # e' l'assenza di un nome, e trattarlo come dato sarebbe peggio che ignorarlo.
+# Parole che sulla schermata stanno dentro etichette e pulsanti e che, lette
+# come valori, sembrano nomi: "Fedelta Paziente Cronico" produceva un cliente
+# chiamato "Cronico".
+PAROLE_INTERFACCIA = {
+    "cronico", "fedelta", "storico", "ricetta", "ricette", "scontrino",
+    "totale", "pezzi", "presc", "cerca", "codice", "libera", "ticket",
+}
+
 # Oltre al cliente generico, sulla schermata ci sono i pulsanti di stato
 # "Vendita Aperta" e "Cliente Aperto": il loro testo non e' un nome.
 CLIENTI_GENERICI = {"cliente generico", "generico", "cliente", "nessuno", "-", "aperto", "chiuso"}
@@ -106,6 +114,21 @@ def _somiglia(a: str, b: str, soglia: float = 0.72) -> bool:
     """
     confronto = difflib.SequenceMatcher(None, normalizza(a).strip(), normalizza(b).strip())
     return confronto.ratio() >= soglia
+
+
+def _nome_plausibile(valore: str | None) -> bool:
+    """Un nome di persona ha almeno due lettere.
+
+    Serve perche' sulla schermata ci sono anche righe come "Storico Cliente | ?":
+    l'etichetta c'e', il valore no, e senza questo controllo nascerebbe un
+    cliente chiamato "?".
+    """
+    if not valore:
+        return False
+    parole = {normalizza(parola).strip(" .,:;") for parola in valore.split()}
+    if parole and parole <= PAROLE_INTERFACCIA:
+        return False
+    return re.search(r"[^\W\d_]{2,}", valore, re.UNICODE) is not None
 
 
 def _pulisci(valore: str | None) -> str | None:
@@ -250,7 +273,7 @@ def estrai_vendita(testo: str) -> dict:
     for riga in righe:
         if cliente is None:
             valore = _pulisci(_valore_dopo_etichetta(riga, ETICHETTE["cliente"]))
-            if valore and not any(
+            if valore and _nome_plausibile(valore) and not any(
                 normalizza(valore).strip() == generico or _somiglia(valore, generico)
                 for generico in CLIENTI_GENERICI
             ):
