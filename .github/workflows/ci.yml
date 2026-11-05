@@ -4,6 +4,10 @@ on:
   pull_request:
   push:
     branches: [main]
+  # Serve a lanciare i controlli a mano quando l'evento automatico non arriva
+  # (il 5 novembre le PR #164 non ha generato nessun run): stessa CI, stesso
+  # verdetto, solo su richiesta.
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}
