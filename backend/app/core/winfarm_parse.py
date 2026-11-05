@@ -365,3 +365,112 @@ def estrai_vendita(testo: str) -> dict:
         "righe_lette": len(righe),
         "caratteri_letti": len(testo or ""),
     }
+
+
+# Un importo puro: "14,90". Sulla schermata il totale e i campi di pagamento
+# sono cosi', senza simbolo; i costi di prodotto invece portano "€" e le
+# percentuali il "%". Questa differenza separa i soldi della vendita dai
+# numeri del pannello informativo, senza bisogno di coordinate.
+RE_IMPORTO_PURO = re.compile(r"^\d{1,3}(?:\.\d{3})*,\d{2}$")
+RE_CF_COMPLETO = re.compile(r"^[A-Z]{6}\d{2}[A-Z]\d{2}[A-Z]\d{3}[A-Z]$")
+
+
+def estrai_vendita_da_controlli(nomi: list[str] | None) -> dict:
+    """Riconosce la vendita dall'elenco dei controlli esposti da Windows.
+
+    Winfarm e' un programma Delphi, ma espone i testi all'accessibilita' di
+    Windows: il nome di ogni controllo *e'* il testo che si vede a schermo.
+    Leggerli e' meglio che fotografare lo schermo e indovinare le lettere:
+    nessun errore di OCR, nessun problema di risoluzione o di zoom.
+
+    Prova reale su una schermata di vendita con cliente selezionato: 115
+    controlli, dentro ci sono nome e codice fiscale del cliente, il totale,
+    i pulsanti di stato e il numero di pezzi.
+    """
+    # Niente _pulisci qui: le parentesi quadre fanno parte del testo di Winfarm
+    # ("Cliente MELLINO FEDERICO [ NV 175 ]") e toglierle rompe il riconoscimento.
+    elenco = [(n or "").strip() for n in (nomi or [])]
+    elenco = [n for n in elenco if n]
+
+    cliente = None
+    numero_cliente = None
+    for nome in elenco:
+        basso = normalizza(nome)
+        if not basso.startswith("cliente ") or "aperto" in basso:
+            continue
+        # "Cliente MELLINO FEDERICO [ NV 175 ]" e' il nome, con il codice accanto
+        trovato = re.match(r"cliente\s+(.+?)\s*\[\s*nv\s*\d+\s*\]$", nome, re.IGNORECASE)
+        if trovato and _nome_plausibile(trovato.group(1)):
+            cliente = trovato.group(1).strip()
+            continue
+        # "Cliente N. 217" e' il codice cliente, non un nome
+        trovato = re.match(r"cliente\s+n\.?\s*(\d+)$", nome, re.IGNORECASE)
+        if trovato:
+            numero_cliente = trovato.group(1)
+
+    cf = None
+    for nome in elenco:
+        compatto = nome.replace(" ", "").upper()
+        if RE_CF_COMPLETO.match(compatto):
+            cf = compatto
+            break
+
+    importi = []
+    for nome in elenco:
+        if RE_IMPORTO_PURO.match(nome.strip()):
+            valore = _importo_da(nome)
+            if valore is not None:
+                importi.append(valore)
+    # Il totale di una vendita non e' mai inferiore alle sue righe: il maggiore
+    # fra i soldi scritti senza simbolo e' il totale da incassare.
+    importo = max(importi) if importi else None
+
+    pezzi = None
+    for nome in elenco:
+        trovato = re.match(r"totale pezzi\s+(\d+)", normalizza(nome))
+        if trovato:
+            pezzi = int(trovato.group(1))
+
+    tutti = normalizza(" | ".join(elenco))
+    intestazione = {
+        "vendita_libera": "vendita libera" in tutti,
+        "scontrino_non_fiscale": "scontrino non fiscale" in tutti,
+        "vendita_aperta": "vendita aperta" in tutti,
+        "cliente_aperto": "cliente aperto" in tutti,
+        "totale_pezzi": pezzi,
+        "numero_cliente": numero_cliente,
+    }
+    for nome in elenco:
+        if re.fullmatch(r"\d{2}/\d{2}/\d{4}", nome.strip()):
+            intestazione["data_vendita"] = nome.strip()
+            break
+
+    campi = {
+        "cliente": cliente,
+        "indirizzo": None,
+        "telefono": None,
+        "codice_fiscale": cf,
+        "importo": importo,
+        "pagamento": None,
+        "ricette": None,
+    }
+    fiducia = {
+        "cliente": "alta" if cliente else "assente",
+        "codice_fiscale": "alta" if cf else "assente",
+        "importo": "media" if importo is not None else "assente",
+        "indirizzo": "assente",
+        "telefono": "assente",
+        "pagamento": "assente",
+        "ricette": "assente",
+    }
+    return {
+        "fonte": "accessibilita",
+        "campi": campi,
+        "intestazione": intestazione,
+        "fiducia": fiducia,
+        "riconosciuti": [n for n, v in campi.items() if v not in (None, "")],
+        "utilizzabile": bool(cliente and importo is not None),
+        "indirizzo_da_chiedere": True,
+        "righe_lette": len(elenco),
+        "caratteri_letti": sum(len(n) for n in elenco),
+    }

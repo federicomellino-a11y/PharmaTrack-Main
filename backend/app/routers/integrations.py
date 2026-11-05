@@ -14,7 +14,7 @@ from app.core.notifications import (
     create_notification_internal,
 )
 from app.core.winfarm_bridge import render_bridge_script
-from app.core.winfarm_parse import estrai_vendita
+from app.core.winfarm_parse import estrai_vendita, estrai_vendita_da_controlli
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -196,11 +196,19 @@ async def winfarm_bridge_download(request: Request, user: dict = Depends(get_cur
 
 @router.post("/integrations/winfarm/parse")
 async def winfarm_parse(request: Request, user: dict = Depends(get_current_user)):
-    """Legge il testo di una vendita e dice cosa ha riconosciuto. Non crea nulla.
+    """Legge una vendita e dice cosa ha riconosciuto. Non crea nulla.
+
+    Due sorgenti, perche' i gestionali si leggono in due modi:
+
+    - "controlli": l'elenco dei testi che Windows espone all'accessibilita'.
+      E' la via buona quando c'e': nessun errore di lettura, nessuna
+      dipendenza dalla risoluzione dello schermo.
+    - "testo": il testo incollato o letto da OCR, per i gestionali che non
+      espongono niente.
 
     Serve a due cose: far provare il riconoscimento alla farmacia con una
-    vendita vera, e dare al bridge un cervello che si migliora lato server
-    senza reinstallare niente sul PC. Il testo non viene salvato.
+    vendita vera, e dare al programma desktop un cervello che si migliora lato
+    server senza reinstallare niente sul PC. Niente viene salvato.
     """
     if len(await request.body()) > 40000:
         raise HTTPException(status_code=413, detail="Testo troppo lungo")
@@ -208,9 +216,15 @@ async def winfarm_parse(request: Request, user: dict = Depends(get_current_user)
         body = await request.json()
     except Exception:
         raise HTTPException(status_code=400, detail="Payload non valido")
-    testo = str((body or {}).get("testo") or "")
+    body = body or {}
+    controlli = body.get("controlli")
+    if controlli is not None:
+        if not isinstance(controlli, list) or len(controlli) > 3000:
+            raise HTTPException(status_code=400, detail="Elenco controlli non valido")
+        return estrai_vendita_da_controlli([str(c) for c in controlli if c is not None])
+    testo = str(body.get("testo") or "")
     if not testo.strip():
-        raise HTTPException(status_code=400, detail="Testo mancante")
+        raise HTTPException(status_code=400, detail="Serve 'controlli' oppure 'testo'")
     return estrai_vendita(testo)
 
 
