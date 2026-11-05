@@ -40,3 +40,6 @@ ADMIN_TOTP_SECRET = os.getenv("ADMIN_TOTP_SECRET", "").strip()
 # ADMIN_EMAIL, che pero' e' un nome utente di configurazione e spesso
 # non e' una casella vera.
 ALERT_EMAIL = os.getenv("ALERT_EMAIL", "").strip()
+# Secondo fattore col codice a 6 cifre per email, per chi non usa
+# un app di autenticazione. Si accende con ADMIN_2FA_EMAIL=true.
+ADMIN_2FA_EMAIL = os.getenv("ADMIN_2FA_EMAIL", "").strip().lower() in ("1", "true", "yes", "si")

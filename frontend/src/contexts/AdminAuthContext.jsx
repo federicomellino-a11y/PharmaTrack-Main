@@ -36,6 +36,18 @@ export const AdminAuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     const response = await axios.post(`${API}/admin/login`, { email, password }, { withCredentials: true });
+    // 202 significa: password giusta, codice mandato per email, sessione non
+    // ancora aperta. Il chiamante mostra il campo del codice.
+    if (response.status === 202 || response.data?.secondo_fattore === 'email') {
+      return { secondoFattore: 'email', destinatario: response.data?.destinatario };
+    }
+    setAdmin(response.data);
+    setError(null);
+    return response.data;
+  };
+
+  const verificaCodice = async (codice) => {
+    const response = await axios.post(`${API}/admin/login/2fa`, { codice }, { withCredentials: true });
     setAdmin(response.data);
     setError(null);
     return response.data;
@@ -59,7 +71,7 @@ export const AdminAuthProvider = ({ children }) => {
   };
 
   return (
-    <AdminAuthContext.Provider value={{ admin, loading, error, login, logout, checkAuth, isAuthenticated: !!admin }}>
+    <AdminAuthContext.Provider value={{ admin, loading, error, login, verificaCodice, logout, checkAuth, isAuthenticated: !!admin }}>
       {children}
     </AdminAuthContext.Provider>
   );
