@@ -14,6 +14,7 @@ import { ScrollArea } from './ui/scroll-area';
 import { Badge } from './ui/badge';
 import CommandPalette from './CommandPalette';
 import { ensureArray } from '@/lib/collections';
+import { useConversationsQuery } from '@/hooks/queries';
 import {
   LayoutDashboard, Users, Package, Truck, MessageSquare, Archive, Settings,
   Bell, LogOut, Menu, X, ChevronRight, BarChart3, Stethoscope,
@@ -54,6 +55,32 @@ export const Layout = ({ children, title }) => {
 
   const safeNotifications = ensureArray(notifications);
   const unreadCount = safeNotifications.filter((notification) => !notification.is_read && !isArchivedDeliveryNotification(notification)).length;
+
+  // Il numero accanto a "Chat" parla dei messaggi dei fattorini, non delle
+  // notifiche: sono due cose diverse e prima si confondevano, perche' il badge
+  // della chat mostrava il conteggio delle notifiche.
+  const { data: conversazioni = [] } = useConversationsQuery();
+  // il server conta gia' solo i messaggi dei fattorini non ancora letti
+  const messaggiNonLetti = ensureArray(conversazioni)
+    .reduce((totale, conversazione) => totale + (conversazione.unread_count || 0), 0);
+
+  // Aprire l'elenco vuol dire averlo letto. Il badge sparisce subito, ma per
+  // quella volta le righe nuove restano segnate: cosi' si vede cosa era nuovo
+  // senza doverlo cercare fra le altre.
+  const [nuoveAllApertura, setNuoveAllApertura] = useState(null);
+  const apriNotifiche = (aperto) => {
+    if (!aperto) { setNuoveAllApertura(null); return; }
+    const nuove = safeNotifications.filter((n) => !n.is_read).map((n) => n.notification_id);
+    setNuoveAllApertura(new Set(nuove));
+    if (nuove.length) {
+      // un attimo dopo, per non far sparire il pallino mentre l'occhio arriva
+      setTimeout(() => markAllNotificationsRead(), 900);
+    }
+  };
+  const eraNuova = (notifica) => Boolean(nuoveAllApertura?.has(notifica.notification_id));
+  const sembraNuova = (notifica) => !notifica.is_read || eraNuova(notifica);
+  const nuoveVisibili = safeNotifications
+    .filter((n) => sembraNuova(n) && !isArchivedDeliveryNotification(n)).length;
   const isActive = (path) => path === '/dashboard'
     ? location.pathname === path
     : location.pathname.startsWith(path);
@@ -146,9 +173,12 @@ export const Layout = ({ children, title }) => {
                   data-testid={`nav-${item.label.toLowerCase().replace(/\s/g, '-')}`}>
                   <item.icon className="w-[18px] h-[18px] shrink-0" />
                   <span>{item.label}</span>
-                  {item.badge && unreadCount > 0 && (
-                    <Badge className="ml-auto h-5 px-1.5 text-xs bg-destructive text-destructive-foreground">
-                      {unreadCount > 9 ? '9+' : unreadCount}
+                  {item.badge && messaggiNonLetti > 0 && (
+                    <Badge
+                      className="ml-auto h-5 px-1.5 text-xs bg-destructive text-destructive-foreground"
+                      title={`${messaggiNonLetti} messaggi non letti`}
+                    >
+                      {messaggiNonLetti > 9 ? '9+' : messaggiNonLetti}
                     </Badge>
                   )}
                 </Link>
@@ -222,7 +252,7 @@ export const Layout = ({ children, title }) => {
                 non sempre ricompare dopo una disinstallazione */}
             <InstallAppButton variant="ghost" size="sm" className="rounded-xl lg:hidden" />
             {/* Notifications */}
-            <DropdownMenu>
+            <DropdownMenu onOpenChange={apriNotifiche}>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="relative rounded-xl" data-testid="notifications-btn">
                   <Bell className="w-5 h-5" />
@@ -235,8 +265,8 @@ export const Layout = ({ children, title }) => {
                 <div className="px-4 py-3 border-b border-border flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
                     <h3 className="font-semibold text-sm">Notifiche</h3>
-                    {unreadCount > 0 && (
-                      <Badge variant="secondary" className="text-xs">{unreadCount} nuove</Badge>
+                    {nuoveVisibili > 0 && (
+                      <Badge variant="secondary" className="text-xs">{nuoveVisibili} nuove</Badge>
                     )}
                   </div>
                   <div className="flex items-center gap-2">
@@ -269,12 +299,12 @@ export const Layout = ({ children, title }) => {
                     safeNotifications.slice(0, 12).map((n) => (
                       <div
                         key={n.notification_id}
-                        className={`px-4 py-3 border-b border-border/50 last:border-0 ${!n.is_read ? 'bg-primary/5' : ''}`}
+                        className={`px-4 py-3 border-b border-border/50 last:border-0 ${sembraNuova(n) ? 'bg-primary/5' : ''}`}
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex min-w-0 items-start gap-2">
-                            {!n.is_read && <div className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary" />}
-                            <div className={!n.is_read ? 'min-w-0' : 'ml-4 min-w-0'}>
+                            {sembraNuova(n) && <div className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary" />}
+                            <div className={sembraNuova(n) ? 'min-w-0' : 'ml-4 min-w-0'}>
                               <p className="truncate text-sm font-medium leading-tight">{n.title}</p>
                               <p className="mt-0.5 break-words text-xs text-muted-foreground">{n.message}</p>
                               {isArchivedDeliveryNotification(n) && (
@@ -362,7 +392,7 @@ export const Layout = ({ children, title }) => {
                   <item.icon className="w-5 h-5" />
                   {item.badge && unreadCount > 0 && (
                     <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-destructive rounded-full text-[9px] font-bold text-white flex items-center justify-center">
-                      {unreadCount > 9 ? '9' : unreadCount}
+                      {messaggiNonLetti > 9 ? '9' : messaggiNonLetti}
                     </span>
                   )}
                 </div>
@@ -384,7 +414,7 @@ export const Layout = ({ children, title }) => {
                   <item.icon className="w-5 h-5" />
                   {item.badge && unreadCount > 0 && (
                     <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-destructive rounded-full text-[9px] font-bold text-white flex items-center justify-center">
-                      {unreadCount > 9 ? '9' : unreadCount}
+                      {messaggiNonLetti > 9 ? '9' : messaggiNonLetti}
                     </span>
                   )}
                 </div>
