@@ -68,17 +68,7 @@ public static extern bool RegisterHotKey(IntPtr hWnd, int id, uint modificatori,
 public static extern bool UnregisterHotKey(IntPtr hWnd, int id);
 
 [DllImport("user32.dll")]
-public static extern bool PeekMessage(out MSG messaggio, IntPtr hWnd, uint filtroMin, uint filtroMax, uint rimuovi);
-
-public struct MSG {
-    public IntPtr hwnd;
-    public uint message;
-    public IntPtr wParam;
-    public IntPtr lParam;
-    public uint time;
-    public int x;
-    public int y;
-}
+public static extern short GetAsyncKeyState(int vk);
 '@
 
 # Questi due valori li scrive il server quando generi il file dalla pagina
@@ -373,9 +363,21 @@ function Prendi-Vendita {
         return
     }
     if (-not $letto.utilizzabile) {
-        $motivo = if (-not $letto.campi.cliente) { 'Non ho letto il cliente.' } else { 'Non ho letto il totale.' }
-        Mostra ([System.Windows.Forms.ToolTipIcon]::Warning) 'Vendita non riconosciuta' `
-            ($motivo + ' Seleziona il cliente in Winfarm e riprova.')
+        # Nessun cliente selezionato in Winfarm (o totale non letto) non e' un
+        # vicolo cieco: e' il momento in cui la farmacia sceglie il cliente.
+        # Il modulo si apre con quello che si e' letto, e l'indirizzo arriva
+        # dalla scheda del cliente, come sempre.
+        $parametri = @{ origine = 'winfarm' }
+        if ($letto.campi.importo) { $parametri.amount = $letto.campi.importo }
+        if ($letto.campi.codice_fiscale) { $parametri.fiscal_code = $letto.campi.codice_fiscale }
+        if ($letto.intestazione.riferimento) { $parametri.external_ref = $letto.intestazione.riferimento }
+        Apri-Dock -Parametri $parametri
+        $spiegazione = if (-not $letto.campi.cliente) {
+            'Non c e un cliente selezionato in Winfarm: nel modulo che ho aperto scegli il cliente, o aggiungilo se e nuovo.'
+        } else {
+            'Manca il totale: nel modulo che ho aperto scrivi l importo e scegli il cliente.'
+        }
+        Mostra ([System.Windows.Forms.ToolTipIcon]::Info) 'Consegna da completare' $spiegazione
         return
     }
     $pezzi = if ($letto.intestazione.totale_pezzi) { $letto.intestazione.totale_pezzi } else { 1 }
@@ -552,17 +554,34 @@ $menu.Items.Add('Esci').Add_Click({ $iconaTray.Visible = $false; $modulo.Close()
 $iconaTray.ContextMenuStrip = $menu
 $iconaTray.add_DoubleClick({ Prendi-Vendita })
 
-# Il timer guarda se e' arrivata la pressione del tasto. Con PowerShell e'
-# piu' semplice e solido che intercettare i messaggi di Windows a mano.
-$messaggio = New-Object Wf.Tasti+MSG
+# Il tasto si legge dallo stato dei tasti, non dai messaggi di Windows.
+# Con RegisterHotKey il messaggio esiste, ma arrivava alla finestra e non alla
+# coda del thread, quindi il vecchio controllo non lo vedeva mai: menu' si',
+# tasto no (6/11 in farmacia). GetAsyncKeyState guarda la tastiera vera, quindi
+# funziona comunque, anche se un altro programma si e' prenotato la combinazione.
+$script:tastoEraGiu = $false
+$script:ultimaPressione = [datetime]::MinValue
 $timer = New-Object System.Windows.Forms.Timer
-$timer.Interval = 150
+$timer.Interval = 100
 $timer.add_Tick({
-        while ([Wf.Tasti]::PeekMessage([ref]$messaggio, [IntPtr]::Zero, 0, 0, 1)) {
-            if ($messaggio.message -eq $WM_HOTKEY -and $messaggio.wParam.ToInt64() -eq $ID_TASTO) {
+        if (-not $tastoScelto) { return }
+        $mod = [int]$tastoScelto.Mod
+        $giu = (([int][Wf.Tasti]::GetAsyncKeyState([int]$tastoScelto.Vk)) -band 0x8000) -ne 0
+        if ($giu -and ($mod -band 2)) { $giu = (([int][Wf.Tasti]::GetAsyncKeyState(0x11)) -band 0x8000) -ne 0 }
+        if ($giu -and ($mod -band 4)) { $giu = (([int][Wf.Tasti]::GetAsyncKeyState(0x10)) -band 0x8000) -ne 0 }
+        if ($giu -and ($mod -band 1)) { $giu = (([int][Wf.Tasti]::GetAsyncKeyState(0x12)) -band 0x8000) -ne 0 }
+        if ($giu -and ($mod -band 8)) {
+            $giu = ((([int][Wf.Tasti]::GetAsyncKeyState(0x5B)) -band 0x8000) -ne 0) -or ((([int][Wf.Tasti]::GetAsyncKeyState(0x5C)) -band 0x8000) -ne 0)
+        }
+        # scatta sul bordo (prima era su, ora e' giu') e non piu' di una volta
+        # ogni mezzo secondo: tenendo premuto non riparte in continuazione
+        if ($giu -and -not $script:tastoEraGiu) {
+            if (([datetime]::Now - $script:ultimaPressione).TotalMilliseconds -gt 500) {
+                $script:ultimaPressione = [datetime]::Now
                 Prendi-Vendita
             }
         }
+        $script:tastoEraGiu = $giu
     })
 $timer.Start()
 

@@ -141,6 +141,16 @@ async def create_delivery(delivery: DeliveryCreate, user: dict = Depends(get_cur
     if delivery.payment_method == "cash" and delivery.amount is not None and delivery.amount_given is not None and delivery.amount_given < delivery.amount:
         raise HTTPException(status_code=400, detail="Il pagato con non può essere inferiore all'importo")
 
+    # Stessa vendita, stesso scontrino: una consegna sola. Il riferimento arriva
+    # dal pulsante magico e vale anche se la consegna viene completata a mano.
+    if delivery.external_ref:
+        gia = await db.deliveries.find_one({
+            "pharmacy_id": user["user_id"],
+            "external_ref": delivery.external_ref,
+        }, {"_id": 0, "delivery_id": 1})
+        if gia:
+            raise HTTPException(status_code=409, detail="Questa vendita è già stata importata")
+
     # Fattorino predefinito dal profilo: viene solo preselezionato.
     # La consegna resta comunque in "da preparare" finche' non viene confermata.
     selected_driver_id = delivery.driver_id or (user.get("settings") or {}).get("default_driver_id")
@@ -200,6 +210,7 @@ async def create_delivery(delivery: DeliveryCreate, user: dict = Depends(get_cur
         "auto_assigned": False,  # in coda: non ancora assegnata
         "nre": (getattr(delivery, "nre", None) or None),
         "client_meta": (getattr(delivery, "client_meta", None) or None),
+        "external_ref": delivery.external_ref or None,
     }
     await db.deliveries.insert_one(delivery_data)
     # Log audit NRE (tracciabilità legale, Garante 2025)
