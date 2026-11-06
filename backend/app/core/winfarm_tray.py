@@ -191,6 +191,10 @@ function Chiama-Api($config, $percorso, $corpo) {
     return Invoke-RestMethod @parametri
 }
 
+function Stato-Errore($errore) {
+    try { return [int]$errore.Exception.Response.StatusCode } catch { return 0 }
+}
+
 function Mostra($icona, $titolo, $testo) {
     $iconaTray.ShowBalloonTip(4000, $titolo, $testo, $icona)
     Scrivi-Log ($titolo + ' - ' + $testo)
@@ -222,6 +226,9 @@ function Prendi-Vendita {
         return
     }
     $pezzi = if ($letto.intestazione.totale_pezzi) { $letto.intestazione.totale_pezzi } else { 1 }
+    # Il codice fiscale e' il primo dato su cui il server cerca il cliente:
+    # mandarlo sempre, quando c'e'. Il pagamento NON si manda: metodo e resto
+    # li sceglie la farmacia nel modulo, perche' la schermata non li dice.
     $corpo = @{
         cliente = $letto.campi.cliente
         importo = $letto.campi.importo
@@ -231,11 +238,21 @@ function Prendi-Vendita {
     try {
         $creata = Chiama-Api $config '/api/integrations/winfarm/bridge' $corpo
     } catch {
-        $errore = $_.Exception.Message
-        if ($errore -match '409') {
+        $stato = Stato-Errore $_
+        if ($stato -eq 422) {
+            # Cliente non in anagrafica: si apre il modulo gia' compilato.
+            # Nome e importo li sappiamo, l'indirizzo lo sa la farmacia.
+            Apri-Dock -Parametri @{
+                customer_name = $letto.campi.cliente
+                amount = $letto.campi.importo
+                fiscal_code = $letto.campi.codice_fiscale
+            }
+            Mostra ([System.Windows.Forms.ToolTipIcon]::Warning) 'Cliente da inserire' `
+                ($letto.campi.cliente + ' non e in anagrafica: completa il modulo che ho aperto.')
+        } elseif ($stato -eq 409) {
             Mostra ([System.Windows.Forms.ToolTipIcon]::Info) 'Gia importata' 'Questa vendita e gia su PharmaTrack.'
         } else {
-            Mostra ([System.Windows.Forms.ToolTipIcon]::Error) 'Consegna non creata' $errore
+            Mostra ([System.Windows.Forms.ToolTipIcon]::Error) 'Consegna non creata' $_.Exception.Message
         }
         return
     }
@@ -245,8 +262,21 @@ function Prendi-Vendita {
 }
 
 function Apri-Dock {
+    <#
+      Apre il Dock; con -Parametri apre la finestra di inserimento gia'
+      compilata (usata quando il cliente non e' in anagrafica: li' si sceglie
+      il cliente giusto o lo si crea con l'indirizzo, che e' l'unica cosa che
+      il programma non puo' sapere).
+    #>
+    param([hashtable]$Parametri = @{})
     if (-not $script:config) { return }
     $url = $script:config.base_url + '/dock'
+    if ($Parametri.Count -gt 0) {
+        $coda = ($Parametri.GetEnumerator() | Where-Object { $_.Value } | ForEach-Object {
+            [uri]::EscapeDataString($_.Key) + '=' + [uri]::EscapeDataString([string]$_.Value)
+        }) -join '&'
+        if ($coda) { $url = $script:config.base_url + '/quick?' + $coda }
+    }
     $browser = @(
         "$env:ProgramFiles\Google\Chrome\Application\chrome.exe",
         "${env:ProgramFiles(x86)}\Google\Chrome\Application\chrome.exe",

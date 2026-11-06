@@ -8,7 +8,7 @@ import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import {
   Download, CheckCircle2, Keyboard, Monitor, Zap, Loader2, RefreshCw, CircleDot,
-  ArrowRight, ExternalLink, FlaskConical, Code2, KeyRound, FileSpreadsheet,
+  ArrowRight, ExternalLink, Code2, KeyRound, FileSpreadsheet,
   MessageCircle, CalendarClock, Receipt, Printer,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -99,10 +99,6 @@ export default function IntegrationsPage() {
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
   const [downloadingTray, setDownloadingTray] = useState(false);
-  const [testoProva, setTestoProva] = useState('');
-  const [esitoProva, setEsitoProva] = useState(null);
-  const [analizzando, setAnalizzando] = useState(false);
-  const [testing, setTesting] = useState(false);
 
   const queryClient = useQueryClient();
   const { data: winfarmData, isLoading: winfarmLoading } = useWinfarmStatusQuery();
@@ -141,26 +137,21 @@ export default function IntegrationsPage() {
     }
   };
 
-  const runTest = async () => {
-    setTesting(true);
-    try {
-      const { data } = await axios.post(`${API}/integrations/winfarm/import`, {
-        cliente: 'CLIENTE DI PROVA',
-        telefono: '3330000000',
-        importo: 12.5,
-        note: 'Prova bridge Winfarm',
-        pagamento: 'cash',
-      }, { withCredentials: true });
-      toast.success(`Prova ok: consegna creata da ${data?.customer?.name || 'cliente di prova'}`);
-      loadStatus();
-    } catch (err) {
-      toast.error(err?.response?.data?.detail || 'Prova non riuscita');
-    } finally {
-      setTesting(false);
-    }
+  // "Collegato" non puo' voler dire "ha importato almeno una volta": un
+  // programma fermo da un mese lascerebbe la pagina verde per sempre.
+  const giorniDa = (iso) => {
+    if (!iso) return null;
+    const quando = new Date(iso);
+    if (Number.isNaN(quando.getTime())) return null;
+    return Math.floor((Date.now() - quando.getTime()) / 86400000);
   };
-
-  const active = !!status?.last_import;
+  const giorni = giorniDa(status?.last_import);
+  const active = giorni !== null && giorni <= 7;
+  const stato = giorni === null
+    ? { testo: 'Pronto da collegare', sotto: 'Scegli una delle due strade qui sotto: servono due minuti', badge: 'Da attivare' }
+    : giorni <= 1
+      ? { testo: 'Collegato a Winfarm', sotto: `Ultimo import ${formatWhen(status.last_import)}${status.last_import_customer ? ` · ${status.last_import_customer}` : ''}`, badge: 'Attivo' }
+      : { testo: `Fermo da ${giorni} giorni`, sotto: `Ultimo import ${formatWhen(status.last_import)}${status.last_import_customer ? ` · ${status.last_import_customer}` : ''}`, badge: 'Da controllare' };
 
   return (
     <Layout title="Integrazioni">
@@ -182,18 +173,16 @@ export default function IntegrationsPage() {
                 </div>
                 <div>
                   <p className="font-semibold text-sm">
-                    {loading ? 'Controllo stato…' : active ? 'Collegato a Winfarm' : 'Pronto da collegare'}
+                    {loading ? 'Controllo stato…' : stato.testo}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {active
-                      ? `Ultimo import ${formatWhen(status.last_import)}${status.last_import_customer ? ` · ${status.last_import_customer}` : ''}`
-                      : 'Scegli una delle due strade qui sotto: servono due minuti'}
+                    {loading ? 'Un attimo…' : stato.sotto}
                   </p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
                 <Badge variant="outline" className={active ? 'border-emerald-500/40 text-emerald-600 dark:text-emerald-400' : ''}>
-                  {active ? 'Attivo' : 'Da attivare'}
+                  {stato.badge}
                 </Badge>
                 <Button variant="ghost" size="sm" onClick={loadStatus} aria-label="Aggiorna stato">
                   <RefreshCw className="w-4 h-4" />
@@ -311,93 +300,6 @@ export default function IntegrationsPage() {
           </CardContent>
         </Card>
 
-        {/* Verifiche */}
-        <div>
-          <h2 className="font-semibold text-sm">Due modi per verificare che funzioni</h2>
-          <p className="text-xs text-muted-foreground mt-1">
-            Il primo controlla che la strada sia aperta, senza toccare Winfarm. Il secondo controlla che le regole di
-            riconoscimento leggano giusto la vendita che hai davanti.
-          </p>
-        </div>
-
-        <div className="grid gap-3 md:grid-cols-2">
-          <Card>
-            <CardContent className="p-4 space-y-3">
-              <div className="flex items-center gap-2">
-                <FlaskConical className="w-4 h-4 text-primary" />
-                <p className="font-medium text-sm">Consegna di prova</p>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Crea una consegna finta per vedere il giro completo. La trovi in Consegne e la cancelli in un click.
-              </p>
-              <Button size="sm" variant="outline" className="gap-2 w-full" onClick={runTest} disabled={testing}>
-                {testing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
-                Crea consegna di prova
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4 space-y-3">
-              <div className="flex items-center gap-2">
-                <CircleDot className="w-4 h-4 text-primary" />
-                <p className="font-medium text-sm">Riconoscimento da testo</p>
-              </div>
-              <textarea
-                value={testoProva}
-                onChange={(e) => setTestoProva(e.target.value)}
-                rows={4}
-                placeholder={'Cliente: Mario Rossi\nTotale: 18,50\nCodice fiscale: RSSMRA80A01F839X'}
-                className="w-full rounded-lg border border-input bg-background p-2 text-xs font-mono"
-              />
-              <div className="flex items-center justify-between gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={analizzando || !testoProva.trim()}
-                  onClick={async () => {
-                    setAnalizzando(true);
-                    try {
-                      const r = await axios.post(`${API}/integrations/winfarm/parse`,
-                        { testo: testoProva }, { withCredentials: true });
-                      setEsitoProva(r.data);
-                    } catch {
-                      toast.error('Riconoscimento non riuscito');
-                    } finally {
-                      setAnalizzando(false);
-                    }
-                  }}
-                >
-                  {analizzando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
-                  Analizza
-                </Button>
-                {esitoProva && (
-                  <span className={`text-[11px] font-medium ${esitoProva.utilizzabile ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
-                    {esitoProva.utilizzabile ? 'Vendita leggibile' : 'Manca qualcosa'}
-                  </span>
-                )}
-              </div>
-              {esitoProva && (
-                <div className="space-y-1 pt-1 border-t border-border/60">
-                  {[
-                    ['Cliente', esitoProva.campi.cliente],
-                    ['Codice fiscale', esitoProva.campi.codice_fiscale],
-                    ['Importo', esitoProva.campi.importo != null ? `€ ${Number(esitoProva.campi.importo).toFixed(2)}` : null],
-                    ['Telefono', esitoProva.campi.telefono],
-                  ].map(([etichetta, valore]) => (
-                    <div key={etichetta} className="flex items-baseline gap-2 text-xs">
-                      <span className="w-24 shrink-0 text-muted-foreground">{etichetta}</span>
-                      <span className={valore ? 'font-medium' : 'text-muted-foreground/60'}>
-                        {valore || 'non riconosciuto'}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
         {/* Per sviluppatori */}
         <details className="rounded-xl border border-border bg-card">
           <summary className="px-4 py-3 cursor-pointer text-sm font-medium flex items-center gap-2">
@@ -406,7 +308,8 @@ export default function IntegrationsPage() {
           <div className="px-4 pb-4 space-y-3 text-xs text-muted-foreground">
             <p>
               Tre endpoint, tutti sotto <code className="px-1 bg-secondary rounded">/api/integrations/winfarm</code>.
-              Il corpo va in JSON, non nella query string: i dati del cliente non finiscono nei log.
+              I campi del cliente vanno nel corpo JSON: una via che oggi usa ancora la query string
+              e' il vecchio script AutoHotkey, che va migrato.
             </p>
             <div className="overflow-x-auto">
               <table className="w-full text-left">
@@ -437,9 +340,13 @@ export default function IntegrationsPage() {
               </table>
             </div>
             <p>
-              <strong className="text-foreground">Autenticazione.</strong> Con la sessione della farmacia (cookie) oppure,
-              per i programmi che girano sul PC come il pulsante magico, con l’header
-              <code className="px-1 bg-secondary rounded mx-1">X-Bridge-Token</code> e la chiave del bridge.
+              <strong className="text-foreground">Autenticazione.</strong>
+              <code className="px-1 bg-secondary rounded mx-1">/parse</code> e
+              <code className="px-1 bg-secondary rounded mx-1">/bridge</code> accettano la sessione della farmacia
+              (cookie) oppure, per i programmi che girano sul PC, l’header
+              <code className="px-1 bg-secondary rounded mx-1">X-Bridge-Token</code> con la chiave del bridge.
+              <code className="px-1 bg-secondary rounded mx-1">/import</code> vuole la sessione: un gestionale
+              desktop usa <code className="px-1 bg-secondary rounded mx-1">/bridge</code>.
             </p>
             <pre className="bg-secondary rounded-lg p-3 overflow-x-auto text-[11px] leading-relaxed">
 {`POST /api/integrations/winfarm/import
