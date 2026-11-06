@@ -385,7 +385,7 @@ export default function DeliveriesPage() {
       return;
     }
     const esc = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
-    const header = ['Data', 'Cliente', 'Telefono', 'Indirizzo', 'Stato', 'Fattorino', 'Pagamento', 'Importo', 'Priorita', 'Note'];
+    const header = ['Data', 'Cliente', 'Telefono', 'Indirizzo', 'Stato', 'Fattorino', 'Pagamento', 'Importo', 'Pagato con', 'Resto', 'Riferimento vendita', 'Motivo mancata consegna', 'Priorita', 'Note'];
     const lines = [header.join(',')];
     rows.forEach((d) => {
       const driver = safeDrivers.find((dr) => dr.driver_id === d.driver_id);
@@ -398,6 +398,10 @@ export default function DeliveriesPage() {
         driver?.name || '',
         d.payment_method === 'cash' ? 'Contanti' : 'POS',
         d.amount != null ? String(d.amount).replace('.', ',') : '',
+        d.amount_given != null ? String(d.amount_given).replace('.', ',') : '',
+        d.change_due != null ? String(d.change_due).replace('.', ',') : '',
+        d.external_ref || '',
+        d.failure_reason || '',
         PRIORITY_LABELS[d.priority] || '',
         d.notes || '',
       ].map(esc).join(','));

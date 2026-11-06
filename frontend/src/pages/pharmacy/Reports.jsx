@@ -10,13 +10,17 @@ import {
 import { Button } from '../../components/ui/button';
 import {
   Euro, Package, TrendingUp, Truck, CreditCard, Banknote, Trophy, Download, CheckCircle2,
+  Clock, XCircle, Users, BarChart3,
 } from 'lucide-react';
+import { Badge } from '../../components/ui/badge';
 import { toast } from 'sonner';
 import { ensureArray } from '@/lib/collections';
 import { useAnalyticsQuery } from '@/hooks/queries';
 import { ListSkeleton } from '../../components/Skeletons';
 
 const periodLabels = { week: 'Settimana', month: 'Mese', quarter: 'Trimestre', year: 'Anno' };
+const minuti = (valore) => Number(valore || 0).toLocaleString('it-IT', { maximumFractionDigits: 1 });
+const GIORNI_LUNGHI = { lun: 'lunedì', mar: 'martedì', mer: 'mercoledì', gio: 'giovedì', ven: 'venerdì', sab: 'sabato', dom: 'domenica' };
 
 const formatCurrency = (amount) =>
   new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(amount || 0);
@@ -133,6 +137,17 @@ export default function ReportsPage() {
     { name: 'POS', value: pos.revenue || 0, count: pos.count || 0, color: 'hsl(199,89%,48%)' },
   ];
   const hasRevenue = daily.some((d) => (d.revenue || 0) > 0);
+
+  const tempi = data.delivery_times || {};
+  const motivi = ensureArray(data.failures?.by_reason);
+  const perOra = ensureArray(data.by_hour);
+  const daRichiamare = ensureArray(data.lapsed_customers);
+  const massimoOra = Math.max(1, ...perOra.map((v) => v.count || 0));
+  const perGiorno = ensureArray(data.by_weekday);
+  const massimoGiorno = Math.max(1, ...perGiorno.map((v) => v.count || 0));
+  const punta = data.busiest || {};
+  const senzaFattorino = Number(data.open_without_driver || 0);
+  const massimoMotivo = Math.max(1, ...motivi.map((v) => v.count || 0));
 
   return (
     <Layout title="Report">
@@ -289,6 +304,148 @@ export default function ReportsPage() {
                       <p className="text-[11px] text-muted-foreground">fatturato gestito</p>
                     </div>
                   ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+          {/* Tempi di consegna */}
+          <Card className="card-exclusive">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Clock className="w-5 h-5 text-sky-500" />
+                Quanto ci mette il giro
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {tempi.sampled ? (
+                <div className="space-y-4" data-testid="delivery-times">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Media</p>
+                      <p className="text-3xl font-black tabular-nums">{minuti(tempi.avg_minutes)}<span className="text-sm font-medium text-muted-foreground ml-1">min</span></p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Metà delle volte</p>
+                      <p className="text-3xl font-black tabular-nums">{minuti(tempi.median_minutes)}<span className="text-sm font-medium text-muted-foreground ml-1">min</span></p>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    {ensureArray(tempi.by_driver).map((riga) => (
+                      <div key={riga.name} className="flex items-center justify-between text-sm">
+                        <span className="truncate">{riga.name}</span>
+                        <span className="tabular-nums font-medium">{minuti(riga.avg_minutes)} min <span className="text-xs text-muted-foreground font-normal">({riga.count})</span></span>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">Dalla creazione dell'ordine alla consegna confermata, su {tempi.sampled} consegne.</p>
+                </div>
+              ) : (
+                <EmptyState title="Dati insufficienti" hint="Servono consegne completate con data di consegna." />
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Motivi di mancata consegna */}
+          <Card className="card-exclusive">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <XCircle className="w-5 h-5 text-rose-500" />
+                Perché non è arrivata
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {motivi.length === 0 ? (
+                <EmptyState title="Nessuna consegna fallita" hint="Nel periodo scelto non ci sono consegne non riuscite." />
+              ) : (
+                <div className="space-y-3" data-testid="failure-reasons">
+                  {motivi.map((voce) => (
+                    <div key={voce.reason}>
+                      <div className="flex items-center justify-between text-sm mb-1">
+                        <span className="truncate">{voce.reason}</span>
+                        <span className="tabular-nums font-medium">{voce.count}</span>
+                      </div>
+                      <div className="h-1.5 rounded-full bg-secondary overflow-hidden">
+                        <div className="h-full bg-rose-500" style={{ width: `${Math.round((voce.count / massimoMotivo) * 100)}%` }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Quando arrivano le richieste */}
+          <Card className="card-exclusive lg:col-span-2">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="w-5 h-5 text-indigo-500" />
+                Quando arrivano le richieste
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-end gap-1 h-28" data-testid="by-hour">
+                {perOra.map((voce) => (
+                  <div key={voce.hour} className="flex-1 flex flex-col items-center justify-end gap-1">
+                    <div
+                      className="w-full rounded-t bg-primary/70"
+                      style={{ height: `${Math.max(2, Math.round((voce.count / massimoOra) * 100))}%` }}
+                      title={`${voce.hour}:00 · ${voce.count} richieste`}
+                    />
+                    {voce.hour % 3 === 0 && <span className="text-[10px] text-muted-foreground">{voce.hour}</span>}
+                  </div>
+                ))}
+              </div>
+              <p className="mt-2 text-xs text-muted-foreground">Ora in cui la farmacia crea l'ordine: serve a decidere quando avere il fattorino in piedi.</p>
+              {punta.hour != null && (
+                <p className="mt-2 text-sm">
+                  Il momento più carico è <span className="font-semibold">alle {punta.hour}</span>
+                  {punta.weekday ? <> e il giorno è <span className="font-semibold">{GIORNI_LUNGHI[punta.weekday] || punta.weekday}</span></> : null}.
+                </p>
+              )}
+              {perGiorno.length > 0 && (
+                <div className="mt-4 flex items-end gap-2" data-testid="by-weekday">
+                  {perGiorno.map((voce) => (
+                    <div key={voce.day} className="flex-1 flex flex-col items-center gap-1">
+                      <div
+                        className="w-full rounded-t bg-primary/40"
+                        style={{ height: `${Math.max(3, Math.round(((voce.count || 0) / massimoGiorno) * 56))}px` }}
+                        title={`${voce.day}: ${voce.count || 0} richieste`}
+                      />
+                      <span className="text-[10px] uppercase text-muted-foreground">{voce.day}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Clienti da richiamare */}
+          <Card className="card-exclusive lg:col-span-2">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="w-5 h-5 text-emerald-500" />
+                Pazienti da richiamare
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {daRichiamare.length === 0 ? (
+                <EmptyState title="Nessuno da richiamare" hint="Chi ordinava spesso ha ordinato di recente." />
+              ) : (
+                <div className="divide-y divide-border/60" data-testid="lapsed-customers">
+                  {daRichiamare.map((cliente) => (
+                    <div key={cliente.customer_id} className="flex items-center justify-between gap-3 py-2">
+                      <div className="min-w-0">
+                        <p className="font-medium truncate">{cliente.name || 'Cliente'}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {cliente.deliveries} consegne · ultima il {cliente.last_delivery}
+                        </p>
+                      </div>
+                      <Badge variant="secondary" className="tabular-nums shrink-0">{cliente.days_since} giorni</Badge>
+                    </div>
+                  ))}
+                  <p className="pt-2 text-[11px] text-muted-foreground">
+                    Chi ordinava almeno due volte e non ordina da 45 giorni. L'importo cambia ogni volta, la persona no.
+                  </p>
                 </div>
               )}
             </CardContent>

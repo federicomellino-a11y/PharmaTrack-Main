@@ -123,6 +123,22 @@ export default function ShiftsPage() {
   return (
     <Layout title="Turni & Cassa">
       <div className="space-y-4 animate-fade-in-up" data-testid="shifts-page">
+        {/* Come funziona: la sezione faceva fatica a spiegarsi da sola */}
+        <details className="rounded-2xl border bg-card/60 px-4 py-3" data-testid="come-funziona-turni">
+          <summary className="cursor-pointer text-sm font-medium flex items-center gap-2">
+            <Wallet className="w-4 h-4 text-primary" />
+            Come funziona il giro dei soldi
+          </summary>
+          <ol className="mt-3 space-y-2 text-sm text-muted-foreground">
+            <li><span className="font-medium text-foreground">1. Il fattorino apre il turno</span> quando esce e chiude quando rientra.</li>
+            <li><span className="font-medium text-foreground">2. Alla chiusura dichiara i contanti</span> che ha in tasca: non li decide il sistema, li conta lui.</li>
+            <li><span className="font-medium text-foreground">3. La farmacia confronta</span>. Il sistema sa quanto doveva incassare in contanti (le consegne segnate come pagate), e mostra la differenza. Il POS invece si verifica sullo scontrino del registratore.</li>
+          </ol>
+          <p className="mt-3 text-xs text-muted-foreground">
+            Serve a una cosa sola: sapere la sera se la cassa torna, senza rifare i conti a mano.
+          </p>
+        </details>
+
         <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
           <div>
             <h1 className="text-xl font-bold flex items-center gap-2">
