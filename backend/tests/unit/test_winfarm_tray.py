@@ -84,3 +84,24 @@ def test_un_aggiornamento_che_non_e_il_programma_viene_scartato():
     from app.core.winfarm_tray import render_tray_script
     script = render_tray_script('https://a.test', 'wf_x', 'Farmacia')
     assert 'Aggiornamento scartato' in script
+
+
+def test_il_tasto_si_legge_dalla_tastiera_non_dai_messaggi():
+    """Il 6/11 la pressione non arrivava: PeekMessage sulla coda del thread non
+    vedeva il WM_HOTKEY, che invece va alla finestra. Ora si guarda lo stato."""
+    from app.core.winfarm_tray import render_tray_script
+    script = render_tray_script('https://a.test', 'wf_x', 'Farmacia')
+    assert 'GetAsyncKeyState' in script
+    assert 'PeekMessage' not in script
+    # scatta sul bordo (una volta per pressione), non a ogni giro del timer
+    assert '$script:tastoEraGiu' in script
+
+
+def test_senza_cliente_il_modulo_si_apre_lo_stesso():
+    """Nessun cliente selezionato in Winfarm = la farmacia lo sceglie nel modulo,
+    non un vicolo cieco."""
+    from app.core.winfarm_tray import render_tray_script
+    script = render_tray_script('https://a.test', 'wf_x', 'Farmacia')
+    assert "origine = 'winfarm'" in script
+    blocco = script[script.index('if (-not $letto.utilizzabile)'):]
+    assert 'Apri-Dock -Parametri $parametri' in blocco[:1200]

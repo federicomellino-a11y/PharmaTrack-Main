@@ -99,6 +99,10 @@ class DeliveryCreate(BaseModel):
     scheduled_date: Optional[str] = None
     scheduled_time: Optional[str] = None
     priority: str = "normal"
+    # Numero dello scontrino letto dal pulsante magico: se la farmacia completa
+    # la consegna dal modulo (cliente non selezionato in Winfarm) il riferimento
+    # viaggia con lei e la stessa vendita non entra due volte.
+    external_ref: Optional[str] = None
 
 class DeliveryUpdate(BaseModel):
     driver_id: Optional[str] = None

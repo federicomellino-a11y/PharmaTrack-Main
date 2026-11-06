@@ -10,12 +10,12 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { toast } from 'sonner';
-import { Search, User, Plus, Package, CheckCircle2, X, Zap, XCircle } from 'lucide-react';
+import { Search, User, Plus, Package, CheckCircle2, Zap, Banknote, CreditCard } from 'lucide-react';
 
 const PRIORITIES = [
-  { id: 'normal', label: 'Normale', emoji: '🟢' },
-  { id: 'high', label: 'Alta', emoji: '🟡' },
-  { id: 'urgent', label: 'Urgente', emoji: '🔴' },
+  { id: 'normal', label: 'Normale', dot: 'bg-emerald-500' },
+  { id: 'high', label: 'Alta', dot: 'bg-amber-500' },
+  { id: 'urgent', label: 'Urgente', dot: 'bg-destructive' },
 ];
 
 const ensureArrayLocal = (value) => (Array.isArray(value) ? value : []);
@@ -36,6 +36,7 @@ export default function QuickAddPage() {
     address: '',
     fiscal_code: searchParams.get('fiscal_code') || '',
   });
+  const [externalRef] = useState(searchParams.get('external_ref') || '');
   const [form, setForm] = useState({
     notes: searchParams.get('notes') || '',
     amount: searchParams.get('amount') || '',
@@ -45,7 +46,12 @@ export default function QuickAddPage() {
   });
   const [creating, setCreating] = useState(false);
   // Arrivo dal pulsante magico: il cliente va scelto in anagrafica, non inventato.
-  const arrivoDaVendita = !!(searchParams.get('customer_name') || searchParams.get('fiscal_code'));
+  // Due casi: il cliente e' stato letto (va cercato) oppure in Winfarm non c'era
+  // nessun cliente selezionato (si sceglie qui, con l'importo gia' scritto).
+  const customerFromSale = !!searchParams.get('customer_name');
+  const arrivoDaVendita = !!(searchParams.get('customer_name')
+    || searchParams.get('fiscal_code')
+    || searchParams.get('origine'));
   const [created, setCreated] = useState(null);
 
   const queryClient = useQueryClient();
@@ -173,6 +179,7 @@ export default function QuickAddPage() {
         amount_given: form.amount_given === '' ? null : given,
         payment_method: form.payment_method,
         priority: form.priority,
+        external_ref: externalRef || null,
       };
       const { data } = await axios.post(`${API}/deliveries`, payload, { withCredentials: true });
       setCreated({
@@ -210,163 +217,245 @@ export default function QuickAddPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background p-5 flex flex-col gap-4">
-      <div className="flex items-center gap-2">
-        <Zap className="w-5 h-5 text-primary" />
-        <h1 className="text-lg font-bold">Consegna rapida</h1>
-        <span className="ml-auto text-xs text-muted-foreground">{user?.pharmacy_name || ''}</span>
-      </div>
+    <div className="min-h-screen bg-background">
+      <div className="mx-auto flex min-h-screen w-full max-w-md flex-col">
+        {/* Testata: cosa sto facendo, e per quale farmacia */}
+        <header className="flex items-center gap-3 px-4 pt-5 pb-4">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10">
+            <Zap className="h-4 w-4 text-primary" />
+          </div>
+          <div className="min-w-0">
+            <h1 className="text-base font-semibold leading-tight">Nuova consegna</h1>
+            <p className="truncate text-xs text-muted-foreground">{user?.pharmacy_name || 'PharmaTrack'}</p>
+          </div>
+        </header>
 
-      <form onSubmit={handleCreate} className="flex flex-col gap-4">
-        <div className="space-y-1.5">
-          <Label className="text-sm">Cliente</Label>
-          {selectedCustomer ? (
-            <div className="flex items-center gap-2 p-2.5 rounded-xl bg-primary/5 border border-primary/20">
-              <User className="w-4 h-4 text-primary shrink-0" />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold truncate">{selectedCustomer.name}</p>
-                <p className="text-xs text-muted-foreground truncate">{selectedCustomer.phone ? `${selectedCustomer.phone} · ` : ''}{selectedCustomer.address}</p>
-              </div>
-              <button type="button" onClick={() => setSelectedCustomer(null)} className="text-muted-foreground hover:text-destructive"><XCircle className="w-4 h-4" /></button>
-            </div>
-          ) : (
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground z-10 pointer-events-none" />
-              <Input
-                autoFocus
-                className="pl-9"
-                placeholder="Nome, telefono… (frecce + Invio)"
-                value={searchTerm}
-                onChange={(e) => { setSearchTerm(e.target.value); setDropdownOpen(true); setActiveIndex(-1); }}
-                onFocus={() => setDropdownOpen(true)}
-                onBlur={() => setTimeout(() => setDropdownOpen(false), 150)}
-                onKeyDown={handleKeyDown}
-                autoComplete="off"
-              />
-              {dropdownOpen && (
-                <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-background border border-border rounded-xl shadow-lg overflow-hidden">
-                  <div className="max-h-56 overflow-y-auto">
-                    {!searchTerm && recentCustomers.length > 0 && (
-                      <p className="px-4 pt-2 pb-1 text-[10px] uppercase tracking-wide text-muted-foreground">Recenti</p>
-                    )}
-                    {list.length === 0 ? (
-                      <button type="button" className="w-full p-3 text-left text-sm hover:bg-accent flex items-center gap-2"
-                        onMouseDown={() => { setNewCustomerOpen(true); setNewCustomer({ name: searchTerm, phone: '', address: '' }); }}>
-                        <Plus className="w-4 h-4 text-primary" /> Crea cliente "{searchTerm || 'nuovo'}"
-                      </button>
-                    ) : list.map((c, i) => (
-                      <button type="button" key={c.customer_id}
-                        className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors border-b border-border/50 last:border-0 ${i === activeIndex ? 'bg-accent' : 'hover:bg-accent'}`}
-                        onMouseEnter={() => setActiveIndex(i)}
-                        onMouseDown={() => selectCustomer(c)}>
-                        <User className="w-3.5 h-3.5 text-primary shrink-0" />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">{c.name}</p>
-                          <p className="text-xs text-muted-foreground truncate">{c.phone ? `${c.phone} · ` : ''}{c.address}</p>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
+        <form onSubmit={handleCreate} className="flex flex-1 flex-col gap-3 px-4 pb-32">
+          {/* 1. Il cliente: e' la scelta che conta, quindi viene per prima */}
+          <section className="rounded-2xl border bg-card p-4">
+            <div className="mb-2.5 flex items-center justify-between">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Cliente</p>
+              {selectedCustomer && (
+                <button type="button" className="text-xs font-medium text-primary" onClick={() => setSelectedCustomer(null)}>
+                  Cambia
+                </button>
               )}
             </div>
-          )}
-          {!selectedCustomer && !newCustomerOpen && !searchTerm && recentCustomers.length === 0 && (
-            <button type="button" className="text-xs text-primary flex items-center gap-1"
-              onClick={() => setNewCustomerOpen(true)}>
-              <Plus className="w-3 h-3" />Nuovo cliente
-            </button>
-          )}
-        </div>
 
-        {!selectedCustomer && arrivoDaVendita && !newCustomerOpen && (
-          <div className="rounded-xl border border-amber-500/40 bg-amber-500/[0.06] p-3 space-y-1">
-            <p className="text-xs font-semibold">Cliente non in anagrafica</p>
-            <p className="text-[11px] text-muted-foreground">
-              Scegli il cliente dalla lista qui sopra, oppure aggiungine uno nuovo con il suo indirizzo:
-              l'indirizzo resta in anagrafica e non va piu' scritto.
-            </p>
-            <button type="button" className="text-xs text-primary font-medium" onClick={() => setNewCustomerOpen(true)}>
-              Aggiungi un cliente nuovo
-            </button>
-          </div>
-        )}
-
-        {newCustomerOpen && (
-          <div className="p-3 rounded-xl border border-border space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Nuovo cliente</p>
-            <Input placeholder="Nome e cognome *" value={newCustomer.name} onChange={(e) => setNewCustomer({ ...newCustomer, name: e.target.value })} />
-            <Input
-              placeholder="Codice fiscale"
-              value={newCustomer.fiscal_code || ''}
-              onChange={(e) => setNewCustomer({ ...newCustomer, fiscal_code: e.target.value.toUpperCase() })}
-              maxLength={16}
-              className="font-mono uppercase"
-            />
-            <Input placeholder="Telefono" value={newCustomer.phone} onChange={(e) => setNewCustomer({ ...newCustomer, phone: e.target.value })} />
-            <AddressAutocomplete
-                placeholder="Indirizzo (opzionale)"
-                testId="qa-address-input"
-                value={newCustomer.address}
-                onChange={(value) => setNewCustomer((p) => ({ ...p, address: value, lat: null, lng: null, placeId: '' }))}
-                onAddressSelect={(sel) => setNewCustomer((p) => ({ ...p, address: sel.address, lat: sel.lat, lng: sel.lng, placeId: sel.placeId || '' }))}
-              />
-            <Button
-              type="button"
-              size="sm"
-              onClick={createCustomer}
-              disabled={!newCustomer.name.trim() || !(newCustomer.address || '').trim()}
-            >
-              Crea e seleziona
-            </Button>
-            {!(newCustomer.address || '').trim() && (
-              <p className="text-[11px] text-muted-foreground">L'indirizzo serve per la consegna.</p>
+            {selectedCustomer ? (
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
+                  {selectedCustomer.name?.charAt(0)?.toUpperCase() || '?'}
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold leading-tight">{selectedCustomer.name}</p>
+                  <p className="mt-0.5 break-words text-xs leading-snug text-muted-foreground">
+                    {selectedCustomer.phone ? `${selectedCustomer.phone} · ` : ''}{selectedCustomer.address}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  autoFocus
+                  className="h-11 pl-9"
+                  placeholder="Cerca per nome, telefono o CF"
+                  value={searchTerm}
+                  onChange={(e) => { setSearchTerm(e.target.value); setDropdownOpen(true); setActiveIndex(-1); }}
+                  onFocus={() => setDropdownOpen(true)}
+                  onBlur={() => setTimeout(() => setDropdownOpen(false), 150)}
+                  onKeyDown={handleKeyDown}
+                  autoComplete="off"
+                />
+                {dropdownOpen && (
+                  <div className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-xl border bg-background shadow-lg">
+                    <div className="max-h-64 overflow-y-auto">
+                      {!searchTerm && recentCustomers.length > 0 && (
+                        <p className="px-4 pb-1 pt-2 text-[10px] uppercase tracking-wide text-muted-foreground">Usati di recente</p>
+                      )}
+                      {list.length === 0 ? (
+                        <button
+                          type="button"
+                          className="flex w-full items-center gap-2 p-3 text-left text-sm hover:bg-accent"
+                          onMouseDown={() => { setNewCustomerOpen(true); setNewCustomer({ name: searchTerm, phone: '', address: '', fiscal_code: '' }); }}
+                        >
+                          <Plus className="h-4 w-4 text-primary" />
+                          Nuovo cliente{searchTerm ? ` "${searchTerm}"` : ''}
+                        </button>
+                      ) : list.map((c, i) => (
+                        <button
+                          type="button"
+                          key={c.customer_id}
+                          className={`flex w-full items-center gap-3 border-b border-border/50 px-4 py-2.5 text-left transition-colors last:border-0 ${i === activeIndex ? 'bg-accent' : 'hover:bg-accent'}`}
+                          onMouseEnter={() => setActiveIndex(i)}
+                          onMouseDown={() => selectCustomer(c)}
+                        >
+                          <User className="h-3.5 w-3.5 shrink-0 text-primary" />
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium">{c.name}</p>
+                            <p className="truncate text-xs text-muted-foreground">{c.phone ? `${c.phone} · ` : ''}{c.address}</p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
+
+            {!selectedCustomer && !newCustomerOpen && (
+              <button
+                type="button"
+                className="mt-2.5 inline-flex items-center gap-1.5 text-xs font-medium text-primary"
+                onClick={() => setNewCustomerOpen(true)}
+              >
+                <Plus className="h-3.5 w-3.5" />Aggiungi un cliente
+              </button>
+            )}
+
+            {!selectedCustomer && arrivoDaVendita && !newCustomerOpen && (
+              <div className="mt-3 rounded-xl bg-amber-500/10 px-3 py-2.5">
+                <p className="text-xs font-semibold text-amber-700 dark:text-amber-400">
+                  {customerFromSale ? 'Cliente non in anagrafica' : 'Vendita letta da Winfarm'}
+                </p>
+                <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+                  {customerFromSale
+                    ? 'Sceglilo dalla lista, oppure aggiungilo qui con il suo indirizzo: cosi resta in anagrafica.'
+                    : 'Scegli il cliente fra i tuoi. L\'indirizzo arriva dalla sua scheda, senza riscriverlo.'}
+                </p>
+              </div>
+            )}
+
+            {newCustomerOpen && (
+              <div className="mt-3 space-y-2 rounded-xl border border-dashed p-3">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Nuovo cliente</p>
+                <Input placeholder="Nome e cognome" value={newCustomer.name} onChange={(e) => setNewCustomer({ ...newCustomer, name: e.target.value })} />
+                <Input
+                  placeholder="Codice fiscale"
+                  value={newCustomer.fiscal_code || ''}
+                  onChange={(e) => setNewCustomer({ ...newCustomer, fiscal_code: e.target.value.toUpperCase() })}
+                  maxLength={16}
+                  className="font-mono uppercase"
+                />
+                <Input placeholder="Telefono" value={newCustomer.phone} onChange={(e) => setNewCustomer({ ...newCustomer, phone: e.target.value })} />
+                <AddressAutocomplete
+                  placeholder="Indirizzo di consegna"
+                  testId="qa-address-input"
+                  value={newCustomer.address}
+                  onChange={(value) => setNewCustomer((p) => ({ ...p, address: value, lat: null, lng: null, placeId: '' }))}
+                  onAddressSelect={(sel) => setNewCustomer((p) => ({ ...p, address: sel.address, lat: sel.lat, lng: sel.lng, placeId: sel.placeId || '' }))}
+                />
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={createCustomer}
+                    disabled={!newCustomer.name.trim() || !(newCustomer.address || '').trim()}
+                  >
+                    Crea e usa
+                  </Button>
+                  <button type="button" className="text-xs text-muted-foreground" onClick={() => setNewCustomerOpen(false)}>
+                    Annulla
+                  </button>
+                </div>
+                {!(newCustomer.address || '').trim() && (
+                  <p className="text-[11px] text-muted-foreground">L\'indirizzo serve per la consegna.</p>
+                )}
+              </div>
+            )}
+          </section>
+
+          {/* 2. Il denaro: importo, contanti ricevuti, resto */}
+          <section className="rounded-2xl border bg-card p-4">
+            <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Pagamento</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Da pagare</Label>
+                <div className="relative">
+                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">€</span>
+                  <Input type="number" step="0.01" inputMode="decimal" min="0" placeholder="0,00" value={form.amount}
+                    className="h-11 pl-7 text-base font-semibold tabular-nums"
+                    onChange={(e) => setForm({ ...form, amount: e.target.value })} />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Ricevuto</Label>
+                <div className="relative">
+                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">€</span>
+                  <Input type="number" step="0.01" inputMode="decimal" min="0" placeholder="0,00" value={form.amount_given}
+                    className="h-11 pl-7 text-base tabular-nums"
+                    onChange={(e) => setForm({ ...form, amount_given: e.target.value })} />
+                </div>
+              </div>
+            </div>
+
+            {resto != null && (
+              <div className="mt-3 flex items-baseline justify-between rounded-xl bg-primary/5 px-3 py-2">
+                <span className="text-xs font-medium text-muted-foreground">Resto</span>
+                <span className="text-lg font-bold tabular-nums text-primary">€ {resto.toFixed(2).replace('.', ',')}</span>
+              </div>
+            )}
+
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setForm({ ...form, payment_method: 'cash' })}
+                className={`flex h-11 items-center justify-center gap-2 rounded-xl border text-sm font-medium transition-colors ${form.payment_method === 'cash' ? 'border-primary bg-primary/10 text-primary' : 'bg-background text-muted-foreground hover:bg-accent'}`}
+              >
+                <Banknote className="h-4 w-4" />Contanti
+              </button>
+              <button
+                type="button"
+                onClick={() => setForm({ ...form, payment_method: 'pos' })}
+                className={`flex h-11 items-center justify-center gap-2 rounded-xl border text-sm font-medium transition-colors ${form.payment_method === 'pos' ? 'border-primary bg-primary/10 text-primary' : 'bg-background text-muted-foreground hover:bg-accent'}`}
+              >
+                <CreditCard className="h-4 w-4" />POS
+              </button>
+            </div>
+          </section>
+
+          {/* 3. Il resto delle informazioni, in una riga sola */}
+          <section className="rounded-2xl border bg-card p-4 space-y-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Note per il fattorino</Label>
+              <Input placeholder="Es: citofono, piano, orario" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Priorità</Label>
+              <div className="grid grid-cols-3 gap-2">
+                {PRIORITIES.map((p) => (
+                  <button
+                    type="button"
+                    key={p.id}
+                    className={`flex h-9 items-center justify-center gap-1.5 rounded-lg border text-xs font-medium transition-colors ${form.priority === p.id ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:bg-accent'}`}
+                    onClick={() => setForm({ ...form, priority: p.id })}
+                  >
+                    <span className={`h-1.5 w-1.5 rounded-full ${p.dot}`} />
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          {!selectedCustomer && (
+            <p className="px-1 text-center text-[11px] text-muted-foreground">
+              Scegli un cliente per creare la consegna.
+            </p>
+          )}
+
+          {/* Il pulsante resta sempre a portata di dito, anche in fondo alla pagina */}
+          <div className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 px-4 py-3 backdrop-blur">
+            <div className="mx-auto w-full max-w-md">
+              <Button type="submit" disabled={creating || !selectedCustomer} className="h-12 w-full text-base font-semibold">
+                <Package className="mr-1.5 h-4 w-4" />
+                {creating ? 'Creazione…' : 'Crea consegna'}
+              </Button>
+            </div>
           </div>
-        )}
-
-        <div className="flex gap-2">
-          <button type="button" onClick={() => setForm({ ...form, payment_method: 'cash' })}
-            className={`flex-1 py-2.5 rounded-lg text-sm font-semibold border ${form.payment_method === 'cash' ? 'bg-primary text-primary-foreground border-primary' : 'bg-card border-border'}`}>💵 Contanti</button>
-          <button type="button" onClick={() => setForm({ ...form, payment_method: 'pos' })}
-            className={`flex-1 py-2.5 rounded-lg text-sm font-semibold border ${form.payment_method === 'pos' ? 'bg-primary text-primary-foreground border-primary' : 'bg-card border-border'}`}>💳 POS</button>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1.5">
-            <Label className="text-sm">Importo (€)</Label>
-            <Input type="number" step="0.01" inputMode="decimal" min="0" placeholder="0,00" value={form.amount}
-              onChange={(e) => setForm({ ...form, amount: e.target.value })} />
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-sm">Pagato con (€)</Label>
-            <Input type="number" step="0.01" inputMode="decimal" min="0" placeholder="0,00" value={form.amount_given}
-              onChange={(e) => setForm({ ...form, amount_given: e.target.value })} />
-          </div>
-        </div>
-        {resto != null && (
-          <p className="text-sm">Resto: <span className="text-xl font-bold text-primary tabular-nums">€ {resto.toFixed(2).replace('.', ',')}</span></p>
-        )}
-
-        <div className="flex gap-2">
-          {PRIORITIES.map((p) => (
-            <button type="button" key={p.id}
-              className={`flex-1 rounded-xl border px-2 py-2 text-xs font-medium transition-colors ${form.priority === p.id ? 'border-primary bg-primary/10' : 'border-border'}`}
-              onClick={() => setForm({ ...form, priority: p.id })}>
-              {p.emoji} {p.label}
-            </button>
-          ))}
-        </div>
-
-        <div className="space-y-1.5">
-          <Label className="text-sm">Note</Label>
-          <Input placeholder="Es: Augmentin 1g…" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
-        </div>
-
-        <Button type="submit" disabled={creating || !selectedCustomer} className="w-full h-12 text-base font-bold">
-          <Package className="w-4 h-4 mr-1.5" />{creating ? 'Creazione…' : 'CREA CONSEGNA'}
-        </Button>
-      </form>
+        </form>
+      </div>
     </div>
   );
 }
