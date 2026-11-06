@@ -150,6 +150,11 @@ export default function DeliveriesPage() {
   const handleCreateCustomer = async (e) => {
     e.preventDefault();
     if (!newCustomer.name.trim()) { toast.error('Il nome è obbligatorio'); return; }
+    // Un cliente senza indirizzo non puo' ricevere consegne: si crea completo.
+    if (!(newCustomer.address || '').trim()) {
+      toast.error("Serve l'indirizzo: senza, la consegna non si puo' fare");
+      return;
+    }
     setCreatingCustomer(true);
     try {
       const res = await axios.post(`${API}/customers`, {
