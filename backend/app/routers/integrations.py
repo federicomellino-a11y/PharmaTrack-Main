@@ -37,7 +37,22 @@ PAGAMENTI = {
 # Versione del pulsante magico che il server considera corrente. La stessa
 # cifra finisce dentro lo script scaricato: quando la alzo, i PC in farmacia la
 # leggono al giro successivo e si aggiornano da soli.
-VERSIONE_PULSANTE = 2
+VERSIONE_PULSANTE = 3
+
+def _api_pubblico(request: Request) -> str:
+    """L'indirizzo dell'API, che non e' quello del sito.
+
+    Il programma in farmacia deve mandare i POST qui: il sito (Vercel) non li
+    accetta e risponde 405, che e' esattamente quello che e' successo il 6/11.
+    """
+    for chiave in ("API_PUBLIC_URL", "RENDER_EXTERNAL_URL"):
+        valore = (os.environ.get(chiave) or "").strip()
+        if valore:
+            return valore.rstrip("/")
+    return str(request.base_url).rstrip("/")
+
+
+
 
 
 def serve_aggiornamento(versione_client: object) -> bool:
@@ -336,7 +351,12 @@ async def winfarm_tray_download(request: Request):
         await db.users.update_one({"user_id": user["user_id"]}, {"$set": {"bridge_token": token}})
     base_url = (request.query_params.get("base") or request.headers.get("origin")
                 or os.environ.get("APP_BASE_URL") or "https://pharmatrack-zeta.vercel.app")
-    script = render_tray_script(base_url, token, user.get("pharmacy_name") or user.get("name") or "")
+    script = render_tray_script(
+        base_url,
+        token,
+        user.get("pharmacy_name") or user.get("name") or "",
+        api_url=_api_pubblico(request),
+    )
     return Response(
         content=con_bom(script),
         media_type="application/octet-stream",

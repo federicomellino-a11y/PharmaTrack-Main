@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 try:
     from app.routers.integrations import VERSIONE_PULSANTE
 except Exception:  # pragma: no cover - solo per esecuzioni isolate
-    VERSIONE_PULSANTE = 2
+    VERSIONE_PULSANTE = 3
 
 _TEMPLATE = r'''# wf-tray.ps1  --  il pulsante magico di PharmaTrack, versione 1
 # Farmacia: @@PHARMACY@@
@@ -85,6 +85,10 @@ public struct MSG {
 # Integrazioni: cosi' non c'e' niente da copiare a mano al primo avvio. Se il
 # file arriva da un'altra parte restano vuoti e il programma li chiede.
 $URL_PRECOMPILATA = '@@URL@@'
+# L'API sta su un indirizzo diverso dal sito: le chiamate vanno fatte a lei,
+# i link (/dock, /quick) al sito. Confonderli e' il motivo per cui il 6/11 il
+# programma ha risposto 405 per ore: mandava i POST a Vercel, che non li accetta.
+$API_PRECOMPILATA = '@@API@@'
 $TOKEN_PRECOMPILATO = '@@TOKEN@@'
 
 # Versione di questo file. Il server la confronta col battito e, se e' vecchia,
@@ -161,11 +165,23 @@ function Combinazione($testo) {
 
 function Leggi-Config {
     if (Test-Path $percorsoConfig) {
-        try { return Get-Content $percorsoConfig -Raw | ConvertFrom-Json } catch { }
+        $letto = $null
+        try { $letto = Get-Content $percorsoConfig -Raw | ConvertFrom-Json } catch { }
+        if ($letto) {
+            # Chi ha il file scritto da una versione vecchia non ha api_url: glielo
+            # aggiungo qui, altrimenti le chiamate continuano ad andare al sito.
+            if (-not $letto.api_url) {
+                $letto | Add-Member -NotePropertyName api_url -NotePropertyValue $(if ($API_PRECOMPILATA) { $API_PRECOMPILATA } else { $letto.base_url }) -Force
+                try { $letto | ConvertTo-Json | Out-File -FilePath $percorsoConfig -Encoding UTF8 } catch { }
+                Scrivi-Log ('Indirizzo dell API aggiunto alla configurazione: ' + $letto.api_url)
+            }
+            return $letto
+        }
     }
     if ($URL_PRECOMPILATA -and $TOKEN_PRECOMPILATO) {
         $config = [pscustomobject]@{
             base_url = $URL_PRECOMPILATA
+            api_url = $API_PRECOMPILATA
             bridge_token = $TOKEN_PRECOMPILATO
         }
         $config | ConvertTo-Json | Out-File -FilePath $percorsoConfig -Encoding UTF8
@@ -179,12 +195,17 @@ function Chiedi-Config {
         "Indirizzo di PharmaTrack (lo vedi nella barra del browser):",
         'PharmaTrack - pulsante magico', 'https://pharmatrack-zeta.vercel.app')
     if (-not $url) { return $null }
+    $api = [Microsoft.VisualBasic.Interaction]::InputBox(
+        "Indirizzo del server (quello che finisce in .onrender.com):",
+        'PharmaTrack - pulsante magico', 'https://pharmatrack-api.onrender.com')
+    if (-not $api) { return $null }
     $token = [Microsoft.VisualBasic.Interaction]::InputBox(
         "Token del bridge. Lo trovi in PharmaTrack > Integrazioni > Winfarm.",
         'PharmaTrack - pulsante magico', '')
     if (-not $token) { return $null }
     $config = [pscustomobject]@{
         base_url = $url.TrimEnd('/')
+        api_url = $api.TrimEnd('/')
         bridge_token = $token.Trim()
     }
     $config | ConvertTo-Json | Out-File -FilePath $percorsoConfig -Encoding UTF8
@@ -231,7 +252,7 @@ function Leggi-Vendita {
 
 function Chiama-Api($config, $percorso, $corpo) {
     $parametri = @{
-        Uri = $config.base_url + $percorso
+        Uri = $(if ($config.api_url) { $config.api_url } else { $config.base_url }) + $percorso
         Method = 'Post'
         ContentType = 'application/json; charset=utf-8'
         Headers = @{ 'X-Bridge-Token' = $config.bridge_token }
@@ -270,13 +291,22 @@ function Scarica-Aggiornamento($config) {
     try {
         $percorsoNuovo = $script:percorsoScript + '.new'
         $parametri = @{
-            Uri = $config.base_url + '/api/integrations/winfarm/tray/download'
+            Uri = $(if ($config.api_url) { $config.api_url } else { $config.base_url }) + '/api/integrations/winfarm/tray/download'
             Headers = @{ 'X-Bridge-Token' = $config.bridge_token }
             OutFile = $percorsoNuovo
             TimeoutSec = 60
             UseBasicParsing = $true
         }
         Invoke-WebRequest @parametri | Out-Null
+        # Solo un file che e' davvero il programma puo' sostituirlo: se al posto
+        # dello script arriva una pagina web (indirizzo sbagliato, portale, errore)
+        # il file scaricato va buttato, altrimenti al riavvio non parte piu' niente.
+        $testo = Get-Content $percorsoNuovo -Raw
+        if (-not $testo -or $testo -notmatch 'PharmaTrack' -or $testo -notmatch 'ID_TASTO') {
+            Remove-Item $percorsoNuovo -Force
+            Scrivi-Log 'Aggiornamento scartato: il file scaricato non e il programma.'
+            return
+        }
         if ((Get-Item $percorsoNuovo).Length -lt 2000) {
             Remove-Item $percorsoNuovo -Force
             return
@@ -466,6 +496,13 @@ $iconaTray.Visible = $true
 
 # --- Tasto globale ---------------------------------------------------------
 
+# La configurazione va letta prima di registrare il tasto: leggendola dopo,
+# il tasto scelto dall'utente non veniva mai applicato (6/11: Alt+Shift+C salvato
+# e mai usato, restava Ctrl+Shift+C).
+$script:config = Leggi-Config
+if (-not $script:config) { $script:config = Chiedi-Config }
+if (-not $script:config) { $modulo.Close(); return }
+
 $tastoScelto = $null
 $candidatiDaProvare = @()
 if ($script:config -and $script:config.tasto) {
@@ -534,9 +571,6 @@ $timer.Start()
 if (Applica-Aggiornamento) { $modulo.Close(); return }
 
 $modulo.add_Shown({
-        $script:config = Leggi-Config
-        if (-not $script:config) { $script:config = Chiedi-Config }
-        if (-not $script:config) { $modulo.Close(); return }
         $tasto = if ($tastoScelto) { $tastoScelto.Nome } else { 'nessuno' }
         Mostra ([System.Windows.Forms.ToolTipIcon]::Info) 'PharmaTrack pronto' `
             ('Icona attiva. Premi ' + $tasto + ' in Winfarm per prendere la vendita.')
@@ -559,10 +593,11 @@ $modulo.add_FormClosing({
 '''
 
 
-def render_tray_script(base_url: str, token: str, pharmacy_name: str) -> str:
+def render_tray_script(base_url: str, token: str, pharmacy_name: str, api_url: str = "") -> str:
     """Restituisce lo script con indirizzo, token e intestazione gia' compilati."""
     return (
         _TEMPLATE.replace("@@URL@@", (base_url or "https://pharmatrack-zeta.vercel.app").rstrip("/"))
+        .replace("@@API@@", (api_url or base_url or "https://pharmatrack-api.onrender.com").rstrip("/"))
         .replace("@@TOKEN@@", token or "")
         .replace("@@PHARMACY@@", (pharmacy_name or "Farmacia").replace("\r", " ").replace("\n", " "))
         .replace("@@GENERATED@@", datetime.now(timezone.utc).strftime("%d/%m/%Y %H:%M UTC"))
