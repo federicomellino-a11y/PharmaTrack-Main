@@ -30,7 +30,12 @@ export default function QuickAddPage() {
   const [activeIndex, setActiveIndex] = useState(-1);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [newCustomerOpen, setNewCustomerOpen] = useState(false);
-  const [newCustomer, setNewCustomer] = useState({ name: '', phone: '', address: '' });
+  const [newCustomer, setNewCustomer] = useState({
+    name: searchParams.get('customer_name') || '',
+    phone: '',
+    address: '',
+    fiscal_code: searchParams.get('fiscal_code') || '',
+  });
   const [form, setForm] = useState({
     notes: searchParams.get('notes') || '',
     amount: searchParams.get('amount') || '',
@@ -70,6 +75,18 @@ export default function QuickAddPage() {
   };
   useEffect(() => { load(); }, []);
 
+  // Il pulsante magico passa il codice fiscale: se il cliente esiste si
+  // seleziona da solo, senza che nessuno lo cerchi a mano.
+  useEffect(() => {
+    const cf = (searchParams.get('fiscal_code') || '').trim().toUpperCase();
+    if (!cf || selectedCustomer || !(customers || []).length) return;
+    const trovato = customers.find((c) => (c.fiscal_code || '').toUpperCase() === cf);
+    if (trovato) {
+      setSelectedCustomer(trovato);
+      setSearchTerm('');
+    }
+  }, [customers, selectedCustomer, searchParams]);
+
   const recentCustomers = useMemo(() => {
     const seen = new Map();
     const sorted = [...(deliveries || [])].sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
@@ -91,6 +108,7 @@ export default function QuickAddPage() {
     return (customers || []).filter((c) =>
       (c.name || '').toLowerCase().includes(term) ||
       (c.phone || '').includes(term) ||
+      (c.fiscal_code || '').toLowerCase().includes(term) ||
       (c.address || '').toLowerCase().includes(term)
     ).slice(0, 8);
   }, [searchTerm, customers, recentCustomers]);
@@ -116,13 +134,14 @@ export default function QuickAddPage() {
       const { data } = await axios.post(`${API}/customers`, {
         name: newCustomer.name.trim(),
         phone: newCustomer.phone.trim() || null,
+        fiscal_code: (newCustomer.fiscal_code || '').trim().toUpperCase() || null,
         address: newCustomer.address.trim() || null,
         customer_lat: newCustomer.lat || null,
         customer_lng: newCustomer.lng || null,
         place_id: newCustomer.placeId || null,
       }, { withCredentials: true });
       setNewCustomerOpen(false);
-      setNewCustomer({ name: '', phone: '', address: '' });
+      setNewCustomer({ name: '', phone: '', address: '', fiscal_code: '' });
       setCustomers((prev) => [...prev, data]);
       selectCustomer(data);
       toast.success(`Cliente "${data.name}" creato`);
@@ -255,7 +274,14 @@ export default function QuickAddPage() {
         {newCustomerOpen && (
           <div className="p-3 rounded-xl border border-border space-y-2">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Nuovo cliente</p>
-            <Input placeholder="Nome *" value={newCustomer.name} onChange={(e) => setNewCustomer({ ...newCustomer, name: e.target.value })} />
+            <Input placeholder="Nome e cognome *" value={newCustomer.name} onChange={(e) => setNewCustomer({ ...newCustomer, name: e.target.value })} />
+            <Input
+              placeholder="Codice fiscale"
+              value={newCustomer.fiscal_code || ''}
+              onChange={(e) => setNewCustomer({ ...newCustomer, fiscal_code: e.target.value.toUpperCase() })}
+              maxLength={16}
+              className="font-mono uppercase"
+            />
             <Input placeholder="Telefono" value={newCustomer.phone} onChange={(e) => setNewCustomer({ ...newCustomer, phone: e.target.value })} />
             <AddressAutocomplete
                 placeholder="Indirizzo (opzionale)"

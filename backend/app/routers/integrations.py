@@ -1,4 +1,5 @@
 import os
+import re
 import uuid
 import secrets
 import logging
@@ -21,6 +22,62 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+# Il vocabolario dei pagamenti e' uno solo per tutta l'app: cash, pos, other.
+# Il riconoscimento di Winfarm pero' parla di "card", e prima questo valore
+# diventava "cash" in silenzio: un pagamento POS registrato come contanti e' un
+# errore che si scopre a fine giornata, quando la cassa non torna.
+PAGAMENTI = {
+    "cash": "cash", "contanti": "cash", "contante": "cash", "contanti.": "cash",
+    "pos": "pos", "card": "pos", "carta": "pos", "bancomat": "pos",
+    "carta di credito": "pos", "elettronico": "pos", "elettronica": "pos",
+    "other": "other", "altro": "other",
+}
+
+
+def normalizza_pagamento(valore: object, predefinito: str = "cash") -> str:
+    """Traduce qualunque modo di scrivere il pagamento nei tre valori dell'app."""
+    if valore in (None, ""):
+        return predefinito
+    return PAGAMENTI.get(str(valore).strip().lower(), "other")
+
+
+def normalizza_cf(valore: object) -> str | None:
+    """Tiene solo un codice fiscale completo: 16 caratteri alfanumerici.
+
+    Un CF troncato o inventato non deve guidare la ricerca del cliente, perche'
+    sbagliare cliente vuol dire consegnare il pacco alla persona sbagliata.
+    """
+    cf = re.sub(r"[^A-Z0-9]", "", str(valore or "").upper())
+    return cf if len(cf) == 16 else None
+
+
+def filtri_cliente(pharmacy_id: str, body: dict) -> list[dict]:
+    """Come cercare il cliente, dal dato piu' affidabile al piu' debole.
+
+    Ordine deciso con Federico: prima il codice fiscale, poi nome e cognome,
+    poi il telefono. Il codice cliente esplicito, se c'e', viene prima di tutto
+    perche' e' una scelta dell'utente, non un'ipotesi.
+    """
+    customer_id = body.get("customer_id")
+    cf = normalizza_cf(body.get("codice_fiscale") or body.get("fiscal_code") or body.get("cf"))
+    nome = (body.get("customer_name") or body.get("cliente") or "").strip()
+    telefono = (body.get("customer_phone") or body.get("telefono") or "").strip()
+
+    filtri: list[dict] = []
+    if customer_id:
+        filtri.append({"customer_id": customer_id, "pharmacy_id": pharmacy_id})
+    if cf:
+        filtri.append({"pharmacy_id": pharmacy_id, "fiscal_code": cf})
+    if nome:
+        # re.escape: un cognome con parentesi o punto non deve rompere la ricerca
+        filtri.append({"pharmacy_id": pharmacy_id, "name": {"$regex": f"^{re.escape(nome)}$", "$options": "i"}})
+    cifre = "".join(c for c in telefono if c.isdigit())
+    if cifre:
+        coda = cifre[-9:] if len(cifre) >= 9 else cifre
+        filtri.append({"pharmacy_id": pharmacy_id, "phone": {"$regex": re.escape(coda) + "$"}})
+    return filtri
+
+
 async def _winfarm_create_delivery(pharmacy_id: str, body: dict) -> dict:
     """Crea (o riusa) una consegna da una vendita Winfarm. Condiviso tra il
     bridge desktop (token) e l'endpoint REST (sessione).
@@ -33,6 +90,7 @@ async def _winfarm_create_delivery(pharmacy_id: str, body: dict) -> dict:
     payment_method = body.get("payment_method") or body.get("pagamento") or "cash"
     notes = body.get("notes") or body.get("note")
     external_ref = body.get("external_ref") or body.get("ricevuta") or body.get("scontrino")
+    codice_fiscale = normalizza_cf(body.get("codice_fiscale") or body.get("fiscal_code") or body.get("cf"))
 
     if not (customer_id or customer_phone or customer_name):
         raise HTTPException(status_code=400, detail="Specifica customer_id, customer_phone o customer_name")
@@ -42,13 +100,26 @@ async def _winfarm_create_delivery(pharmacy_id: str, body: dict) -> dict:
     except (TypeError, ValueError):
         amount_val = None
 
-    # --- Anti doppio-click: stessa vendita entro 3 minuti ---
-    if not external_ref:
-        three_min_ago = (datetime.now(timezone.utc) - timedelta(minutes=3)).isoformat()
+    # --- Anti doppio: prima per riferimento della vendita, poi per tempo ---
+    if external_ref:
+        # Se il programma conosce il numero dello scontrino, quello comanda:
+        # vale per sempre, non solo nei minuti successivi.
         dup = await db.deliveries.find_one({
             "pharmacy_id": pharmacy_id,
             "imported_from": "winfarm",
-            "created_at": {"$gte": three_min_ago},
+            "external_ref": external_ref,
+        }, {"_id": 0})
+        if dup:
+            return {"delivery": dup, "customer_created": False, "duplicate": True}
+    else:
+        # Senza riferimento vale la finestra: dieci minuti coprono il doppio
+        # clic e la pressione ripetuta, senza bloccare una seconda vendita vera
+        # dello stesso cliente piu' tardi nella giornata.
+        dieci_minuti_fa = (datetime.now(timezone.utc) - timedelta(minutes=10)).isoformat()
+        dup = await db.deliveries.find_one({
+            "pharmacy_id": pharmacy_id,
+            "imported_from": "winfarm",
+            "created_at": {"$gte": dieci_minuti_fa},
             "customer_name": customer_name,
             "amount": amount_val,
         }, {"_id": 0})
@@ -56,29 +127,34 @@ async def _winfarm_create_delivery(pharmacy_id: str, body: dict) -> dict:
             return {"delivery": dup, "customer_created": False, "duplicate": True}
 
     customer = None
-    if customer_id:
-        customer = await db.customers.find_one({"customer_id": customer_id, "pharmacy_id": pharmacy_id}, {"_id": 0})
-    if not customer and customer_phone:
-        digits = "".join(c for c in customer_phone if c.isdigit())
-        if digits:
-            tail = digits[-9:] if len(digits) >= 9 else digits
-            customer = await db.customers.find_one(
-                {"pharmacy_id": pharmacy_id, "phone": {"$regex": tail + "$"}}, {"_id": 0})
-    if not customer and customer_name:
-        customer = await db.customers.find_one(
-            {"pharmacy_id": pharmacy_id, "name": {"$regex": f"^{customer_name}$", "$options": "i"}}, {"_id": 0})
+    for filtro in filtri_cliente(pharmacy_id, body):
+        customer = await db.customers.find_one(filtro, {"_id": 0})
+        if customer:
+            break
 
     created_customer = False
     if not customer:
-        if not customer_name:
-            raise HTTPException(status_code=404, detail="Cliente non trovato; passa customer_name per crearlo")
+        # Non si crea un cliente alla cieca: senza indirizzo la consegna non e'
+        # fattibile, e un cliente sbagliato in anagrafica resta per sempre.
+        indirizzo_fornito = (customer_address or "").strip()
+        if not (customer_name and indirizzo_fornito):
+            raise HTTPException(status_code=422, detail={
+                "codice": "cliente_da_inserire",
+                "messaggio": "Cliente non trovato in anagrafica: inseriscilo a mano con l'indirizzo di consegna.",
+                "cliente": {
+                    "nome": customer_name,
+                    "codice_fiscale": codice_fiscale,
+                    "telefono": customer_phone,
+                },
+                "importo": amount_val,
+            })
         customer = {
             "customer_id": f"cust_{uuid.uuid4().hex[:12]}",
             "pharmacy_id": pharmacy_id,
             "name": customer_name,
             "phone": customer_phone or "",
-            "address": customer_address or "",
-            "email": None, "fiscal_code": None, "birth_date": None, "notes": None,
+            "address": indirizzo_fornito,
+            "email": None, "fiscal_code": codice_fiscale, "birth_date": None, "notes": None,
             "customer_lat": None, "customer_lng": None, "place_id": None,
             "extra_phones": [],
             "created_at": datetime.now(timezone.utc).isoformat(),
@@ -87,6 +163,14 @@ async def _winfarm_create_delivery(pharmacy_id: str, body: dict) -> dict:
         await db.customers.insert_one(customer)
         customer.pop("_id", None)
         created_customer = True
+
+    if codice_fiscale and not customer.get("fiscal_code"):
+        # Il codice fiscale letto dalla schermata e' il dato piu' affidabile che
+        # abbiamo: se il cliente c'era ma senza CF, glielo scriviamo adesso.
+        await db.customers.update_one(
+            {"customer_id": customer["customer_id"], "pharmacy_id": pharmacy_id},
+            {"$set": {"fiscal_code": codice_fiscale}})
+        customer["fiscal_code"] = codice_fiscale
 
     now_iso = datetime.now(timezone.utc).isoformat()
     delivery_data = {
@@ -101,7 +185,7 @@ async def _winfarm_create_delivery(pharmacy_id: str, body: dict) -> dict:
         "customer_lng": customer.get("customer_lng"),
         "notes": notes,
         "status": "da_preparare",
-        "payment_method": payment_method if payment_method in ["cash", "pos"] else "cash",
+        "payment_method": normalizza_pagamento(payment_method),
         "amount": amount_val,
         "amount_given": None,
         "change_due": None,
