@@ -44,6 +44,8 @@ export default function QuickAddPage() {
     priority: 'normal',
   });
   const [creating, setCreating] = useState(false);
+  // Arrivo dal pulsante magico: il cliente va scelto in anagrafica, non inventato.
+  const arrivoDaVendita = !!(searchParams.get('customer_name') || searchParams.get('fiscal_code'));
   const [created, setCreated] = useState(null);
 
   const queryClient = useQueryClient();
@@ -130,6 +132,12 @@ export default function QuickAddPage() {
 
   const createCustomer = async () => {
     if (!newCustomer.name.trim()) { toast.error('Il nome è obbligatorio'); return; }
+    // Senza indirizzo il fattorino non sa dove andare: il cliente si crea
+    // completo, non a meta'.
+    if (!(newCustomer.address || '').trim()) {
+      toast.error("Serve l'indirizzo: senza, la consegna non si puo' fare");
+      return;
+    }
     try {
       const { data } = await axios.post(`${API}/customers`, {
         name: newCustomer.name.trim(),
@@ -271,6 +279,19 @@ export default function QuickAddPage() {
           )}
         </div>
 
+        {!selectedCustomer && arrivoDaVendita && !newCustomerOpen && (
+          <div className="rounded-xl border border-amber-500/40 bg-amber-500/[0.06] p-3 space-y-1">
+            <p className="text-xs font-semibold">Cliente non in anagrafica</p>
+            <p className="text-[11px] text-muted-foreground">
+              Scegli il cliente dalla lista qui sopra, oppure aggiungine uno nuovo con il suo indirizzo:
+              l'indirizzo resta in anagrafica e non va piu' scritto.
+            </p>
+            <button type="button" className="text-xs text-primary font-medium" onClick={() => setNewCustomerOpen(true)}>
+              Aggiungi un cliente nuovo
+            </button>
+          </div>
+        )}
+
         {newCustomerOpen && (
           <div className="p-3 rounded-xl border border-border space-y-2">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Nuovo cliente</p>
@@ -290,7 +311,17 @@ export default function QuickAddPage() {
                 onChange={(value) => setNewCustomer((p) => ({ ...p, address: value, lat: null, lng: null, placeId: '' }))}
                 onAddressSelect={(sel) => setNewCustomer((p) => ({ ...p, address: sel.address, lat: sel.lat, lng: sel.lng, placeId: sel.placeId || '' }))}
               />
-            <Button type="button" size="sm" onClick={createCustomer}>Crea e seleziona</Button>
+            <Button
+              type="button"
+              size="sm"
+              onClick={createCustomer}
+              disabled={!newCustomer.name.trim() || !(newCustomer.address || '').trim()}
+            >
+              Crea e seleziona
+            </Button>
+            {!(newCustomer.address || '').trim() && (
+              <p className="text-[11px] text-muted-foreground">L'indirizzo serve per la consegna.</p>
+            )}
           </div>
         )}
 

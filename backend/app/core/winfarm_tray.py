@@ -247,8 +247,8 @@ function Prendi-Vendita {
                 amount = $letto.campi.importo
                 fiscal_code = $letto.campi.codice_fiscale
             }
-            Mostra ([System.Windows.Forms.ToolTipIcon]::Warning) 'Cliente da inserire' `
-                ($letto.campi.cliente + ' non e in anagrafica: completa il modulo che ho aperto.')
+            Mostra ([System.Windows.Forms.ToolTipIcon]::Warning) 'Cliente non in anagrafica' `
+                ($letto.campi.cliente + ': scegli il cliente dalla lista o aggiungine uno nuovo nel modulo che ho aperto.')
         } elseif ($stato -eq 409) {
             Mostra ([System.Windows.Forms.ToolTipIcon]::Info) 'Gia importata' 'Questa vendita e gia su PharmaTrack.'
         } else {
