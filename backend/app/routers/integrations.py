@@ -37,7 +37,7 @@ PAGAMENTI = {
 # Versione del pulsante magico che il server considera corrente. La stessa
 # cifra finisce dentro lo script scaricato: quando la alzo, i PC in farmacia la
 # leggono al giro successivo e si aggiornano da soli.
-VERSIONE_PULSANTE = 3
+VERSIONE_PULSANTE = 4
 
 def _api_pubblico(request: Request) -> str:
     """L'indirizzo dell'API, che non e' quello del sito.
