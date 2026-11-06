@@ -379,7 +379,10 @@ export default function IntegrationsPage() {
             </p>
             <p className="flex items-center gap-1.5">
               <KeyRound className="w-3.5 h-3.5" />
-              Chiave di questa farmacia: <code className="px-1 bg-secondary rounded">{status?.token_preview || '—'}</code>
+              Chiave di questa farmacia:{' '}
+              <code className="px-1 bg-secondary rounded">
+                {status?.token_preview || 'nasce al primo download'}
+              </code>
               {status?.pharmacy_name ? ` · ${status.pharmacy_name}` : ''}
             </p>
           </div>

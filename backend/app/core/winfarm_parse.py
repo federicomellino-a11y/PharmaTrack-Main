@@ -375,6 +375,53 @@ RE_IMPORTO_PURO = re.compile(r"^\d{1,3}(?:\.\d{3})*,\d{2}$")
 RE_CF_COMPLETO = re.compile(r"^[A-Z]{6}\d{2}[A-Z]\d{2}[A-Z]\d{3}[A-Z]$")
 
 
+def riferimento_vendita(elenco: list[str]) -> str | None:
+    """Il numero del documento, per riconoscere la stessa vendita due volte.
+
+    Winfarm scrive in testa allo scontrino tre controlli separati:
+
+        "A"   "89"   "del"   ...   "05/11/2026"
+
+    cioe' "scontrino A numero 89 del 05/11/2026". Il numero da solo non basta
+    (ogni giorno riparte), la data da sola nemmeno: insieme sono una chiave che
+    non si ripete, e valgono per sempre, non solo per i minuti successivi.
+
+    Il "del" isolato e' il segnale che distingue questa intestazione da altre
+    righe che contengono una data, come "SOSPESO N. 9765 DEL 05/11/2026" o
+    "n° 1578289 del 05/11/2026": quelle sono una stringa sola, non tre
+    controlli in fila.
+    """
+    for indice, nome in enumerate(elenco):
+        if normalizza(nome) != "del":
+            continue
+        # indietro: il numero, e prima ancora la serie (una lettera)
+        numero = None
+        lettera = None
+        for passo in range(1, 4):
+            if indice - passo < 0:
+                break
+            precedente = elenco[indice - passo].strip()
+            if numero is None and re.fullmatch(r"\d{1,6}", precedente):
+                numero = precedente
+            elif numero is not None and re.fullmatch(r"[A-Za-z]", precedente):
+                lettera = precedente.upper()
+                break
+        if not numero:
+            continue
+        # avanti: la prima data completa dopo il "del"
+        data = None
+        for successivo in elenco[indice + 1:indice + 8]:
+            trovato = re.search(r"\b(\d{2}/\d{2}/\d{4})\b", successivo)
+            if trovato:
+                data = trovato.group(1)
+                break
+        if not data:
+            continue
+        serie = f"{lettera}-" if lettera else ""
+        return f"{serie}{numero}/{data}"
+    return None
+
+
 def estrai_vendita_da_controlli(nomi: list[str] | None) -> dict:
     """Riconosce la vendita dall'elenco dei controlli esposti da Windows.
 
@@ -444,6 +491,7 @@ def estrai_vendita_da_controlli(nomi: list[str] | None) -> dict:
         if re.fullmatch(r"\d{2}/\d{2}/\d{4}", nome.strip()):
             intestazione["data_vendita"] = nome.strip()
             break
+    intestazione["riferimento"] = riferimento_vendita(elenco)
 
     campi = {
         "cliente": cliente,

@@ -274,10 +274,10 @@ async def _bridge_pharmacy(request: Request) -> dict:
 @router.get("/integrations/winfarm/status")
 async def winfarm_status(request: Request, user: dict = Depends(get_current_user)):
     """Stato del bridge: token configurato, ultimo import, conteggi."""
+    # Leggere non deve scrivere: il token nasce al primo download del
+    # programma, dove serve davvero. Prima questa GET lo creava, e una
+    # richiesta di sola lettura cambiava il database.
     token = user.get("bridge_token")
-    if not token:
-        token = f"wf_{secrets.token_urlsafe(24)}"
-        await db.users.update_one({"user_id": user["user_id"]}, {"$set": {"bridge_token": token}})
     last = await db.deliveries.find_one(
         {"pharmacy_id": user["user_id"], "imported_from": "winfarm"}, {"_id": 0}, sort=[("created_at", -1)])
     today_iso = datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -287,7 +287,8 @@ async def winfarm_status(request: Request, user: dict = Depends(get_current_user
     total = await db.deliveries.count_documents({"pharmacy_id": user["user_id"], "imported_from": "winfarm"})
     return {
         "configured": True,
-        "token_preview": f"{token[:5]}...{token[-4:]}",
+        "token_configurato": bool(token),
+        "token_preview": f"{token[:5]}...{token[-4:]}" if token else None,
         "last_import": last.get("created_at") if last else None,
         "last_import_customer": last.get("customer_name") if last else None,
         "imports_today": imports_today,
