@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 try:
     from app.routers.integrations import VERSIONE_PULSANTE
 except Exception:  # pragma: no cover - solo per esecuzioni isolate
-    VERSIONE_PULSANTE = 3
+    VERSIONE_PULSANTE = 4
 
 _TEMPLATE = r'''# wf-tray.ps1  --  il pulsante magico di PharmaTrack, versione 1
 # Farmacia: @@PHARMACY@@
