@@ -10,6 +10,13 @@ Winfarm e li manda a /api/integrations/winfarm/parse, dove vivono le regole.
 """
 from datetime import datetime, timezone
 
+# La stessa cifra sta in integrations.py (VERSIONE_PULSANTE): qui la importo per
+# non averne due copie. Se il router non e' importabile (script isolato) resta 2.
+try:
+    from app.routers.integrations import VERSIONE_PULSANTE
+except Exception:  # pragma: no cover - solo per esecuzioni isolate
+    VERSIONE_PULSANTE = 2
+
 _TEMPLATE = r'''# wf-tray.ps1  --  il pulsante magico di PharmaTrack, versione 1
 # Farmacia: @@PHARMACY@@
 # Generato: @@GENERATED@@
@@ -80,7 +87,12 @@ public struct MSG {
 $URL_PRECOMPILATA = '@@URL@@'
 $TOKEN_PRECOMPILATO = '@@TOKEN@@'
 
+# Versione di questo file. Il server la confronta col battito e, se e' vecchia,
+# prepara l'aggiornamento: nessuno deve riscaricare niente a mano.
+$VERSIONE = '@@VERSION@@'
+
 $cartella = Split-Path -Parent $MyInvocation.MyCommand.Path
+$script:percorsoScript = $MyInvocation.MyCommand.Path
 $percorsoConfig = Join-Path $cartella 'wf-tray-config.json'
 $percorsoLog = Join-Path $cartella 'wf-tray-log.txt'
 $MOD_CONTROL = 0x0002
@@ -189,6 +201,78 @@ function Chiama-Api($config, $percorso, $corpo) {
         UseBasicParsing = $true
     }
     return Invoke-RestMethod @parametri
+}
+
+function Invia-Battito($config) {
+    <#
+      Una chiamata ogni cinque minuti, in silenzio:
+      - dice al server che questo PC e' vivo (lo stato in pagina diventa un
+        fatto invece di un indovinello);
+      - chiede se la versione e' vecchia, e se lo e' si porta a casa la nuova.
+    #>
+    try {
+        $risposta = Chiama-Api $config '/api/integrations/winfarm/heartbeat' @{
+            versione = $VERSIONE
+            host = $env:COMPUTERNAME
+        }
+        if ($risposta.aggiorna) { Scarica-Aggiornamento $config }
+    } catch {
+        # Rete giu' o server fermo: non si dice niente al banco, si riprova.
+        Scrivi-Log ('Battito non riuscito: ' + $_.Exception.Message)
+    }
+}
+
+function Scarica-Aggiornamento($config) {
+    <#
+      Scarica la versione nuova accanto al file in uso, senza toccarlo: quella
+      in esecuzione deve continuare a funzionare. Al prossimo avvio il file
+      nuovo prende il posto del vecchio.
+    #>
+    try {
+        $percorsoNuovo = $script:percorsoScript + '.new'
+        $parametri = @{
+            Uri = $config.base_url + '/api/integrations/winfarm/tray/download'
+            Headers = @{ 'X-Bridge-Token' = $config.bridge_token }
+            OutFile = $percorsoNuovo
+            TimeoutSec = 60
+            UseBasicParsing = $true
+        }
+        Invoke-WebRequest @parametri | Out-Null
+        if ((Get-Item $percorsoNuovo).Length -lt 2000) {
+            Remove-Item $percorsoNuovo -Force
+            return
+        }
+        Mostra ([System.Windows.Forms.ToolTipIcon]::Info) 'Aggiornamento pronto' `
+            'Al prossimo avvio il pulsante magico si aggiorna da solo.'
+    } catch {
+        Scrivi-Log ('Aggiornamento non scaricato: ' + $_.Exception.Message)
+    }
+}
+
+function Applica-Aggiornamento {
+    <#
+      Se accanto al file c'e' una versione .new, questa prende il posto di
+      quella in uso e il programma riparte: l'utente vede solo l'icona tornare.
+      PowerShell legge lo script in memoria all'avvio, quindi il file si puo'
+      sostituire mentre gira.
+    #>
+    $percorsoNuovo = $script:percorsoScript + '.new'
+    if (-not (Test-Path $percorsoNuovo)) { return $false }
+    try {
+        if ((Get-Item $percorsoNuovo).Length -lt 2000) { Remove-Item $percorsoNuovo -Force; return $false }
+        $copia = $script:percorsoScript + '.old'
+        if (Test-Path $copia) { Remove-Item $copia -Force -ErrorAction SilentlyContinue }
+        Move-Item -Path $script:percorsoScript -Destination $copia -Force
+        Move-Item -Path $percorsoNuovo -Destination $script:percorsoScript -Force
+        Start-Process -FilePath 'powershell.exe' -ArgumentList @(
+            '-WindowStyle', 'Hidden', '-ExecutionPolicy', 'Bypass', '-File', ('"' + $script:percorsoScript + '"')
+        ) | Out-Null
+        Scrivi-Log 'Aggiornamento applicato, riavvio'
+        return $true
+    } catch {
+        Scrivi-Log ('Aggiornamento non applicato: ' + $_.Exception.Message)
+        return $false
+    }
 }
 
 function Stato-Errore($errore) {
@@ -377,6 +461,10 @@ $timer.add_Tick({
     })
 $timer.Start()
 
+# Prima di fare qualunque cosa: se e' pronto un aggiornamento, si riparte con
+# quello e questa istanza si chiude senza nemmeno mostrarsi.
+if (Applica-Aggiornamento) { $modulo.Close(); return }
+
 $modulo.add_Shown({
         $script:config = Leggi-Config
         if (-not $script:config) { $script:config = Chiedi-Config }
@@ -384,6 +472,12 @@ $modulo.add_Shown({
         $tasto = if ($tastoScelto) { $tastoScelto.Nome } else { 'nessuno' }
         Mostra ([System.Windows.Forms.ToolTipIcon]::Info) 'PharmaTrack pronto' `
             ('Icona attiva. Premi ' + $tasto + ' in Winfarm per prendere la vendita.')
+        # Il primo battito parte subito, poi ogni cinque minuti.
+        Invia-Battito $script:config
+        $script:battito = New-Object System.Windows.Forms.Timer
+        $script:battito.Interval = 300000
+        $script:battito.add_Tick({ if ($script:config) { Invia-Battito $script:config } })
+        $script:battito.Start()
     })
 
 $modulo.add_FormClosing({
@@ -404,6 +498,7 @@ def render_tray_script(base_url: str, token: str, pharmacy_name: str) -> str:
         .replace("@@TOKEN@@", token or "")
         .replace("@@PHARMACY@@", (pharmacy_name or "Farmacia").replace("\r", " ").replace("\n", " "))
         .replace("@@GENERATED@@", datetime.now(timezone.utc).strftime("%d/%m/%Y %H:%M UTC"))
+        .replace("@@VERSION@@", str(VERSIONE_PULSANTE))
     )
 
 
