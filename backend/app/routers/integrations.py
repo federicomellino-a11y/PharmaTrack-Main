@@ -34,6 +34,42 @@ PAGAMENTI = {
 }
 
 
+# Versione del pulsante magico che il server considera corrente. La stessa
+# cifra finisce dentro lo script scaricato: quando la alzo, i PC in farmacia la
+# leggono al giro successivo e si aggiornano da soli.
+VERSIONE_PULSANTE = 2
+
+
+def serve_aggiornamento(versione_client: object) -> bool:
+    """True se il client e' indietro rispetto alla versione corrente.
+
+    Il confronto e' numerico: un client che non dichiara la versione (la prima
+    release non lo faceva) vale come zero, quindi si aggiorna.
+    """
+    try:
+        return int(versione_client or 0) < VERSIONE_PULSANTE
+    except (TypeError, ValueError):
+        return True
+
+
+def client_online(ultimo_battito: object, adesso: datetime | None = None) -> bool:
+    """Il programma e' vivo se ha battuto negli ultimi minuti.
+
+    Cinque minuti di battito piu' due di tolleranza: sotto questa soglia dire
+    "collegato" e' un fatto, non una speranza.
+    """
+    if not ultimo_battito:
+        return False
+    try:
+        quando = datetime.fromisoformat(str(ultimo_battito))
+    except ValueError:
+        return False
+    if quando.tzinfo is None:
+        quando = quando.replace(tzinfo=timezone.utc)
+    riferimento = adesso or datetime.now(timezone.utc)
+    return (riferimento - quando) <= timedelta(minutes=7)
+
+
 def normalizza_pagamento(valore: object, predefinito: str = "cash") -> str:
     """Traduce qualunque modo di scrivere il pagamento nei tre valori dell'app."""
     if valore in (None, ""):
@@ -256,6 +292,9 @@ async def winfarm_status(request: Request, user: dict = Depends(get_current_user
         "last_import_customer": last.get("customer_name") if last else None,
         "imports_today": imports_today,
         "imports_total": total,
+        "bridge_last_seen": user.get("bridge_last_seen"),
+        "bridge_version": user.get("bridge_version"),
+        "bridge_online": client_online(user.get("bridge_last_seen")),
         "pharmacy_name": user.get("pharmacy_name") or user.get("name"),
         "base_url": (request.headers.get("origin") or "").rstrip("/"),
     }
@@ -280,8 +319,16 @@ async def winfarm_bridge_download(request: Request, user: dict = Depends(get_cur
 
 
 @router.get("/integrations/winfarm/tray/download")
-async def winfarm_tray_download(request: Request, user: dict = Depends(get_current_user)):
-    """Pulsante magico (icona + tasto) gia' configurato con indirizzo e token."""
+async def winfarm_tray_download(request: Request):
+    """Pulsante magico (icona + tasto) gia' configurato con indirizzo e token.
+
+    Accetta la sessione del browser e anche il token del PC: e' cosi' che il
+    programma si riscarica da solo quando c'e' una versione nuova.
+    """
+    if (request.headers.get("X-Bridge-Token") or "").strip():
+        user = await _bridge_pharmacy(request)
+    else:
+        user = await get_current_user(request)
     token = user.get("bridge_token")
     if not token:
         token = f"wf_{secrets.token_urlsafe(24)}"
@@ -294,6 +341,36 @@ async def winfarm_tray_download(request: Request, user: dict = Depends(get_curre
         media_type="application/octet-stream",
         headers={"Content-Disposition": 'attachment; filename="pharmatrack-pulsante-magico.ps1"'},
     )
+
+
+@router.post("/integrations/winfarm/heartbeat")
+async def winfarm_heartbeat(request: Request):
+    """Il programma dice "sono vivo" e chiede se c'e' una versione nuova.
+
+    Una chiamata sola fa due cose: rende vero lo stato in pagina (invece di
+    dedurlo dall'ultimo import) e dice al PC se deve aggiornarsi.
+    """
+    pharmacy = await _bridge_pharmacy(request)
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    body = body or {}
+    adesso = datetime.now(timezone.utc).isoformat()
+    await db.users.update_one(
+        {"user_id": pharmacy["user_id"]},
+        {"$set": {
+            "bridge_last_seen": adesso,
+            "bridge_version": body.get("versione"),
+            "bridge_host": (str(body.get("host") or "")[:60] or None),
+        }},
+    )
+    return {
+        "ok": True,
+        "versione_ultima": VERSIONE_PULSANTE,
+        "aggiorna": serve_aggiornamento(body.get("versione")),
+        "scaricabile": "/api/integrations/winfarm/tray/download",
+    }
 
 
 @router.post("/integrations/winfarm/parse")

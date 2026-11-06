@@ -145,13 +145,20 @@ export default function IntegrationsPage() {
     if (Number.isNaN(quando.getTime())) return null;
     return Math.floor((Date.now() - quando.getTime()) / 86400000);
   };
+  // Se il programma batte, lo stato e' un fatto; se non batte (o e' una
+  // versione che non lo sa fare) si ricade sull'ultimo import.
+  const vivo = status?.bridge_online === true;
+  const ultimoBattito = status?.bridge_last_seen ? formatWhen(status.bridge_last_seen) : null;
   const giorni = giorniDa(status?.last_import);
-  const active = giorni !== null && giorni <= 7;
-  const stato = giorni === null
-    ? { testo: 'Pronto da collegare', sotto: 'Scegli una delle due strade qui sotto: servono due minuti', badge: 'Da attivare' }
-    : giorni <= 1
-      ? { testo: 'Collegato a Winfarm', sotto: `Ultimo import ${formatWhen(status.last_import)}${status.last_import_customer ? ` · ${status.last_import_customer}` : ''}`, badge: 'Attivo' }
-      : { testo: `Fermo da ${giorni} giorni`, sotto: `Ultimo import ${formatWhen(status.last_import)}${status.last_import_customer ? ` · ${status.last_import_customer}` : ''}`, badge: 'Da controllare' };
+  const active = vivo || (giorni !== null && giorni <= 7);
+  const sotto = `Ultimo import ${formatWhen(status?.last_import)}${status?.last_import_customer ? ` · ${status.last_import_customer}` : ''}`;
+  const stato = vivo
+    ? { testo: 'Programma collegato', sotto: `Ultimo giro ${ultimoBattito}`, badge: 'Attivo' }
+    : giorni === null
+      ? { testo: 'Pronto da collegare', sotto: 'Scegli una delle due strade qui sotto: servono due minuti', badge: 'Da attivare' }
+      : giorni <= 1
+        ? { testo: 'Collegato a Winfarm', sotto, badge: 'Attivo' }
+        : { testo: `Fermo da ${giorni} giorni`, sotto, badge: 'Da controllare' };
 
   return (
     <Layout title="Integrazioni">
@@ -192,7 +199,11 @@ export default function IntegrationsPage() {
             <div className="grid grid-cols-3 gap-3 pt-3 border-t border-border/60">
               <Metrica etichetta="Oggi" valore={status?.imports_today ?? 0} sotto="importate" />
               <Metrica etichetta="In totale" valore={status?.imports_total ?? 0} sotto="da sempre" />
-              <Metrica etichetta="Chiave del PC" valore={<span className="font-mono text-xs">{status?.token_preview || '—'}</span>} sotto="questo computer" />
+              <Metrica
+                etichetta="Programma"
+                valore={vivo ? 'vivo' : 'silenzioso'}
+                sotto={vivo ? `vers. ${status?.bridge_version || '—'}` : 'nessun battito'}
+              />
             </div>
           </CardContent>
         </Card>
