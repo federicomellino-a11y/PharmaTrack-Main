@@ -49,3 +49,38 @@ def test_il_file_arriva_con_il_bom():
     contenuto = con_bom("ciao")
     assert contenuto[:3] == b"\xef\xbb\xbf"
     assert contenuto[3:] == b"ciao"
+
+
+# --- Due indirizzi: il sito e l'API -----------------------------------------
+
+def test_lo_script_conosce_l_indirizzo_dell_api_e_quello_del_sito():
+    """Il 6/11 i POST andavano al sito e tornavano 405: devono essere due cose."""
+    from app.core.winfarm_tray import render_tray_script
+    script = render_tray_script(
+        'https://pharmatrack-zeta.vercel.app', 'wf_x', 'Farmacia',
+        api_url='https://pharmatrack-api.onrender.com',
+    )
+    assert "$URL_PRECOMPILATA = 'https://pharmatrack-zeta.vercel.app'" in script
+    assert "$API_PRECOMPILATA = 'https://pharmatrack-api.onrender.com'" in script
+    assert 'api_url' in script
+
+
+def test_senza_indirizzo_dell_api_lo_script_non_resta_vuoto():
+    from app.core.winfarm_tray import render_tray_script
+    script = render_tray_script('https://pharmatrack-api.onrender.com', 'wf_x', 'Farmacia')
+    assert "$API_PRECOMPILATA = 'https://pharmatrack-api.onrender.com'" in script
+
+
+def test_la_configurazione_si_legge_prima_del_tasto():
+    """Se si legge dopo, il tasto scelto dall'utente non viene mai applicato."""
+    from app.core.winfarm_tray import render_tray_script
+    script = render_tray_script('https://a.test', 'wf_x', 'Farmacia')
+    lettura = script.index('$script:config = Leggi-Config')
+    registrazione = script.index('function Registra-Tasto') if 'function Registra-Tasto' in script else script.index('[Wf.Tasti]::RegisterHotKey($modulo.Handle')
+    assert lettura < registrazione
+
+
+def test_un_aggiornamento_che_non_e_il_programma_viene_scartato():
+    from app.core.winfarm_tray import render_tray_script
+    script = render_tray_script('https://a.test', 'wf_x', 'Farmacia')
+    assert 'Aggiornamento scartato' in script
