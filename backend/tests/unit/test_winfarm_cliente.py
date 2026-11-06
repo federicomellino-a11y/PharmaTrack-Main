@@ -79,3 +79,34 @@ def test_una_parola_mai_vista_non_diventa_contanti():
 
 def test_senza_pagamento_il_predefinito_e_contanti():
     assert normalizza_pagamento(None) == "cash"
+
+
+# --- Riferimento della vendita ----------------------------------------------
+
+def test_il_riferimento_viene_dai_tre_controlli_dello_scontrino():
+    """"A" "89" "del" "05/11/2026" e' lo scontrino: una chiave che non si ripete."""
+    from app.core.winfarm_parse import riferimento_vendita
+    controlli = ['D.P.C.', 'Ord. 2 da GUACCI.', '11/2028', 'A', '89', 'del',
+                 'Scontrino Non Fiscale', 'Vendita Libera', 'Vendita Libera', '05/11/2026',
+                 'Totale Pezzi 1']
+    assert riferimento_vendita(controlli) == 'A-89/05/11/2026'
+
+
+def test_una_stringa_che_contiene_del_non_e_un_riferimento():
+    """ "SOSPESO N. 9765 DEL 05/11/2026" e' un testo solo, non un'intestazione."""
+    from app.core.winfarm_parse import riferimento_vendita
+    assert riferimento_vendita(['SOSPESO N. 9765 DEL 05/11/2026']) is None
+
+
+def test_senza_numero_o_senza_data_non_c_e_riferimento():
+    from app.core.winfarm_parse import riferimento_vendita
+    assert riferimento_vendita(['del', '05/11/2026']) is None
+    assert riferimento_vendita(['A', '89', 'del']) is None
+    assert riferimento_vendita([]) is None
+
+
+def test_il_riferimento_finisce_nel_riconoscimento():
+    from app.core.winfarm_parse import estrai_vendita_da_controlli
+    risultato = estrai_vendita_da_controlli(
+        ['Cliente MELLINO FEDERICO [ NV 175 ]', '15,90 ', 'A', '89', 'del', '05/11/2026'])
+    assert risultato['intestazione']['riferimento'] == 'A-89/05/11/2026'

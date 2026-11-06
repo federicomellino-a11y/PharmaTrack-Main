@@ -60,18 +60,18 @@ TrayTip, PharmaTrack, Pronto. Seleziona la vendita in Winfarm e premi ALT+C, 8, 
         return
     }
 
-    url := PharmaTrackURL . "/api/integrations/winfarm/bridge"
-    url := url . "?cliente=" . UrlEncode(name)
-    url := url . "&telefono=" . UrlEncode(phone)
-    url := url . "&importo=" . UrlEncode(amount)
-    url := url . "&indirizzo=" . UrlEncode(address)
+    ; I dati del cliente viaggiano nel corpo JSON, non nell'indirizzo: quello
+    ; finisce nei log del server e nella cronologia, il corpo no.
+    corpo := "{""cliente"":""" . JsonEsc(name) . """,""telefono"":""" . JsonEsc(phone)
+        . """,""importo"":""" . JsonEsc(amount) . """,""indirizzo"":""" . JsonEsc(address) . """}"
 
     status := 0
     try {
         http := ComObjCreate("WinHttp.WinHttpRequest.5.1")
-        http.Open("POST", url, false)
+        http.Open("POST", PharmaTrackURL . "/api/integrations/winfarm/bridge", false)
+        http.SetRequestHeader("Content-Type", "application/json; charset=utf-8")
         http.SetRequestHeader("X-Bridge-Token", BridgeToken)
-        http.Send()
+        http.Send(corpo)
         status := http.Status
         if (status = 200)
             TrayTip, PharmaTrack, Consegna importata da Winfarm., 3, 1
@@ -95,6 +95,16 @@ TrayTip, PharmaTrack, Pronto. Seleziona la vendita in Winfarm e premi ALT+C, 8, 
         Run, % PharmaTrackURL . "/deliveries?" . qs
     }
 return
+
+; Mette fra virgolette un testo senza rompere il JSON (virgolette, barre, a capo).
+JsonEsc(testo) {
+    testo := StrReplace(testo, "\", "\\")
+    testo := StrReplace(testo, """", "\""")
+    testo := StrReplace(testo, "`r", "\r")
+    testo := StrReplace(testo, "`n", "\n")
+    testo := StrReplace(testo, "`t", "\t")
+    return testo
+}
 
 ; ---------- ALT + D : Dock di banco ----------
 !d::

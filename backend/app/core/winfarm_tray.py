@@ -96,6 +96,7 @@ $script:percorsoScript = $MyInvocation.MyCommand.Path
 $percorsoConfig = Join-Path $cartella 'wf-tray-config.json'
 $percorsoLog = Join-Path $cartella 'wf-tray-log.txt'
 $MOD_CONTROL = 0x0002
+$MOD_ALT = 0x0001
 $MOD_SHIFT = 0x0004
 $MOD_WIN = 0x0008
 $MOD_NOREPEAT = 0x4000
@@ -119,6 +120,44 @@ function Scrivi-Log($testo) {
 }
 
 # --- Configurazione ---------------------------------------------------------
+
+function Combinazione($testo) {
+    <#
+      Traduce "Ctrl+Shift+C" in una combinazione vera per Windows. Serve a chi
+      vuole un tasto diverso: si scrive nel file di configurazione e il
+      programma lo usa, senza ricompilare niente.
+      Se la scrittura non si capisce torna $null e valgono i tasti predefiniti.
+    #>
+    if (-not $testo) { return $null }
+    $pezzi = @($testo -split '\+' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+    if ($pezzi.Count -lt 2) { return $null }
+    $mod = 0
+    $nome = @()
+    foreach ($pezzo in $pezzi[0..($pezzi.Count - 2)]) {
+        switch -Regex ($pezzo.ToLower()) {
+            '^ctrl$|^control$' { $mod = $mod -bor $MOD_CONTROL; $nome += 'Ctrl' }
+            '^shift$|^maiusc$|^maiuscolo$' { $mod = $mod -bor $MOD_SHIFT; $nome += 'Shift' }
+            '^alt$' { $mod = $mod -bor $MOD_ALT; $nome += 'Alt' }
+            '^win$|^windows$' { $mod = $mod -bor $MOD_WIN; $nome += 'Win' }
+            default { return $null }
+        }
+    }
+    $tasto = $pezzi[-1].ToUpper()
+    $codice = 0
+    if ($tasto -match '^[A-Z0-9]$') {
+        $codice = [int][char]$tasto
+    } elseif ($tasto -match '^F([1-9]|1[0-9]|2[0-4])$') {
+        # F1..F24: sono i tasti che Windows chiama 0x70 e seguenti
+        $codice = 0x70 + ([int]$tasto.Substring(1) - 1)
+    } else {
+        return $null
+    }
+    return @{
+        Nome = (($nome + $tasto) -join '+')
+        Mod = ($mod -bor $MOD_NOREPEAT)
+        Vk = $codice
+    }
+}
 
 function Leggi-Config {
     if (Test-Path $percorsoConfig) {
@@ -319,6 +358,10 @@ function Prendi-Vendita {
         note = 'Letta da Winfarm (' + $pezzi + ' pezzi)'
     }
     if ($letto.campi.codice_fiscale) { $corpo.codice_fiscale = $letto.campi.codice_fiscale }
+    # Il numero dello scontrino ("A 89 del 05/11/2026") vale per sempre: con
+    # quello il server riconosce la stessa vendita anche a distanza di ore,
+    # non solo nei dieci minuti della finestra.
+    if ($letto.intestazione.riferimento) { $corpo.external_ref = $letto.intestazione.riferimento }
     try {
         $creata = Chiama-Api $config '/api/integrations/winfarm/bridge' $corpo
     } catch {
@@ -424,7 +467,15 @@ $iconaTray.Visible = $true
 # --- Tasto globale ---------------------------------------------------------
 
 $tastoScelto = $null
-foreach ($candidato in $candidati) {
+$candidatiDaProvare = @()
+if ($script:config -and $script:config.tasto) {
+    $preferito = Combinazione $script:config.tasto
+    if ($preferito) { $candidatiDaProvare += $preferito }
+    else { Scrivi-Log ('Tasto non riconosciuto nel file di configurazione: ' + $script:config.tasto) }
+}
+$candidatiDaProvare += $candidati
+
+foreach ($candidato in $candidatiDaProvare) {
     if ([Wf.Tasti]::RegisterHotKey($modulo.Handle, $ID_TASTO, [uint32]$candidato.Mod, [uint32]$candidato.Vk)) {
         $tastoScelto = $candidato
         break
@@ -438,6 +489,23 @@ $menu = New-Object System.Windows.Forms.ContextMenuStrip
 $vocePrendi = $menu.Items.Add('Prendi la vendita ora (' + $(if ($tastoScelto) { $tastoScelto.Nome } else { 'nessun tasto' }) + ')')
 $vocePrendi.Add_Click({ Prendi-Vendita })
 $menu.Items.Add('Apri il Dock').Add_Click({ Apri-Dock })
+$menu.Items.Add('Cambia tasto...').Add_Click({
+        if (-not $script:config) { return }
+        $attuale = if ($script:config.tasto) { $script:config.tasto } else { 'Ctrl+Shift+C' }
+        $nuovo = [Microsoft.VisualBasic.Interaction]::InputBox(
+            'Scrivi la combinazione, per esempio Ctrl+Shift+C oppure Alt+F9.',
+            'Quale tasto vuoi usare?', $attuale)
+        if (-not $nuovo) { return }
+        if (-not (Combinazione $nuovo)) {
+            Mostra ([System.Windows.Forms.ToolTipIcon]::Warning) 'Tasto non valido' `
+                'Servono almeno un modificatore e una lettera, per esempio Ctrl+Shift+C.'
+            return
+        }
+        $script:config | Add-Member -NotePropertyName tasto -NotePropertyValue $nuovo -Force
+        $script:config | ConvertTo-Json | Out-File -FilePath $percorsoConfig -Encoding UTF8
+        Mostra ([System.Windows.Forms.ToolTipIcon]::Info) 'Tasto salvato' `
+            ('Riavvia il pulsante magico per usare ' + $nuovo + '.')
+    })
 $menu.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator)) | Out-Null
 $voceAvvio = $menu.Items.Add('Avvio automatico con Windows')
 $voceAvvio.Add_Click({ Alterna-AvvioAutomatico })
