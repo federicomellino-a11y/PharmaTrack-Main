@@ -121,6 +121,14 @@ export default function QuickAddPage() {
     ).slice(0, 8);
   }, [searchTerm, customers, recentCustomers]);
 
+  // Lo stesso cliente due volte in un giorno e' quasi sempre un doppione: si
+  // vede prima di premere, non dopo (il server lo blocca a consegna creata).
+  const consegneAperte = useMemo(() => {
+    if (!selectedCustomer) return [];
+    return ensureArrayLocal(deliveries).filter((d) => d.customer_id === selectedCustomer.customer_id
+      && !['delivered', 'cancelled', 'not_delivered'].includes(d.status));
+  }, [deliveries, selectedCustomer]);
+
   const selectCustomer = (c) => {
     setSelectedCustomer(c);
     setSearchTerm('');
@@ -243,16 +251,28 @@ export default function QuickAddPage() {
             </div>
 
             {selectedCustomer ? (
-              <div className="flex items-start gap-3">
-                <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
-                  {selectedCustomer.name?.charAt(0)?.toUpperCase() || '?'}
+              <div>
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
+                    {selectedCustomer.name?.charAt(0)?.toUpperCase() || '?'}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold leading-tight">{selectedCustomer.name}</p>
+                    <p className="mt-0.5 break-words text-xs leading-snug text-muted-foreground">
+                      {selectedCustomer.phone ? `${selectedCustomer.phone} · ` : ''}{selectedCustomer.address}
+                    </p>
+                  </div>
                 </div>
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold leading-tight">{selectedCustomer.name}</p>
-                  <p className="mt-0.5 break-words text-xs leading-snug text-muted-foreground">
-                    {selectedCustomer.phone ? `${selectedCustomer.phone} · ` : ''}{selectedCustomer.address}
-                  </p>
-                </div>
+                {consegneAperte.length > 0 && (
+                  <div className="mt-2 flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2" data-testid="avviso-consegna-aperta">
+                    <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
+                    <p className="text-[11px] leading-snug text-amber-700 dark:text-amber-400">
+                      {consegneAperte.length === 1
+                        ? "Questo cliente ha già una consegna aperta. Se è la stessa, non serve crearne un'altra."
+                        : `Questo cliente ha ${consegneAperte.length} consegne aperte. Controlla che non sia la stessa.`}
+                    </p>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="relative">

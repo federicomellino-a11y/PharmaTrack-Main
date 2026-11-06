@@ -14,7 +14,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import {
   Package, Users, Truck, Clock, CheckCircle2, Plus, UserPlus,
-  MapPin, TrendingUp, ArrowRight, AlertCircle, Euro, BarChart3
+  MapPin, TrendingUp, ArrowRight, AlertCircle, Euro, BarChart3, Wallet
 } from 'lucide-react';
 import { toast } from 'sonner';
 import 'leaflet/dist/leaflet.css';
@@ -290,6 +290,34 @@ export default function PharmacyDashboard() {
             </Link>
           ))}
         </div>
+
+        {/* Cassa di oggi: il numero che serve alla sera, senza ricostruirlo */}
+        <Card className="card-exclusive" data-testid="cassa-oggi">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <div className="flex items-center gap-2">
+                <Wallet className="w-4 h-4 text-primary" />
+                <p className="text-sm font-semibold">Cassa di oggi</p>
+              </div>
+              <Link to="/shifts" className="text-xs text-primary hover:underline">Turni &amp; Cassa</Link>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Totale</p>
+                <p className="text-2xl font-black tabular-nums">€ {(stats?.today_money?.total || 0).toFixed(2).replace('.', ',')}</p>
+                <p className="text-xs text-muted-foreground">{stats?.today_money?.count || 0} consegne incassate</p>
+              </div>
+              <div>
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Contanti</p>
+                <p className="text-lg font-bold tabular-nums">€ {(stats?.today_money?.cash || 0).toFixed(2).replace('.', ',')}</p>
+              </div>
+              <div>
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">POS</p>
+                <p className="text-lg font-bold tabular-nums">€ {(stats?.today_money?.pos || 0).toFixed(2).replace('.', ',')}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Map + Chart */}
         <div className="grid lg:grid-cols-2 gap-4">

@@ -42,6 +42,23 @@ async def get_statistics(user: dict = Depends(get_current_user)):
         count = await db.deliveries.count_documents({"pharmacy_id": pharmacy_id, "created_at": {"$gte": day_start.isoformat(), "$lt": day_end.isoformat()}})
         completed = await db.deliveries.count_documents({"pharmacy_id": pharmacy_id, "status": "delivered", "actual_delivery": {"$gte": day_start.isoformat(), "$lt": day_end.isoformat()}})
         weekly_data.append({"date": day_start.strftime("%Y-%m-%d"), "day": day_start.strftime("%a"), "total": count, "completed": completed})
+    # --- Cassa di oggi: quanto e' entrato, diviso contanti e POS ---
+    # Serve al banco alla sera: si guarda un numero, non si ricostruisce.
+    incasso_oggi = {"cash": 0.0, "pos": 0.0, "total": 0.0, "count": 0}
+    for consegna in await db.deliveries.find(
+        {
+            "pharmacy_id": pharmacy_id,
+            "status": {"$in": ["delivered", "delivered_pending_confirmation"]},
+            "actual_delivery": {"$gte": today_start.isoformat()},
+        },
+        {"_id": 0, "amount": 1, "payment_method": 1},
+    ).to_list(2000):
+        importo = consegna.get("amount") or 0
+        metodo = consegna.get("payment_method") if consegna.get("payment_method") in ("cash", "pos") else "pos"
+        incasso_oggi[metodo] = round(incasso_oggi[metodo] + importo, 2)
+        incasso_oggi["total"] = round(incasso_oggi["total"] + importo, 2)
+        incasso_oggi["count"] += 1
+
     priority_breakdown = {}
     for level in ("low", "normal", "high", "urgent"):
         priority_breakdown[level] = await db.deliveries.count_documents({
@@ -55,6 +72,7 @@ async def get_statistics(user: dict = Depends(get_current_user)):
         "deliveries": {"total": total_deliveries, "pending": pending_deliveries, "active": active_deliveries, "completed": completed_deliveries, "cancelled": cancelled_deliveries, "today": today_deliveries, "today_completed": today_completed},
         "weekly": weekly_data,
         "priority": priority_breakdown,
+        "today_money": incasso_oggi,
     }
     await cache_set(cache_key, result)
     return result
