@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
-import { useDriversQuery } from '@/hooks/queries';
+import { useDriversQuery, usePlanQuery } from '@/hooks/queries';
 import AddressAutocomplete from '../../components/AddressAutocomplete';
 import { API } from '@/lib/config';
 import { ensureArray, ensureObject } from '@/lib/collections';
@@ -17,7 +17,7 @@ import { Switch } from '../../components/ui/switch';
 import { Avatar, AvatarFallback, AvatarImage } from '../../components/ui/avatar';
 import { Badge } from '../../components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
-import {
+import { CreditCard,
   Bell,
   BellRing,
   Building2,
@@ -191,6 +191,14 @@ export default function SettingsPage() {
   };
 
 
+  const { data: piano } = usePlanQuery();
+  const limiti = piano?.limiti || {};
+  const uso = piano?.uso || {};
+  const provaFinita = Boolean(piano?.scaduto);
+  const vicinoAlTetto =
+    (limiti.max_consegne_mese && (uso.consegne_mese || 0) >= limiti.max_consegne_mese * 0.9) ||
+    (limiti.max_fattorini && (uso.fattorini || 0) >= limiti.max_fattorini);
+
   return (
     <Layout title="Impostazioni">
       <div className="max-w-2xl space-y-6" data-testid="settings-page">
@@ -204,6 +212,64 @@ export default function SettingsPage() {
               <Save className="w-4 h-4 mr-2" />
               {saving ? 'Salvataggio...' : 'Salva impostazioni'}
             </Button>
+          </CardContent>
+        </Card>
+
+        <Card className={provaFinita ? 'border-destructive/40' : ''} data-testid="carta-del-piano">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CreditCard className="w-5 h-5 text-primary" />Piano
+            </CardTitle>
+            <CardDescription>
+              {piano?.nome
+                ? `${piano.nome}${piano.prezzo_mese ? ` · ${piano.prezzo_mese} €/mese` : ''}`
+                : 'Nessun limite attivo su questo account'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {piano?.in_prova && !provaFinita && (
+              <p className="text-sm">
+                Prova in corso, restano <span className="font-semibold">{Math.max(0, piano.giorni_rimasti ?? 0)} giorni</span>.
+              </p>
+            )}
+            {provaFinita && (
+              <p className="text-sm font-medium text-destructive">
+                La prova è finita: le consegne già aperte si chiudono, ma non se ne possono creare di nuove.
+              </p>
+            )}
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div className="rounded-xl bg-secondary/40 p-3">
+                <p className="text-xs text-muted-foreground">Consegne questo mese</p>
+                <p className="font-bold tabular-nums">
+                  {uso.consegne_mese ?? 0}
+                  {limiti.max_consegne_mese ? ` / ${limiti.max_consegne_mese}` : ''}
+                </p>
+              </div>
+              <div className="rounded-xl bg-secondary/40 p-3">
+                <p className="text-xs text-muted-foreground">Fattorini attivi</p>
+                <p className="font-bold tabular-nums">
+                  {uso.fattorini ?? 0}
+                  {limiti.max_fattorini ? ` / ${limiti.max_fattorini}` : ''}
+                </p>
+              </div>
+            </div>
+            {vicinoAlTetto && !provaFinita && (
+              <p className="text-xs text-amber-600">
+                Sei vicino al tetto del piano: oltre, le creazioni si fermano finché non passi a un piano superiore.
+              </p>
+            )}
+            {piano?.catalogo?.length > 0 && (
+              <div className="space-y-1.5 pt-1">
+                {piano.catalogo.filter((voce) => voce.piano !== 'prova').map((voce) => (
+                  <div key={voce.piano} className="flex items-center justify-between rounded-lg border px-3 py-2 text-sm">
+                    <span className="font-medium">{voce.nome}</span>
+                    <span className="text-muted-foreground">
+                      {voce.prezzo_mese} €/mese · {voce.max_fattorini} fattorini · {voce.max_consegne_mese} consegne
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
 

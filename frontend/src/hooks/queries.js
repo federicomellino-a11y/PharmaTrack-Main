@@ -25,6 +25,9 @@ export const useStatisticsQuery = (options = {}) =>
 export const useAnalyticsQuery = (period = 'month', options = {}) =>
   useQuery({ queryKey: ['analytics', period], queryFn: getObj(`/analytics?period=${period}`), ...options });
 
+export const usePlanQuery = (options = {}) =>
+  useQuery({ queryKey: ['plan'], queryFn: getObj('/plan'), ...options });
+
 export const useNotesQuery = (options = {}) =>
   useQuery({ queryKey: ['notes'], queryFn: getList('/notes'), ...options });
 

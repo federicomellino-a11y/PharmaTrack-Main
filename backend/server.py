@@ -23,7 +23,7 @@ from app.routers import (
     health, pharmacy_auth, admin, driver_auth, customers, drivers,
     deliveries, driver_deliveries, messages, notifications, statistics,
     archive, doctors, useful_numbers, notes, reports, integrations, shifts,
-    analytics, photos, client_errors, csp_reports, admin_db,
+    analytics, photos, client_errors, csp_reports, admin_db, plan,
 )
 from middleware_security import SecurityHeadersMiddleware
 
@@ -106,7 +106,7 @@ _ROUTER_TAGS = {
     "messages": "messages", "notifications": "notifications", "statistics": "statistics",
     "archive": "archive", "doctors": "doctors", "useful_numbers": "useful-numbers",
     "notes": "notes", "reports": "reports", "integrations": "integrations", "shifts": "shifts",
-    "analytics": "analytics", "csp_reports": "csp", "admin_db": "admin-db",
+    "analytics": "analytics", "csp_reports": "csp", "admin_db": "admin-db", "plan": "plan",
 }
 api_router = APIRouter(prefix="/api")
 from app.routers import geocode as geocode_router  # noqa: E402
@@ -114,7 +114,7 @@ for module in [
     health, pharmacy_auth, admin, driver_auth, customers, drivers,
     deliveries, driver_deliveries, messages, notifications, statistics,
     archive, doctors, useful_numbers, notes, reports, integrations, shifts,
-    analytics, photos, client_errors, csp_reports, admin_db, geocode_router,
+    analytics, photos, client_errors, csp_reports, admin_db, geocode_router, plan,
 ]:
     tag = _ROUTER_TAGS.get(module.__name__.split(".")[-1])
     api_router.include_router(module.router, tags=[tag] if tag else None)

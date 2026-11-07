@@ -11,6 +11,7 @@ from app.core.database import db
 from cloudinary_config import PhotoManager
 from app.core.websocket import manager
 # (nessun uso di app.core.config)
+from app.core.piani import piano_corrente, inizio_mese, verifica_consegne
 from app.core.security import (
     get_current_user,
 )
@@ -134,6 +135,19 @@ async def get_deliveries(response: Response, status: Optional[str] = None, drive
 
 @router.post("/deliveries")
 async def create_delivery(delivery: DeliveryCreate, user: dict = Depends(get_current_user)):
+    # Limite del piano: si ferma la creazione, non la lettura né la chiusura di
+    # quello che è già aperto. Chi ha un piano vecchio senza campo "piano" passa.
+    farmacia = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0, "piano": 1, "prova_scadenza": 1}) or {}
+    piano = piano_corrente(farmacia)
+    if piano.get("piano"):
+        usate = await db.deliveries.count_documents({
+            "pharmacy_id": user["user_id"],
+            "created_at": {"$gte": inizio_mese().isoformat()},
+        })
+        motivo = verifica_consegne(piano, usate)
+        if motivo:
+            raise HTTPException(status_code=402, detail=motivo)
+
     customer = await db.customers.find_one({"customer_id": delivery.customer_id, "pharmacy_id": user["user_id"]}, {"_id": 0})
     if not customer:
         raise HTTPException(status_code=404, detail="Cliente non trovato")
@@ -566,7 +580,8 @@ async def public_delivery_tracking(token: str):
             pass
 
     pharmacy = await db.users.find_one(
-        {"user_id": delivery.get("pharmacy_id")}, {"pharmacy_name": 1, "_id": 0}
+        {"user_id": delivery.get("pharmacy_id")},
+        {"pharmacy_name": 1, "pharmacy_phone": 1, "_id": 0},
     )
     first_name = (delivery.get("customer_name") or "").split(" ")[0] or "Cliente"
     return {
@@ -574,6 +589,7 @@ async def public_delivery_tracking(token: str):
         "status": delivery.get("status"),
         "updated_at": delivery.get("updated_at"),
         "pharmacy_name": (pharmacy or {}).get("pharmacy_name") or "Farmacia",
+        "pharmacy_phone": (pharmacy or {}).get("pharmacy_phone"),
         "has_pod": bool(delivery.get("pod_confirmed_at")),
     }
 

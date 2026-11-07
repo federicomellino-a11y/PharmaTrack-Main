@@ -22,6 +22,12 @@ import {
  User, Star, Package, CheckCircle2
 } from 'lucide-react';
 import { toast } from 'sonner';
+
+// Il limite del piano arriva come 402: va spiegato, non mostrato come guasto.
+const messaggioPiano = (errore, ripiego) =>
+  errore?.response?.status === 402
+    ? (errore.response.data?.detail || 'Limite del piano raggiunto.')
+    : ripiego;
 import { ensureArray } from '@/lib/collections';
 import { useAuth } from '../../contexts/AuthContext';
 import { confirmAction } from '../../components/ConfirmDialog';
@@ -96,7 +102,7 @@ export default function DriversPage() {
  }
  }
  } catch (err) {
- toast.error(err.response?.data?.detail || 'Errore');
+ toast.error(messaggioPiano(err, err.response?.data?.detail || 'Errore'));
  }
  };
 

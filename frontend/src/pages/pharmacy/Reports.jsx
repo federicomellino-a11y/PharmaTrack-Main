@@ -10,7 +10,7 @@ import {
 import { Button } from '../../components/ui/button';
 import {
   Euro, Package, TrendingUp, Truck, CreditCard, Banknote, Trophy, Download, CheckCircle2,
-  Clock, XCircle, Users, BarChart3,
+  Clock, XCircle, Users, BarChart3, Printer,
 } from 'lucide-react';
 import { Badge } from '../../components/ui/badge';
 import { toast } from 'sonner';
@@ -160,6 +160,16 @@ export default function ReportsPage() {
           <div className="flex items-center gap-3">
             <Button variant="outline" size="sm" onClick={() => exportCSV(data, period)} className="gap-2" data-testid="export-csv-btn">
               <Download className="w-4 h-4" />Esporta CSV
+            </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => window.print()}
+            className="gap-2"
+            data-testid="print-report-btn"
+            title="Stampa o salva come PDF: nel dialogo di stampa scegli 'Salva come PDF'"
+          >
+              <Printer className="w-4 h-4" />Stampa / PDF
             </Button>
             <Tabs value={period} onValueChange={setPeriod}>
               <TabsList data-testid="period-tabs">
