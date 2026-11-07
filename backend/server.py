@@ -114,7 +114,7 @@ for module in [
     health, pharmacy_auth, admin, driver_auth, customers, drivers,
     deliveries, driver_deliveries, messages, notifications, statistics,
     archive, doctors, useful_numbers, notes, reports, integrations, shifts,
-    analytics, photos, client_errors, csp_reports, admin_db, geocode_router, plan,
+    analytics, photos, client_errors, csp_reports, admin_db, geocode_router, plan, staff,
 ]:
     tag = _ROUTER_TAGS.get(module.__name__.split(".")[-1])
     api_router.include_router(module.router, tags=[tag] if tag else None)

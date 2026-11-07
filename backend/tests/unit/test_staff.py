@@ -55,3 +55,11 @@ def test_il_titolare_passa_dove_lo_staff_si_ferma():
         )
     assert errore.value.status_code == 403
     assert "titolare" in errore.value.detail
+
+
+def test_rotta_staff_registrata():
+    """Un router importato ma non montato risponde 404 in produzione: successo."""
+    from server import app
+
+    percorsi = {getattr(rotta, "path", "") for rotta in app.routes}
+    assert "/api/staff" in percorsi, "il router staff non e' montato in server.py"
