@@ -96,6 +96,16 @@ export default function PublicTrackingPage() {
         <p className="text-sm text-muted-foreground">Consegna per</p>
         <p className="text-2xl font-bold">{data.customer_first_name}</p>
         <p className="text-sm text-muted-foreground mt-1">{data.pharmacy_name}</p>
+        {data.pharmacy_phone && (
+          <a
+            href={`tel:${data.pharmacy_phone}`}
+            className="mt-3 inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium text-primary"
+            data-testid="tracking-telefono-farmacia"
+          >
+            <Phone className="w-4 h-4" />
+            {data.pharmacy_phone}
+          </a>
+        )}
       </div>
 
       {cancelled ? (

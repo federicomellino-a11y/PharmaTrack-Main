@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException, Depends, Request
 from app.core.database import db
 from app.core.passwords import hash_password
 # (nessun uso di app.core.config)
+from app.core.piani import piano_corrente, verifica_fattorini
 from app.core.security import (
     get_current_user,
 )
@@ -22,6 +23,14 @@ async def get_drivers(user: dict = Depends(get_current_user)):
 
 @router.post("/drivers")
 async def create_driver(driver: DriverCreate, user: dict = Depends(get_current_user)):
+    farmacia = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0, "piano": 1, "prova_scadenza": 1}) or {}
+    piano = piano_corrente(farmacia)
+    if piano.get("piano"):
+        attivi = await db.drivers.count_documents({"pharmacy_id": user["user_id"], "is_active": True})
+        motivo = verifica_fattorini(piano, attivi)
+        if motivo:
+            raise HTTPException(status_code=402, detail=motivo)
+
     existing = await db.drivers.find_one({"email": driver.email})
     if existing:
         raise HTTPException(status_code=400, detail="Email già in uso")

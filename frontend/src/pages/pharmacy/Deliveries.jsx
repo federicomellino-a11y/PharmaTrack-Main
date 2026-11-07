@@ -22,6 +22,12 @@ import {
   ClipboardCheck, ChevronRight, Download
 } from 'lucide-react';
 import { toast } from 'sonner';
+
+// Il limite del piano arriva come 402: va spiegato, non mostrato come guasto.
+const messaggioPiano = (errore, ripiego) =>
+  errore?.response?.status === 402
+    ? (errore.response.data?.detail || 'Limite del piano raggiunto.')
+    : ripiego;
 import { useAuth } from '../../contexts/AuthContext';
 import { ensureArray } from '@/lib/collections';
 import { printDeliveryLabel } from '@/lib/printLabel';
@@ -316,7 +322,7 @@ export default function DeliveriesPage() {
 
       toast.success(defaultDriver ? `Consegna creata e assegnata a ${defaultDriver.name}` : 'Consegna creata');
       setDialogOpen(false); resetForm(); fetchData();
-    } catch (err) { toast.error(err.response?.data?.detail || 'Errore'); }
+    } catch (err) { toast.error(messaggioPiano(err, err.response?.data?.detail || 'Errore')); }
   };
 
   const handleEdit = async (e) => {

@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, Depends, Request, Response
 from app.core.database import db
 from app.core.passwords import hash_password, needs_rehash, verify_password
 from app.core.config import APP_BASE_URL, FORGOT_RATE_LIMIT, LOGIN_RATE_LIMIT, REGISTER_RATE_LIMIT, os
+from app.core.piani import nuovo_profilo_piano
 from app.core.security import (
     get_current_user, clear_cookie_variants, delete_pharmacy_account_data,
 )
@@ -81,7 +82,8 @@ async def register(request: Request, data: PharmacyRegister, response: Response)
             "sound_enabled": True,
             "driver_tracking_enabled": False,
         },
-        "created_at": datetime.now(timezone.utc).isoformat()
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        **nuovo_profilo_piano(),
     }
     await db.users.insert_one(new_user)
     await _send_verification_email(user_id, data.email, data.name)
