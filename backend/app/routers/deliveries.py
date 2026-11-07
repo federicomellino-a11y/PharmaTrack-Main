@@ -11,6 +11,7 @@ from app.core.database import db
 from cloudinary_config import PhotoManager
 from app.core.websocket import manager
 # (nessun uso di app.core.config)
+from app.core.fasce import descrivi_fascia, fascia_scaduta, valida_fascia
 from app.core.piani import piano_corrente, inizio_mese, verifica_consegne
 from app.core.security import (
     get_current_user,
@@ -148,6 +149,11 @@ async def create_delivery(delivery: DeliveryCreate, user: dict = Depends(get_cur
         if motivo:
             raise HTTPException(status_code=402, detail=motivo)
 
+    try:
+        inizio_fascia, fine_fascia = valida_fascia(delivery.scheduled_time, getattr(delivery, "slot_to", None))
+    except ValueError as errore:
+        raise HTTPException(status_code=422, detail=str(errore))
+
     customer = await db.customers.find_one({"customer_id": delivery.customer_id, "pharmacy_id": user["user_id"]}, {"_id": 0})
     if not customer:
         raise HTTPException(status_code=404, detail="Cliente non trovato")
@@ -217,7 +223,8 @@ async def create_delivery(delivery: DeliveryCreate, user: dict = Depends(get_cur
         "status": "da_preparare",  # sempre in coda: l'assegnazione e' un passo a parte
         "payment_method": delivery.payment_method, "amount": delivery.amount,
         "amount_given": delivery.amount_given, "change_due": change_due, "payment_collected": False,
-        "scheduled_date": delivery.scheduled_date, "scheduled_time": delivery.scheduled_time,
+        "scheduled_date": delivery.scheduled_date, "scheduled_time": inizio_fascia,
+        "slot_to": fine_fascia,
         "priority": delivery.priority,
         "estimated_delivery": None, "actual_delivery": None,
         "created_at": datetime.now(timezone.utc).isoformat(), "updated_at": datetime.now(timezone.utc).isoformat(),
@@ -327,6 +334,17 @@ async def update_delivery(delivery_id: str, update: DeliveryUpdate, user: dict =
     if not delivery:
         raise HTTPException(status_code=404, detail="Consegna non trovata")
     update_data = {"updated_at": datetime.now(timezone.utc).isoformat()}
+    # Se cambia l'orario, la fascia deve restare coerente: si valida prima di scrivere.
+    if update.scheduled_time is not None or getattr(update, "slot_to", None) is not None:
+        try:
+            inizio_nuovo, fine_nuova = valida_fascia(
+                update.scheduled_time if update.scheduled_time is not None else delivery.get("scheduled_time"),
+                update.slot_to if getattr(update, "slot_to", None) is not None else delivery.get("slot_to"),
+            )
+        except ValueError as errore:
+            raise HTTPException(status_code=422, detail=str(errore))
+        update_data["scheduled_time"] = inizio_nuovo
+        update_data["slot_to"] = fine_nuova
     if update.driver_id is not None:
         # Il fattorino deve appartenere a QUESTA farmacia: senza il controllo
         # una farmacia poteva assegnare una consegna al fattorino di un'altra,
@@ -591,6 +609,13 @@ async def public_delivery_tracking(token: str):
         "pharmacy_name": (pharmacy or {}).get("pharmacy_name") or "Farmacia",
         "pharmacy_phone": (pharmacy or {}).get("pharmacy_phone"),
         "has_pod": bool(delivery.get("pod_confirmed_at")),
+        "slot": descrivi_fascia(delivery.get("scheduled_time"), delivery.get("slot_to")),
+        "slot_late": fascia_scaduta(
+            delivery.get("scheduled_time"),
+            delivery.get("slot_to"),
+            datetime.now(timezone.utc).astimezone(ROME_TZ)
+            if "ROME_TZ" in globals() else datetime.now(timezone.utc),
+        ),
     }
 
 @router.get("/deliveries/{delivery_id}/audit")
