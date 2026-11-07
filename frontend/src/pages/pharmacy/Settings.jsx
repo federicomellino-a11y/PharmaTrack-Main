@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { useDriversQuery, usePlanQuery } from '@/hooks/queries';
+import StaffCard from '../../components/StaffCard';
 import AddressAutocomplete from '../../components/AddressAutocomplete';
 import { API } from '@/lib/config';
 import { ensureArray, ensureObject } from '@/lib/collections';
@@ -291,6 +292,8 @@ export default function SettingsPage() {
             </div>
           </CardContent>
         </Card>
+
+        {user?.role !== 'staff' && <StaffCard />}
 
         <Card>
           <CardHeader>

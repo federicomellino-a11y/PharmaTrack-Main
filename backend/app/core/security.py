@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime, timezone
 from typing import Optional
-from fastapi import HTTPException, Request, Response
+from fastapi import Depends, HTTPException, Request, Response
 
 from app.core.database import db
 from app.core.config import ADMIN_EMAIL, ADMIN_PASSWORD, ADMIN_NAME
@@ -77,6 +77,30 @@ async def delete_pharmacy_account_data(user_id: str):
 
 # ============ AUTH HELPERS ============
 
+def applica_contesto_staff(user: dict) -> dict:
+    """Traduce un accesso staff nel titolare a cui appartiene.
+
+    Tutto il resto del backend usa user_id come identificativo della farmacia.
+    Invece di toccare venti router, lo staff viene ricondotto al titolare qui:
+    da questo punto in poi i dati sono gli stessi della farmacia, e le azioni
+    risultano fatte sulla farmacia e non su un utente a se'.
+    """
+    ruolo = (user.get("role") or "pharmacy").lower()
+    user["ruolo_accesso"] = ruolo
+    if ruolo != "staff":
+        return user
+    titolare = user.get("pharmacy_owner_id")
+    if not titolare:
+        raise HTTPException(status_code=403, detail="Accesso non collegato a una farmacia")
+    user["staff_user_id"] = user.get("user_id")
+    user["staff_role"] = user.get("staff_role") or "operatore"
+    user["user_id"] = titolare
+    # Il resto del codice vede un accesso farmacia: non deve sapere dello staff.
+    user["role"] = "pharmacy"
+    return user
+
+
+
 async def get_current_user(request: Request) -> dict:
     session_token = request.cookies.get("session_token")
     if not session_token:
@@ -97,7 +121,18 @@ async def get_current_user(request: Request) -> dict:
     if user.get("is_active", True) is False:
         await db.user_sessions.delete_many({"user_id": user["user_id"]})
         raise HTTPException(status_code=403, detail="Account disattivato")
+    return applica_contesto_staff(user)
+
+
+async def richiedi_titolare(user: dict = Depends(get_current_user)) -> dict:
+    """Per le cose che solo il titolare puo' fare: staff, fattorini, impostazioni."""
+    if user.get("ruolo_accesso") == "staff":
+        raise HTTPException(
+            status_code=403,
+            detail="Questa operazione spetta al titolare della farmacia",
+        )
     return user
+
 
 async def get_current_driver(request: Request) -> dict:
     session_token = request.cookies.get("driver_session_token")
