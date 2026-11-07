@@ -55,3 +55,17 @@ def test_il_titolare_passa_dove_lo_staff_si_ferma():
         )
     assert errore.value.status_code == 403
     assert "titolare" in errore.value.detail
+
+
+def test_rotta_staff_registrata():
+    """Un router importato ma non montato risponde 404 in produzione.
+
+    Si guarda la lista nel sorgente di server.py, senza avviare l'app: il test
+    deve girare anche in CI, dove non esiste un database da contattare.
+    """
+    from pathlib import Path
+
+    sorgente = (Path(__file__).resolve().parents[2] / "server.py").read_text()
+    inizio = sorgente.index("for module in [")
+    elenco = sorgente[inizio:sorgente.index("]:", inizio)]
+    assert "staff," in elenco, "il router staff non e' nella lista dei router montati"
