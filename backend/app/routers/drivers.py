@@ -7,7 +7,8 @@ from app.core.database import db
 from app.core.passwords import hash_password
 # (nessun uso di app.core.config)
 from app.core.piani import piano_corrente, verifica_fattorini
-from app.core.security import (
+from app.core.security import (  # noqa: F401
+    richiedi_titolare,
     get_current_user,
 )
 from app.models.schemas import DriverCreate
@@ -22,7 +23,7 @@ async def get_drivers(user: dict = Depends(get_current_user)):
     return drivers
 
 @router.post("/drivers")
-async def create_driver(driver: DriverCreate, user: dict = Depends(get_current_user)):
+async def create_driver(driver: DriverCreate, user: dict = Depends(richiedi_titolare)):
     farmacia = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0, "piano": 1, "prova_scadenza": 1}) or {}
     piano = piano_corrente(farmacia)
     if piano.get("piano"):
@@ -186,7 +187,7 @@ async def update_driver(driver_id: str, request: Request, user: dict = Depends(g
     return await db.drivers.find_one({"driver_id": driver_id, "pharmacy_id": user["user_id"]}, {"_id": 0, "password_hash": 0})
 
 @router.delete("/drivers/{driver_id}")
-async def delete_driver(driver_id: str, user: dict = Depends(get_current_user)):
+async def delete_driver(driver_id: str, user: dict = Depends(richiedi_titolare)):
     result = await db.drivers.delete_one({"driver_id": driver_id, "pharmacy_id": user["user_id"]})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Fattorino non trovato")
