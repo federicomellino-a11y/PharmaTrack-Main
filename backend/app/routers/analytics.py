@@ -4,6 +4,7 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Depends
 
 from app.core.database import db
+from app.core.fasce import fascia_scaduta
 from app.core.security import get_current_user
 from app.core.cache import cache_get, cache_set
 
@@ -200,6 +201,14 @@ async def get_analytics(period: str = "month", user: dict = Depends(get_current_
         "status": {"$in": ["da_preparare", "pronta", "pending"]},
         "driver_id": None,
     })
+    # Promesse non mantenute: fascia passata, consegna ancora aperta.
+    aperte = await db.deliveries.find(
+        {"pharmacy_id": pharmacy_id, "status": {"$in": ["da_preparare", "pronta", "pending", "in_transit"]}},
+        {"_id": 0, "scheduled_time": 1, "slot_to": 1},
+    ).to_list(1000)
+    adesso_roma = datetime.now(ROME_TZ)
+    in_ritardo = sum(1 for c in aperte if fascia_scaduta(c.get("scheduled_time"), c.get("slot_to"), adesso_roma))
+
     ora_di_punta = max(per_ora, key=lambda ora: per_ora[ora]) if any(per_ora.values()) else None
     giorno_di_punta = max(per_giorno, key=lambda giorno: per_giorno[giorno]) if any(per_giorno.values()) else None
 
@@ -232,6 +241,7 @@ async def get_analytics(period: str = "month", user: dict = Depends(get_current_
         "by_weekday": [{"day": giorno, "count": per_giorno[giorno]} for giorno in giorni],
         "busiest": {"hour": ora_di_punta, "weekday": giorno_di_punta},
         "open_without_driver": senza_fattorino,
+        "overdue_slots": in_ritardo,
         "lapsed_customers": da_richiamare[:10],
     }
 

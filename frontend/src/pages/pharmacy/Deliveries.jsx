@@ -5,6 +5,7 @@ import { ListSkeleton } from '../../components/Skeletons';
 import AddressAutocomplete from '../../components/AddressAutocomplete';
 import axios from 'axios';
 import { API } from '@/lib/config';
+import { FASCE, fasciaDi, testoFascia } from '@/lib/fasce';
 import { Layout } from '../../components/Layout';
 import { Card, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
@@ -135,9 +136,12 @@ export default function DeliveriesPage() {
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [prontaDialogOpen, setProntaDialogOpen] = useState(false);
   const [selectedDelivery, setSelectedDelivery] = useState(null);
+  // La fascia scelta è uno stato suo: derivarla dai valori non permetteva
+  // di passare a "Orario preciso" quando i valori coincidevano con una fascia.
+  const [fasciaScelta, setFasciaScelta] = useState('subito');
   const [form, setForm] = useState({
     customer_id: 'none', notes: '', payment_method: 'cash',
-    amount: '', amount_given: '', scheduled_date: '', scheduled_time: '', priority: 'normal'
+    amount: '', amount_given: '', scheduled_date: '', scheduled_time: '', slot_to: null, priority: 'normal'
   });
 
   // Stato per import Winfarm: dati pre-compilati dalla querystring
@@ -264,7 +268,11 @@ export default function DeliveriesPage() {
       notes: winfarmPrefill.notes || prev.notes,
       priority: ['low', 'normal', 'high', 'urgent'].includes(winfarmPrefill.priority) ? winfarmPrefill.priority : prev.priority,
       scheduled_time: winfarmPrefill.scheduled_time || prev.scheduled_time,
+      slot_to: winfarmPrefill.scheduled_time ? (prev.slot_to ?? null) : prev.slot_to,
     }));
+    if (winfarmPrefill.scheduled_time) {
+      setFasciaScelta((fasciaDi(winfarmPrefill.scheduled_time, null) || { valore: 'subito' }).valore);
+    }
     if (!matched && winfarmPrefill.customer_name) {
       // mostra termine di ricerca così il farmacista vede la lista filtrata
       setCustomerSearchTerm(winfarmPrefill.customer_name);
@@ -277,7 +285,8 @@ export default function DeliveriesPage() {
   }, [winfarmPrefill, customers]);
 
   const resetForm = () => {
-    setForm({ customer_id: 'none', notes: '', payment_method: 'cash', amount: '', amount_given: '', scheduled_date: '', scheduled_time: '', priority: 'normal', nre: '' });
+    setForm({ customer_id: 'none', notes: '', payment_method: 'cash', amount: '', amount_given: '', scheduled_date: '', scheduled_time: '', slot_to: null, priority: 'normal', nre: '' });
+    setFasciaScelta('subito');
     setCustomerSearchTerm('');
     setCustomerDropdownOpen(false);
   };
@@ -325,6 +334,20 @@ export default function DeliveriesPage() {
     } catch (err) { toast.error(messaggioPiano(err, err.response?.data?.detail || 'Errore')); }
   };
 
+  // La fascia scelta si ricava dallo stato: così resta coerente anche quando
+  // l'orario arriva dal pulsante magico o dal Dock.
+
+  const applicaFascia = (valore) => {
+    setFasciaScelta(valore);
+    const scelta = FASCE.find((f) => f.valore === valore);
+    if (!scelta || valore === 'preciso') {
+      // "Orario preciso": si tengono i valori attuali e si mostrano i campi.
+      setForm((precedente) => ({ ...precedente, scheduled_time: precedente.scheduled_time || '', slot_to: precedente.slot_to || null }));
+      return;
+    }
+    setForm((precedente) => ({ ...precedente, scheduled_time: scelta.da || '', slot_to: scelta.a }));
+  };
+
   const handleEdit = async (e) => {
     e.preventDefault();
     if (!validateCashForm()) return;
@@ -335,7 +358,8 @@ export default function DeliveriesPage() {
         amount: normalizeMoney(form.amount),
         amount_given: normalizeMoney(form.amount_given),
         scheduled_date: form.scheduled_date || null,
-        scheduled_time: form.scheduled_time || null
+        scheduled_time: form.scheduled_time || null,
+        slot_to: form.slot_to || null
       }, { withCredentials: true });
       toast.success('Aggiornata');
       setEditDialogOpen(false); resetForm(); fetchData();
@@ -740,7 +764,13 @@ export default function DeliveriesPage() {
                           {d.scheduled_date && (
                             <span className="flex items-center gap-1 text-primary">
                               <Calendar className="w-3 h-3" />
-                              {d.scheduled_date} {d.scheduled_time}
+                              {d.scheduled_date} {testoFascia(d.scheduled_time, d.slot_to)}
+                            </span>
+                          )}
+                          {!d.scheduled_date && d.scheduled_time && (
+                            <span className="flex items-center gap-1 text-primary" data-testid="fascia-oggi">
+                              <Calendar className="w-3 h-3" />
+                              {testoFascia(d.scheduled_time, d.slot_to)}
                             </span>
                           )}
                           <span className="flex items-center gap-1">
@@ -813,7 +843,8 @@ export default function DeliveriesPage() {
                               <Button variant="outline" size="sm" className="h-7 px-2 text-xs"
                                 onClick={() => {
                                   setSelectedDelivery(d);
-                                  setForm({ ...form, notes: d.notes || '', payment_method: d.payment_method || 'cash', amount: d.amount || '', amount_given: d.amount_given || '', scheduled_date: d.scheduled_date || '', scheduled_time: d.scheduled_time || '' });
+                                  setForm({ ...form, notes: d.notes || '', payment_method: d.payment_method || 'cash', amount: d.amount || '', amount_given: d.amount_given || '', scheduled_date: d.scheduled_date || '', scheduled_time: d.scheduled_time || '', slot_to: d.slot_to || null });
+                                  setFasciaScelta((fasciaDi(d.scheduled_time, d.slot_to) || { valore: 'subito' }).valore);
                                   setEditDialogOpen(true);
                                 }}>
                                 <Pencil className="w-3 h-3" />
@@ -1019,11 +1050,32 @@ export default function DeliveriesPage() {
                   onChange={e => setForm({...form, scheduled_date: e.target.value})} />
               </div>
               <div className="form-group">
-                <Label>Orario</Label>
-                <Input type="time" value={form.scheduled_time}
-                  onChange={e => setForm({...form, scheduled_time: e.target.value})} />
+                <Label>Fascia oraria</Label>
+                <select
+                  className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  value={fasciaScelta}
+                  onChange={e => applicaFascia(e.target.value)}
+                  data-testid="scelta-fascia"
+                >
+                  {FASCE.map(f => <option key={f.valore} value={f.valore}>{f.etichetta}</option>)}
+                </select>
               </div>
             </div>
+
+            {fasciaScelta === 'preciso' && (
+              <div className="grid grid-cols-2 gap-3" data-testid="fascia-manuale">
+                <div className="form-group">
+                  <Label>Dalle</Label>
+                  <Input type="time" value={form.scheduled_time || ''}
+                    onChange={e => setForm({ ...form, scheduled_time: e.target.value })} />
+                </div>
+                <div className="form-group">
+                  <Label>Entro le</Label>
+                  <Input type="time" value={form.slot_to || ''}
+                    onChange={e => setForm({ ...form, slot_to: e.target.value })} />
+                </div>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-3">
               <div className="form-group">

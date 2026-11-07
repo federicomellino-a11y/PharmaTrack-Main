@@ -98,6 +98,8 @@ class DeliveryCreate(BaseModel):
     amount_given: Optional[float] = Field(default=None, ge=0)
     scheduled_date: Optional[str] = None
     scheduled_time: Optional[str] = None
+    # Fine della fascia promessa ("dalle 9 alle 12"): scheduled_time è l'inizio.
+    slot_to: Optional[str] = None
     priority: str = "normal"
     # Numero dello scontrino letto dal pulsante magico: se la farmacia completa
     # la consegna dal modulo (cliente non selezionato in Winfarm) il riferimento
@@ -115,6 +117,7 @@ class DeliveryUpdate(BaseModel):
     payment_collected: Optional[bool] = None
     scheduled_date: Optional[str] = None
     scheduled_time: Optional[str] = None
+    slot_to: Optional[str] = None
     priority: Optional[str] = None
     failure_reason: Optional[str] = None
 

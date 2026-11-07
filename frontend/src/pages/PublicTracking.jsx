@@ -96,6 +96,16 @@ export default function PublicTrackingPage() {
         <p className="text-sm text-muted-foreground">Consegna per</p>
         <p className="text-2xl font-bold">{data.customer_first_name}</p>
         <p className="text-sm text-muted-foreground mt-1">{data.pharmacy_name}</p>
+        {data.slot && (
+          <p className="mt-3 text-sm" data-testid="promessa-fascia">
+            Consegna prevista <span className="font-semibold">{data.slot}</span>
+            {data.slot_late && data.status !== 'delivered' && (
+              <span className="block text-xs text-amber-600 mt-1">
+                Siamo oltre l'orario previsto: la farmacia sta chiudendo le consegne rimaste.
+              </span>
+            )}
+          </p>
+        )}
         {data.pharmacy_phone && (
           <a
             href={`tel:${data.pharmacy_phone}`}
