@@ -20,7 +20,7 @@ from app.core.security import (
 from app.core.notifications import (
     send_transactional_email, push_notifications_enabled, check_email_provider,
 )
-from app.models.schemas import AdminUserStatusUpdate, BaseModel
+from app.models.schemas import AdminUserStatusUpdate
 
 from app.core.limiter import limiter
 from pydantic import BaseModel

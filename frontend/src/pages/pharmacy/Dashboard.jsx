@@ -31,6 +31,7 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
+import { formatCurrency } from '@/lib/format';
 const customerIcon = new L.DivIcon({
   className: '',
   html: `<div style="background:hsl(172,66%,33%);width:12px;height:12px;border-radius:50%;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.3);"></div>`,
@@ -80,7 +81,6 @@ const buildUrgentItems = (deliveries) => {
   return items.sort((a, b) => (a.reason === b.reason ? 0 : a.reason === 'late' ? -1 : 1));
 };
 
-const formatCurrency = (v) => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(v || 0);
 
 
 export default function PharmacyDashboard() {

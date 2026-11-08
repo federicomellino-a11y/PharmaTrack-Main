@@ -1,8 +1,9 @@
 import logging
 from datetime import datetime, timezone, timedelta
-from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Depends
 
+from app.core.clock import ROME_TZ
+from app.core.delivery_lifecycle import BILLED_STATUSES
 from app.core.database import db
 from app.core.fasce import fascia_scaduta
 from app.core.security import get_current_user
@@ -11,8 +12,6 @@ from app.core.cache import cache_get, cache_set
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-_DELIVERED = ["delivered", "delivered_pending_confirmation"]
-ROME_TZ = ZoneInfo("Europe/Rome")
 
 
 @router.get("/analytics")
@@ -33,7 +32,7 @@ async def get_analytics(period: str = "month", user: dict = Depends(get_current_
 
     # Revenue + payment split over delivered orders
     pipeline = [
-        {"$match": {**base, "status": {"$in": _DELIVERED}}},
+        {"$match": {**base, "status": {"$in": BILLED_STATUSES}}},
         {"$group": {
             "_id": "$payment_method",
             "revenue": {"$sum": {"$ifNull": ["$amount", 0]}},
@@ -52,7 +51,7 @@ async def get_analytics(period: str = "month", user: dict = Depends(get_current_
 
     # Daily revenue trend
     trend_pipeline = [
-        {"$match": {**base, "status": {"$in": _DELIVERED}}},
+        {"$match": {**base, "status": {"$in": BILLED_STATUSES}}},
         {"$group": {
             "_id": {"$substr": ["$created_at", 0, 10]},
             "revenue": {"$sum": {"$ifNull": ["$amount", 0]}},
@@ -67,7 +66,7 @@ async def get_analytics(period: str = "month", user: dict = Depends(get_current_
 
     # Top customers by completed deliveries
     top_pipeline = [
-        {"$match": {**base, "status": {"$in": _DELIVERED}}},
+        {"$match": {**base, "status": {"$in": BILLED_STATUSES}}},
         {"$group": {
             "_id": "$customer_id",
             "customer_name": {"$first": "$customer_name"},
@@ -85,7 +84,7 @@ async def get_analytics(period: str = "month", user: dict = Depends(get_current_
 
     # Driver performance
     driver_pipeline = [
-        {"$match": {**base, "status": {"$in": _DELIVERED}, "driver_id": {"$ne": None}}},
+        {"$match": {**base, "status": {"$in": BILLED_STATUSES}, "driver_id": {"$ne": None}}},
         {"$group": {"_id": "$driver_id", "deliveries": {"$sum": 1},
                     "revenue": {"$sum": {"$ifNull": ["$amount", 0]}}}},
         {"$sort": {"deliveries": -1}},
@@ -133,7 +132,7 @@ async def get_analytics(period: str = "month", user: dict = Depends(get_current_
             motivo = (consegna.get("failure_reason") or "Non specificato").strip() or "Non specificato"
             motivi[motivo] = motivi.get(motivo, 0) + 1
         fine = consegna.get("actual_delivery")
-        if inizio and fine and consegna.get("status") in _DELIVERED:
+        if inizio and fine and consegna.get("status") in BILLED_STATUSES:
             try:
                 minuti = (datetime.fromisoformat(str(fine).replace("Z", "+00:00"))
                           - datetime.fromisoformat(str(inizio).replace("Z", "+00:00"))).total_seconds() / 60
@@ -166,7 +165,7 @@ async def get_analytics(period: str = "month", user: dict = Depends(get_current_
     # l'importo cambia, quindi si richiama la persona e non l'ordine.
     ultimi = {}
     for consegna in await db.deliveries.find(
-        {"pharmacy_id": pharmacy_id, "status": {"$in": _DELIVERED}},
+        {"pharmacy_id": pharmacy_id, "status": {"$in": BILLED_STATUSES}},
         {"_id": 0, "customer_id": 1, "customer_name": 1, "actual_delivery": 1, "created_at": 1},
     ).to_list(10000):
         cid = consegna.get("customer_id")

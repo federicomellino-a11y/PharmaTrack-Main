@@ -1,9 +1,10 @@
 import logging
 from datetime import datetime, timezone
-from zoneinfo import ZoneInfo
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends, Request
 
+from app.core.clock import ROME_TZ
+from app.core.delivery_lifecycle import BILLED_STATUSES
 from app.core.database import db
 from app.core.fasce import descrivi_fascia, fascia_scaduta
 from app.core.websocket import manager
@@ -18,7 +19,6 @@ from app.core.shifts_service import (
 )
 
 logger = logging.getLogger(__name__)
-ROME_TZ = ZoneInfo("Europe/Rome")
 router = APIRouter()
 
 
@@ -137,7 +137,7 @@ async def confirm_delivery_payment(delivery_id: str, request: Request, user: dic
     delivery = await db.deliveries.find_one({"delivery_id": delivery_id, "pharmacy_id": user["user_id"]}, {"_id": 0})
     if not delivery:
         raise HTTPException(status_code=404, detail="Consegna non trovata")
-    if delivery.get("status") not in ["delivered_pending_confirmation", "delivered"]:
+    if delivery.get("status") not in BILLED_STATUSES:
         raise HTTPException(status_code=400, detail="La consegna non è in attesa di conferma incasso")
     if delivery.get("payment_collected") is True and delivery.get("status") == "delivered":
         raise HTTPException(status_code=400, detail="Incasso già confermato")

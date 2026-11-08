@@ -13,6 +13,15 @@ ARCHIVED_STATUSES = ("delivered", "delivered_pending_confirmation", "cancelled",
 # Stati in cui la consegna e' ancora "viva" per la farmacia e per il fattorino.
 ACTIVE_STATUSES = ("da_preparare", "pronta", "pending", "assigned", "picked_up", "in_transit")
 
+# Stati che valgono come incasso: la consegna e' chiusa e i soldi sono entrati,
+# oppure sono per strada dal fattorino. E' l'elenco che i report contano come
+# fatturato, quindi deve esistere in un posto solo.
+BILLED_STATUSES = ("delivered", "delivered_pending_confirmation")
+
+# Consegne che la farmacia deve ancora seguire: in corso piu' quelle consegnate
+# con l'incasso non ancora confermato.
+FOLLOW_UP_STATUSES = ACTIVE_STATUSES + ("delivered_pending_confirmation",)
+
 # Stati da cui si puo' annullare: tutto tranne cio' che e' gia' annullato.
 CANCELLABLE_STATUSES = ("da_preparare", "pronta", "pending", "assigned", "picked_up", "in_transit",
                         "delivered_pending_confirmation", "delivered", "not_delivered")
