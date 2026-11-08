@@ -8,12 +8,8 @@ import { Input } from '../components/ui/input';
 import { Truck, Plus, RefreshCw, Search, ClipboardCheck, Package, Euro, XCircle, CheckCircle2, Zap } from 'lucide-react';
 import { toast } from 'sonner';
 
-const STATUS_LABELS = {
-  da_preparare: 'Da preparare', pending: 'Da preparare', pronta: 'Pronta',
-  assigned: 'Assegnata', picked_up: 'Ritirata', in_transit: 'In consegna',
-  delivered_pending_confirmation: 'Da confermare incasso', delivered: 'Consegnata', cancelled: 'Annullata',
-};
 
+import { etichettaStato } from '@/lib/deliveryDisplay';
 export default function DockPage() {
   const queryClient = useQueryClient();
   const { data: deliveries = [] } = useDeliveriesQuery();
