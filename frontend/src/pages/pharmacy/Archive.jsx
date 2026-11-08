@@ -22,6 +22,7 @@ import { ensureArray } from '@/lib/collections';
 
 
 import { formatDateTimeFull } from '@/lib/format';
+import { etichettaStato } from '@/lib/deliveryDisplay';
 export default function ArchivePage() {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
@@ -70,13 +71,6 @@ export default function ArchivePage() {
   useEffect(() => {
     setPage(1);
   }, [searchTerm]);
-
-  const statusLabels = {
-    delivered: 'Consegnata',
-    delivered_pending_confirmation: 'Da confermare',
-    cancelled: 'Annullata',
-    not_delivered: 'Non consegnata',
-  };
 
 
   const safeDeliveries = ensureArray(deliveries);
@@ -155,7 +149,7 @@ export default function ArchivePage() {
                         <div className="flex flex-wrap items-center gap-2 mb-1">
                           <h3 className="font-semibold text-foreground">{delivery.customer_name}</h3>
                           <Badge className={`status-${delivery.status}`}>
-                            {statusLabels[delivery.status] || delivery.status}
+                            {etichettaStato(delivery.status)}
                           </Badge>
                           {delivery.marker === 'ripristinata' && (
                             <Badge variant="outline" className="text-emerald-600 border-emerald-500/40" data-testid="marker-ripristinata">
