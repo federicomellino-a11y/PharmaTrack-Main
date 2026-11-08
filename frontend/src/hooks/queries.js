@@ -112,3 +112,9 @@ export const useDriverShiftQuery = (options = {}) =>
 
 export const useDriverMessagesQuery = (options = {}) =>
   useQuery({ queryKey: chiavi.messaggiFattorino, queryFn: letture.messaggiFattorino, ...options });
+
+export const useStaffQuery = (options = {}) =>
+  useQuery({ queryKey: chiavi.staff, queryFn: letture.staff, ...options });
+
+export const useNotificheQuery = (tipo = 'pharmacy', options = {}) =>
+  useQuery({ queryKey: chiavi.notifiche(tipo), queryFn: letture.notifiche(tipo), enabled: Boolean(tipo), ...options });

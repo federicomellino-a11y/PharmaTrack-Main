@@ -8,6 +8,9 @@ import { Label } from './ui/label';
 import { Badge } from './ui/badge';
 import { toast } from 'sonner';
 import { Users, UserPlus, Trash2 } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
+import { useStaffQuery } from '@/hooks/queries';
+import { chiavi } from '@/lib/api';
 
 const RUOLI = [
   { valore: 'operatore', etichetta: 'Operatore al banco' },
@@ -20,25 +23,17 @@ const RUOLI = [
  * ha il suo accesso invece di usare la password del titolare.
  */
 export default function StaffCard() {
-  const [membri, setMembri] = useState([]);
-  const [caricamento, setCaricamento] = useState(true);
-  const [errore, setErrore] = useState(null);
   const [nuovo, setNuovo] = useState({ name: '', email: '', password: '', staff_role: 'operatore' });
   const [salvataggio, setSalvataggio] = useState(false);
+  const queryClient = useQueryClient();
+  // La lettura passa da react-query come tutto il resto: lo staff ha la sua
+  // chiave in src/lib/api.js e ogni scrittura la invalida.
+  const { data: membri = [], isLoading: caricamento, error: erroreQuery } = useStaffQuery();
 
-  const carica = async () => {
-    try {
-      const { data } = await axios.get(`${API}/staff`, { withCredentials: true });
-      setMembri(Array.isArray(data) ? data : []);
-      setErrore(null);
-    } catch (err) {
-      setErrore(err?.response?.status === 403 ? 'Solo il titolare vede questa scheda' : 'Elenco non disponibile');
-    } finally {
-      setCaricamento(false);
-    }
-  };
-
-  useEffect(() => { carica(); }, []);
+  const errore = erroreQuery
+    ? (erroreQuery?.response?.status === 403 ? 'Solo il titolare vede questa scheda' : 'Elenco non disponibile')
+    : null;
+  const carica = () => queryClient.invalidateQueries({ queryKey: chiavi.staff });
 
   const aggiungi = async (e) => {
     e.preventDefault();

@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import axios from 'axios';
 import { queryClient } from '@/lib/queryClient';
 import { API } from '@/lib/config';
+import { chiavi, letture } from '@/lib/api';
 
 const AuthContext = createContext(null);
 
@@ -57,12 +58,14 @@ export const AuthProvider = ({ children }) => {
     // Il login costa ~0,5s di hashing: nel frattempo chiediamo i dati della
     // dashboard, cosi' la prima schermata non aspetta due volte di fila.
     // Fire-and-forget: se il prefetch fallisce, le pagine lo richiedono da sole.
-    ['/statistics', '/deliveries?status=active', '/customers'].forEach((path) => {
-      queryClient.prefetchQuery({
-        queryKey: ['prefetch', path],
-        queryFn: async () => (await axios.get(`${API}${path}`, { withCredentials: true })).data,
-        staleTime: 15_000,
-      }).catch(() => {});
+    // Chiavi vere, le stesse che leggono le pagine: prima erano ['prefetch', ...]
+    // e nessuno le rileggeva, quindi il prefetch non scaldava niente.
+    [
+      { queryKey: chiavi.statistics, queryFn: letture.statistics },
+      { queryKey: chiavi.deliveries('active'), queryFn: letture.deliveries('active') },
+      { queryKey: chiavi.customers, queryFn: letture.customers },
+    ].forEach((lettura) => {
+      queryClient.prefetchQuery({ ...lettura, staleTime: 15_000 }).catch(() => {});
     });
     return response.data;
   };

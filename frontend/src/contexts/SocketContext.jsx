@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 import { API, BACKEND_URL } from '@/lib/config';
+import { letture } from '@/lib/api';
 import { ensureArray, ensureObject } from '@/lib/collections';
 
 const SocketContext = createContext(null);
@@ -59,8 +60,8 @@ export const SocketProvider = ({ children, userId, userType, settings = {} }) =>
   const fetchNotifications = useCallback(async () => {
     if (!userId || !userType) return;
     try {
-      const response = await axios.get(notificationsEndpoint, { withCredentials: true });
-      const items = ensureArray(response.data);
+      const risposta = await letture.notifiche(userType)();
+      const items = ensureArray(risposta);
       items.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
       setNotifications(items.slice(0, 50));
     } catch {
@@ -77,11 +78,11 @@ export const SocketProvider = ({ children, userId, userType, settings = {} }) =>
 
     setPushSupported(true);
     try {
-      const response = await axios.get(`${API}/push/config`);
+      const configurazione = await letture.pushConfig();
       const nextConfig = {
-        enabled: Boolean(response.data?.enabled),
-        public_key: response.data?.public_key || null,
-        subject: response.data?.subject || null,
+        enabled: Boolean(configurazione?.enabled),
+        public_key: configurazione?.public_key || null,
+        subject: configurazione?.subject || null,
       };
       setPushConfig(prev =>
         prev.enabled === nextConfig.enabled && prev.public_key === nextConfig.public_key && prev.subject === nextConfig.subject

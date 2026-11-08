@@ -17,6 +17,16 @@ import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const PAGINE = join(process.cwd(), 'src', 'pages');
+const COMPONENTI = join(process.cwd(), 'src', 'components');
+
+// Contesti: solo il bootstrap dell'identita', che non si puo' mettere in cache
+// (una sessione scaduta non deve restare buona per 30 secondi). Notifiche e
+// push passano dalla api layer come tutto il resto.
+const LETTURE_NEI_CONTESTI = {
+  'AdminAuthContext.jsx': 'bootstrap della sessione admin (/admin/me)',
+  'AuthContext.jsx': 'bootstrap della sessione farmacia (/auth/me)',
+  'DriverAuthContext.jsx': 'bootstrap della sessione fattorino (/driver/me)',
+};
 
 // Migrazione finita: nelle pagine non resta NESSUNA lettura via axios, tranne
 // questi due casi che non sono letture di dati dell'app.
@@ -120,3 +130,35 @@ describe('un solo strato legge dal server', () => {
     }
   });
 });
+
+describe('anche i componenti leggono dagli hook', () => {
+  it('nessun componente legge con axios.get', () => {
+    const conLetture = fileDelleComponenti()
+      .map((percorso) => ({ nome: relative(COMPONENTI, percorso), testo: readFileSync(percorso, 'utf8') }))
+      .filter(({ testo }) => /axios\.get/.test(testo))
+      .map(({ nome }) => nome);
+    expect(conLetture).toEqual([]);
+  });
+
+  it('i contesti che leggono sono solo quelli ammessi', () => {
+    const cartella = join(process.cwd(), 'src', 'contexts');
+    const trovati = readdirSync(cartella)
+      .filter((voce) => voce.endsWith('.jsx') || voce.endsWith('.js'))
+      .filter((voce) => /axios\.get/.test(readFileSync(join(cartella, voce), 'utf8')));
+    expect(trovati.sort()).toEqual(Object.keys(LETTURE_NEI_CONTESTI).sort());
+  });
+});
+
+function fileDelleComponenti(cartella = COMPONENTI) {
+  const trovati = [];
+  for (const voce of readdirSync(cartella)) {
+    const percorso = join(cartella, voce);
+    if (statSync(percorso).isDirectory()) {
+      if (voce === '__tests__') continue;
+      trovati.push(...fileDelleComponenti(percorso));
+    } else if (voce.endsWith('.jsx') || voce.endsWith('.js')) {
+      trovati.push(percorso);
+    }
+  }
+  return trovati;
+}

@@ -38,6 +38,9 @@ export const chiavi = {
   consegneFattorino: ['driver-deliveries'],
   turnoFattorino: ['driver-shift'],
   messaggiFattorino: ['driver-messages'],
+  staff: ['staff'],
+  notifiche: (tipo) => ['notifiche', tipo],
+  pushConfig: (tipo) => ['push-config', tipo],
   statsCliente: (customerId) => ['customer-stats', customerId],
   statsFattorino: (driverId) => ['driver-stats', driverId],
 };
@@ -66,6 +69,9 @@ export const letture = {
   consegneFattorino: () => getLista('/driver/deliveries'),
   turnoFattorino: () => get('/driver/shifts/current'),
   messaggiFattorino: () => getLista('/driver/messages'),
+  staff: () => getLista('/staff'),
+  notifiche: (tipo) => () => getLista(tipo === 'driver' ? '/driver/notifications' : '/notifications'),
+  pushConfig: () => get('/push/config'),
   statsCliente: (customerId) => () => get(`/customers/${customerId}/stats`),
   statsFattorino: (driverId) => () => get(`/drivers/${driverId}/stats`),
 };
