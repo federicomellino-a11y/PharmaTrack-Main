@@ -204,10 +204,19 @@ async def get_analytics(period: str = "month", user: dict = Depends(get_current_
     # Promesse non mantenute: fascia passata, consegna ancora aperta.
     aperte = await db.deliveries.find(
         {"pharmacy_id": pharmacy_id, "status": {"$in": ["da_preparare", "pronta", "pending", "in_transit"]}},
-        {"_id": 0, "scheduled_time": 1, "slot_to": 1},
+        {"_id": 0, "scheduled_time": 1, "slot_to": 1, "scheduled_date": 1, "created_at": 1},
     ).to_list(1000)
     adesso_roma = datetime.now(ROME_TZ)
-    in_ritardo = sum(1 for c in aperte if fascia_scaduta(c.get("scheduled_time"), c.get("slot_to"), adesso_roma))
+    in_ritardo = sum(
+        1
+        for c in aperte
+        if fascia_scaduta(
+            c.get("scheduled_time"),
+            c.get("slot_to"),
+            adesso_roma,
+            c.get("scheduled_date") or c.get("created_at"),
+        )
+    )
 
     ora_di_punta = max(per_ora, key=lambda ora: per_ora[ora]) if any(per_ora.values()) else None
     giorno_di_punta = max(per_giorno, key=lambda giorno: per_giorno[giorno]) if any(per_giorno.values()) else None

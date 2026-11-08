@@ -4,7 +4,7 @@ Perché un modulo a parte: la validazione è una regola di prodotto ("dalle 15
 alle 18", non "alle 17:43"), e va scritta una volta sola e provata. La fascia
 vive su due campi della consegna: scheduled_time (inizio) e slot_to (fine).
 """
-from datetime import datetime
+from datetime import date, datetime
 from typing import Optional, Tuple
 
 FORMATO = "%H:%M"
@@ -57,12 +57,43 @@ def descrivi_fascia(da: Optional[str], a: Optional[str]) -> Optional[str]:
     return f"{da}–{a}" if a else da
 
 
-def fascia_scaduta(da: Optional[str], a: Optional[str], adesso: datetime) -> bool:
-    """Vero se la fascia promessa è già passata e la consegna è ancora aperta."""
+def _giorno(valore) -> Optional[date]:
+    if not valore:
+        return None
+    if isinstance(valore, datetime):
+        return valore.date()
+    if isinstance(valore, date):
+        return valore
+    testo = str(valore).strip()[:10]
+    try:
+        return datetime.strptime(testo, "%Y-%m-%d").date()
+    except ValueError:
+        return None
+
+
+def fascia_scaduta(
+    da: Optional[str],
+    a: Optional[str],
+    adesso: datetime,
+    giorno=None,
+) -> bool:
+    """Vero se la fascia promessa è passata e la consegna è ancora aperta.
+
+    Il giorno conta: una promessa "15:00-18:00" di ieri è scaduta anche se
+    adesso sono le 10 del mattino dopo. Se il giorno non si conosce si guarda
+    solo l'orario, che è meglio di niente ma va usato sapendo cosa significa.
+    """
     if not da:
         return False
-    riferimento = a or da
-    limite = _minuti(riferimento)
+    limite = _minuti(a or da)
     if limite is None:
         return False
+
+    giorno_promessa = _giorno(giorno)
+    if giorno_promessa is not None:
+        oggi = adesso.date()
+        if giorno_promessa < oggi:
+            return True
+        if giorno_promessa > oggi:
+            return False
     return adesso.hour * 60 + adesso.minute > limite

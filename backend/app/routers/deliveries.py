@@ -556,6 +556,14 @@ async def delete_delivery(delivery_id: str, user: dict = Depends(get_current_use
 TRACKING_TTL_HOURS = 72
 
 
+def _adesso_roma() -> datetime:
+    """Ora italiana, con ripiego su UTC se il fuso non e' disponibile."""
+    try:
+        return datetime.now(ROME_TZ)
+    except NameError:
+        return datetime.now(timezone.utc)
+
+
 @router.post("/deliveries/{delivery_id}/share-link")
 async def create_delivery_share_link(delivery_id: str, user: dict = Depends(get_current_user)):
     """Generate a public tracking token (72h TTL). Only the SHA-256 hash is stored."""
@@ -610,11 +618,13 @@ async def public_delivery_tracking(token: str):
         "pharmacy_phone": (pharmacy or {}).get("pharmacy_phone"),
         "has_pod": bool(delivery.get("pod_confirmed_at")),
         "slot": descrivi_fascia(delivery.get("scheduled_time"), delivery.get("slot_to")),
+        # Il giorno promesso: la data programmata se c'e', altrimenti quello in
+        # cui la consegna e' nata (una fascia senza data vale per oggi).
         "slot_late": fascia_scaduta(
             delivery.get("scheduled_time"),
             delivery.get("slot_to"),
-            datetime.now(timezone.utc).astimezone(ROME_TZ)
-            if "ROME_TZ" in globals() else datetime.now(timezone.utc),
+            _adesso_roma(),
+            delivery.get("scheduled_date") or delivery.get("created_at"),
         ),
     }
 
