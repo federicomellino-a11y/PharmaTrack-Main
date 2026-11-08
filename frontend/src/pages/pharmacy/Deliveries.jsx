@@ -34,6 +34,7 @@ const messaggioPiano = (errore, ripiego) =>
 import { useAuth } from '../../contexts/AuthContext';
 import { ensureArray } from '@/lib/collections';
 import { printDeliveryLabel } from '@/lib/printLabel';
+import DeliveryRow from '../../components/deliveries/DeliveryRow';
 import { confirmAction } from '../../components/ConfirmDialog';
 
 
@@ -563,6 +564,28 @@ export default function DeliveriesPage() {
   const listIsCapped = safeDeliveries.length >= 500;
 
   // V17: la lista attiva si ordina per priorità reale, poi orario, poi data
+  // I quattro gesti che una riga puo' chiedere alla pagina. Stavano dentro il
+  // markup della riga, il che rendeva impossibile leggerla senza la pagina.
+  const apriModifica = (delivery) => {
+    setSelectedDelivery(delivery);
+    setForm({ ...form, notes: delivery.notes || '', payment_method: delivery.payment_method || 'cash', amount: delivery.amount || '', amount_given: delivery.amount_given || '', scheduled_date: delivery.scheduled_date || '', scheduled_time: delivery.scheduled_time || '', slot_to: delivery.slot_to || null });
+    setFasciaScelta((fasciaDi(delivery.scheduled_time, delivery.slot_to) || { valore: 'subito' }).valore);
+    setEditDialogOpen(true);
+  };
+
+  const apriPronta = (delivery) => {
+    setSelectedDelivery(delivery);
+    setForm({ ...form, payment_method: delivery.payment_method || 'cash', amount: delivery.amount || '', amount_given: delivery.amount_given || '' });
+    setProntaDialogOpen(true);
+  };
+
+  const apriAssegna = (delivery) => {
+    setSelectedDelivery(delivery);
+    setAssignDialogOpen(true);
+  };
+
+  const stampaBolla = (delivery) => printDeliverySlip(delivery, safeDrivers, user);
+
   const sorted = useMemo(() => {
     if (activeTab !== 'active') return filtered;
     const rank = (d) => ({ urgent: 0, high: 1, normal: 2, low: 3 }[d.priority || 'normal'] ?? 2);
@@ -724,217 +747,26 @@ export default function DeliveriesPage() {
           </Card>
         ) : (
           <div className="space-y-2.5">
-            {sorted.map(d => {
-              const StatusIcon = STATUS_ICONS[d.status] || Package;
-              const driver = safeDrivers.find(dr => dr.driver_id === d.driver_id);
-              const PriorityIcon = d.priority && PRIORITY_ICONS[d.priority];
-              return (
-                <Card key={d.delivery_id} className={`
-                  transition-all hover:shadow-md
-                  ${d.priority === 'urgent' ? 'border-l-4 border-l-destructive' : ''}
-                  ${d.priority === 'high' ? 'border-l-4 border-l-amber-400' : ''}
-                `}>
-                  <CardContent className="p-4">
-                    <div className="flex flex-col sm:flex-row sm:items-start gap-3">
-                      {/* Status icon */}
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0
-                        ${d.status === 'delivered' ? 'bg-emerald-500/10 text-emerald-600' :
-                          d.status === 'delivered_pending_confirmation' ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300 ring-2 ring-amber-500/30 animate-pulse-soft' :
-                          d.status === 'cancelled' ? 'bg-destructive/10 text-destructive' :
-                          d.status === 'in_transit' ? 'bg-primary/10 text-primary' :
-                          d.status === 'pronta' ? 'bg-green-500/10 text-green-600' :
-                          'bg-secondary text-muted-foreground'}`}>
-                        <StatusIcon className="w-5 h-5" />
-                      </div>
-
-                      {/* Main info */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex flex-wrap items-center gap-2 mb-1.5">
-                          <span className="font-semibold text-sm">{d.customer_name}</span>
-                          <Badge className={`status-${d.status} text-xs px-2 py-0`}>
-                            {STATUS_LABELS[d.status]}
-                          </Badge>
-                          {d.priority && d.priority !== 'normal' && (
-                            <Badge className={`priority-${d.priority} px-2 py-0`}>
-                              {PriorityIcon && <PriorityIcon className="w-3 h-3 mr-1 inline" />}
-                              {PRIORITY_LABELS[d.priority]}
-                            </Badge>
-                          )}
-                        </div>
-                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            <MapPin className="w-3 h-3" />{d.customer_address}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Phone className="w-3 h-3" />{d.customer_phone}
-                          </span>
-                          {driver && (
-                            <span className="flex items-center gap-1">
-                              <Truck className="w-3 h-3" />{driver.name}
-                            </span>
-                          )}
-                          {['assigned', 'picked_up', 'in_transit'].includes(d.status) && d.driver_eta_minutes != null && (
-                            <span className="flex items-center gap-1 font-medium text-primary" data-testid={`eta-${d.delivery_id}`}>
-                              <Clock className="w-3 h-3" />≈ {d.driver_eta_minutes} min
-                            </span>
-                          )}
-                          {d.scheduled_date && (
-                            <span className="flex items-center gap-1 text-primary">
-                              <Calendar className="w-3 h-3" />
-                              {d.scheduled_date} {testoFascia(d.scheduled_time, d.slot_to)}
-                            </span>
-                          )}
-                          {!d.scheduled_date && d.scheduled_time && (
-                            <span className={`flex items-center gap-1 ${inRitardo(d) ? 'text-destructive font-medium' : 'text-primary'}`}>
-                              <Clock className="w-3 h-3" />
-                              {testoFascia(d.scheduled_time, d.slot_to)}
-                              {inRitardo(d) && ' · in ritardo'}
-                            </span>
-                          )}
-                          {d.scheduled_date && inRitardo(d) && (
-                            <span className="flex items-center gap-1 text-destructive font-medium" data-testid="ritardo-lista">
-                              in ritardo
-                            </span>
-                          )}
-                          <span className="flex items-center gap-1">
-                            <Clock className="w-3 h-3" />{formatDateTime(d.created_at)}
-                          </span>
-                        </div>
-                        {d.notes && (
-                          <p className="text-xs text-muted-foreground mt-1.5 bg-secondary/40 rounded-lg px-2.5 py-1.5 italic">
-                            📝 {d.notes}
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Amount + actions */}
-                      <div className="flex sm:flex-col items-center sm:items-end gap-2 sm:gap-1 shrink-0">
-                        {d.amount && (
-                          <div className="text-right">
-                            {/* Importo da incassare dal cliente:
-                                - cash con amount_given valorizzato → mostro amount_given (es. cliente paga con 10 su vendita di 8)
-                                - altrimenti → mostro amount (POS o cash perfetto) */}
-                            {(() => {
-                              const showsGiven = d.payment_method === 'cash' && d.amount_given && d.amount_given > d.amount;
-                              const principal = showsGiven ? d.amount_given : d.amount;
-                              const change = showsGiven ? (d.amount_given - d.amount) : 0;
-                              return (
-                                <>
-                                  <p className="font-bold text-base text-primary">{formatCurrency(principal)}</p>
-                                  <p className="text-xs text-muted-foreground flex items-center gap-1 justify-end">
-                                    {d.payment_method === 'cash'
-                                      ? <><Banknote className="w-3 h-3" />Contanti</>
-                                      : <><CreditCard className="w-3 h-3" />POS</>}
-                                  </p>
-                                  {showsGiven && (
-                                    <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight">
-                                      Vendita {formatCurrency(d.amount)} · Resto {formatCurrency(change)}
-                                    </p>
-                                  )}
-                                </>
-                              );
-                            })()}
-                          </div>
-                        )}
-                        {['da_preparare', 'pronta', 'pending', 'assigned', 'picked_up', 'in_transit', 'delivered_pending_confirmation'].includes(d.status) && (
-                          <div className="delivery-card-actions flex gap-1.5 flex-wrap justify-end">
-                            {d.status === 'delivered_pending_confirmation' && (
-                              <>
-                                <Button size="sm" className="h-8 px-3 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-md"
-                                  onClick={() => handleConfirmPayment(d)}
-                                  data-testid={`confirm-payment-${d.delivery_id}`}>
-                                  <Euro className="w-3.5 h-3.5 mr-1" />Conferma incasso
-                                </Button>
-                                <Button variant="outline" size="sm" className="h-8 px-2 text-xs text-amber-700 border-amber-500/40 hover:bg-amber-500/10"
-                                  onClick={() => handleDisputePayment(d)}
-                                  title="Contesta">
-                                  <AlertTriangle className="w-3.5 h-3.5" />
-                                </Button>
-                              </>
-                            )}
-                            <Button variant="outline" size="sm" className="h-7 px-2 text-xs"
-                              onClick={() => shareDelivery(d)}
-                              title="Condividi link tracking (WhatsApp)">
-                              <Share2 className="w-3 h-3" />
-                            </Button>
-                            <Button variant="outline" size="sm" className="h-7 px-2 text-xs"
-                              onClick={() => printDeliverySlip(d, safeDrivers, user)}
-                              title="Stampa bolla">
-                              <Printer className="w-3 h-3" />
-                            </Button>
-                            {d.status !== 'delivered_pending_confirmation' && (
-                              <Button variant="outline" size="sm" className="h-7 px-2 text-xs"
-                                onClick={() => {
-                                  setSelectedDelivery(d);
-                                  setForm({ ...form, notes: d.notes || '', payment_method: d.payment_method || 'cash', amount: d.amount || '', amount_given: d.amount_given || '', scheduled_date: d.scheduled_date || '', scheduled_time: d.scheduled_time || '', slot_to: d.slot_to || null });
-                                  setFasciaScelta((fasciaDi(d.scheduled_time, d.slot_to) || { valore: 'subito' }).valore);
-                                  setEditDialogOpen(true);
-                                }}>
-                                <Pencil className="w-3 h-3" />
-                              </Button>
-                            )}
-                            {['da_preparare', 'pending'].includes(d.status) && (
-                              <Button size="sm" className="h-7 px-2 text-xs bg-amber-500 hover:bg-amber-600 text-white"
-                                onClick={() => {
-                                  setSelectedDelivery(d);
-                                  setForm({ ...form, payment_method: d.payment_method || 'cash', amount: d.amount || '', amount_given: d.amount_given || '' });
-                                  setProntaDialogOpen(true);
-                                }}>
-                                <ClipboardCheck className="w-3 h-3 mr-1" />Pronta
-                              </Button>
-                            )}
-                            {['pronta', 'assigned', 'picked_up'].includes(d.status) && (
-                              <Button variant="outline" size="sm" className="h-7 px-2 text-xs"
-                                onClick={() => { setSelectedDelivery(d); setAssignDialogOpen(true); }}>
-                                <Truck className="w-3 h-3" />
-                              </Button>
-                            )}
-                            {['assigned', 'picked_up'].includes(d.status) && (
-                              <Button size="sm" className="h-7 px-2 text-xs bg-primary hover:bg-primary/90 text-primary-foreground"
-                                onClick={() => handleAdvanceStatus(d)}>
-                                <ChevronRight className="w-3 h-3 mr-1" />Avvia
-                              </Button>
-                            )}
-                            {d.status === 'in_transit' && (
-                              <Button size="sm" className="h-7 px-2 text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
-                                onClick={() => handleAdvanceStatus(d)}>
-                                <CheckCircle2 className="w-3 h-3 mr-1" />Consegnata
-                              </Button>
-                            )}
-                            {d.status !== 'delivered_pending_confirmation' && (
-                              <Button variant="outline" size="sm" className="h-7 px-2 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
-                                data-testid={`cancel-delivery-${d.delivery_id}`}
-                                onClick={() => handleCancel(d.delivery_id)}>
-                                <XCircle className="w-3 h-3" />
-                              </Button>
-                            )}
-                            {(
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 px-2 text-xs"
-                              data-testid={`print-label-${d.delivery_id}`}
-                              onClick={(event) => { event.stopPropagation(); printDeliveryLabel(d); }}
-                              title="Stampa etichetta"
-                            >
-                              <Printer className="w-3 h-3 mr-1" />Etichetta
-                            </Button>
-                          )}
-                          {d.status === 'cancelled' && (
-                              <Button variant="outline" size="sm" className="h-7 px-2 text-xs"
-                                data-testid={`restore-delivery-${d.delivery_id}`}
-                                onClick={() => handleRestore(d.delivery_id)}>
-                                <RotateCcw className="w-3 h-3 mr-1" />Ripristina
-                              </Button>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
+{sorted.map((d) => (
+              <DeliveryRow
+                key={d.delivery_id}
+                d={d}
+                drivers={safeDrivers}
+                inRitardo={inRitardo}
+                handlers={{
+                  handleConfirmPayment,
+                  handleDisputePayment,
+                  handleAdvanceStatus,
+                  handleCancel,
+                  handleRestore,
+                  shareDelivery,
+                  onPrintSlip: stampaBolla,
+                  apriModifica,
+                  apriPronta,
+                  apriAssegna,
+                }}
+              />
+            ))}
           </div>
         )}
       </div>
