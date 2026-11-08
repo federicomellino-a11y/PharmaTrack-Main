@@ -138,6 +138,24 @@ export default function DeliveriesPage() {
   const [selectedDelivery, setSelectedDelivery] = useState(null);
   // La fascia scelta è uno stato suo: derivarla dai valori non permetteva
   // di passare a "Orario preciso" quando i valori coincidevano con una fascia.
+  // Una consegna e' "in ritardo" quando e' ancora da fare e la fascia promessa
+  // e' passata: stessa regola del Report e dell'elenco del fattorino.
+  const inRitardo = (consegna) => {
+    if (!consegna?.scheduled_time) return false;
+    if (!['da_preparare', 'pronta', 'pending', 'assigned', 'picked_up', 'in_transit'].includes(consegna.status)) return false;
+    const fine = (consegna.slot_to || consegna.scheduled_time).slice(0, 5);
+    const giorno = consegna.scheduled_date || (consegna.created_at ? consegna.created_at.slice(0, 10) : null);
+    if (giorno) {
+      const oggi = new Date().toLocaleDateString('sv-SE');
+      if (giorno < oggi) return true;
+      if (giorno > oggi) return false;
+    }
+    const adesso = new Date();
+    const minuti = adesso.getHours() * 60 + adesso.getMinutes();
+    const [ore, min] = fine.split(':').map(Number);
+    return Number.isFinite(ore) && minuti > ore * 60 + min;
+  };
+
   const [fasciaScelta, setFasciaScelta] = useState('subito');
   const [form, setForm] = useState({
     customer_id: 'none', notes: '', payment_method: 'cash',
@@ -535,10 +553,13 @@ export default function DeliveriesPage() {
       : activeTab === 'pending_confirmation'
         ? d.status === 'delivered_pending_confirmation'
         : ['delivered', 'cancelled', 'not_delivered'].includes(d.status);
+    const cerca = searchTerm.toLowerCase();
     const matchSearch = !searchTerm ||
-      (d.customer_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (d.customer_address || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (d.notes || '').toLowerCase().includes(searchTerm.toLowerCase());
+      (d.customer_name || '').toLowerCase().includes(cerca) ||
+      (d.customer_address || '').toLowerCase().includes(cerca) ||
+      (d.customer_phone || '').toLowerCase().includes(cerca) ||
+      (d.nre || '').toLowerCase().includes(cerca) ||
+      (d.notes || '').toLowerCase().includes(cerca);
     const matchDriver = filterDriver === 'all' || d.driver_id === filterDriver ||
       (filterDriver === 'unassigned' && !d.driver_id);
     return matchTab && matchSearch && matchDriver;
@@ -768,9 +789,15 @@ export default function DeliveriesPage() {
                             </span>
                           )}
                           {!d.scheduled_date && d.scheduled_time && (
-                            <span className="flex items-center gap-1 text-primary" data-testid="fascia-oggi">
-                              <Calendar className="w-3 h-3" />
+                            <span className={`flex items-center gap-1 ${inRitardo(d) ? 'text-destructive font-medium' : 'text-primary'}`}>
+                              <Clock className="w-3 h-3" />
                               {testoFascia(d.scheduled_time, d.slot_to)}
+                              {inRitardo(d) && ' · in ritardo'}
+                            </span>
+                          )}
+                          {d.scheduled_date && inRitardo(d) && (
+                            <span className="flex items-center gap-1 text-destructive font-medium" data-testid="ritardo-lista">
+                              in ritardo
                             </span>
                           )}
                           <span className="flex items-center gap-1">

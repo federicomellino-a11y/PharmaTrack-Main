@@ -10,7 +10,7 @@ import { Avatar, AvatarFallback } from '../../components/ui/avatar';
 import {
   Package, MapPin, Phone, Navigation, CheckCircle2, MessageSquare,
   LogOut, RefreshCw, LocateFixed, ShieldAlert, MapPinned,
-  Play, Square, Euro, AlertCircle, Wallet
+  Play, Square, Euro, AlertCircle, Wallet, Clock
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ensureArray } from '@/lib/collections';
@@ -500,10 +500,21 @@ export default function DriverDashboard() {
                   <div className="flex items-start justify-between mb-3">
                     <div>
                       <h3 className="font-semibold text-white">{delivery.customer_name}</h3>
-                      <div className="flex gap-2 mt-1">
+                      <div className="flex flex-wrap gap-2 mt-1">
                         <Badge className={`status-${delivery.status}`}>
                           {statusLabels[delivery.status]}
                         </Badge>
+                        {delivery.slot && (
+                          <Badge
+                            variant="outline"
+                            className={delivery.slot_late ? 'border-red-500/60 text-red-400' : 'border-zinc-700 text-zinc-300'}
+                            data-testid={`slot-${delivery.delivery_id}`}
+                          >
+                            <Clock className="w-3 h-3 mr-1" />
+                            {delivery.slot_late ? 'in ritardo · ' : 'entro le '}
+                            {delivery.slot}
+                          </Badge>
+                        )}
                       </div>
                     </div>
                   </div>
