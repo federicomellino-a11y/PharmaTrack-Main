@@ -105,7 +105,7 @@ yarn dev  # http://localhost:3000
 
 ### Seed dati di test
 ```bash
-cd backend && python seed_data.py
+cd backend && python scripts/seed_data.py
 ```
 
 Genera:
@@ -135,8 +135,8 @@ Endpoint REST anche disponibile: `POST /api/integrations/winfarm/import` (dettag
 .
 ├── backend/                # FastAPI + MongoDB
 │   ├── server.py           # entry FastAPI (~320 righe), logica in app/
-│   ├── app/                # routers/ + core/ + models/
-│   ├── seed_data.py        # dati di test
+│   ├── app/                # il codice: routers/ (rotte), core/ (logica), models/ (schemi)
+│   ├── scripts/            # seed_data.py (dati di test), audit_db.py (controllo dati)
 │   ├── requirements.txt    # 19 dipendenze dirette pinnate
 │   ├── runtime.txt         # Python 3.11.9
 │   ├── .env.example
@@ -150,10 +150,12 @@ Endpoint REST anche disponibile: `POST /api/integrations/winfarm/import` (dettag
 │   │   │   ├── driver/     # Dashboard, Chat, Tracking
 │   │   │   └── admin/      # Dashboard, Login
 │   │   ├── components/
-│   │   │   ├── ui/         # Shadcn
+│   │   │   ├── ui/         # Shadcn, solo i pezzi che l'app usa davvero
 │   │   │   └── Layout.jsx
 │   │   ├── contexts/       # Auth, Socket, Theme, DriverAuth
-│   │   └── hooks/
+│   │   ├── hooks/          # queries.js: un hook per ogni lettura
+│   │   ├── lib/            # api.js (chiavi + letture), config, utility
+│   │   └── __tests__/      # vitest accanto ai file che prova
 │   ├── public/
 │   │   ├── pharmatrack_winfarm.ahk  # script AutoHotkey
 │   │   ├── sw.js                     # service worker PWA
@@ -162,10 +164,27 @@ Endpoint REST anche disponibile: `POST /api/integrations/winfarm/import` (dettag
 │   ├── tsconfig.json
 │   └── .env.example
 │
+├── docs/                   # note tecniche (backup, privacy, CSP) e archivio storico
+├── .github/workflows/      # CI, test di integrazione notturni, backup database, allarmi
 ├── vercel.json             # config deploy frontend
 ├── render.yaml             # config deploy backend (Blueprint)
 └── README.md               # questo file
 ```
+
+
+### Dove mettere le mani
+
+| Cosa devo cambiare | Dove sta |
+|---|---|
+| Una nuova rotta API | `backend/app/routers/`, poi il router si registra in `server.py` |
+| La regola di un calcolo (piani, fasce, report) | `backend/app/core/` |
+| Un campo nuovo su un dato | `backend/app/models/schemas.py` |
+| Una pagina o una schermata | `frontend/src/pages/` |
+| Come si legge un dato dal server | chiave e lettura in `frontend/src/lib/api.js`, hook in `hooks/queries.js` |
+| Un test backend veloce senza database | `backend/tests/unit/` |
+| Un test che gira contro l'API vera | `backend/tests/` (suite notturna) |
+
+Regola che vale per tutto il frontend: le pagine non chiamano mai `axios` per leggere. Se serve un dato nuovo, si aggiunge la coppia chiave/lettura in `lib/api.js` e l'hook; il test `migrazione-api.test.js` blocca le scorciatoie.
 
 ---
 
