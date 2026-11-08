@@ -53,3 +53,25 @@ def test_fascia_scaduta_solo_dopo_la_fine():
     assert fascia_scaduta("09:00", "12:00", dentro) is False
     senza = datetime(2026, 11, 8, 23, 0)
     assert fascia_scaduta(None, None, senza) is False
+
+
+def test_una_promessa_di_ieri_e_scaduta_anche_di_mattina():
+    """Senza il giorno, alle 10 del mattino una fascia 15-18 di ieri sembrava futura."""
+    adesso = datetime(2026, 11, 8, 10, 0)
+    assert fascia_scaduta("15:00", "18:00", adesso, "2026-11-07") is True
+
+
+def test_una_promessa_di_domani_non_e_scaduta():
+    adesso = datetime(2026, 11, 8, 23, 0)
+    assert fascia_scaduta("09:00", "12:00", adesso, "2026-11-09") is False
+
+
+def test_promessa_di_oggi_si_guarda_l_orario():
+    adesso = datetime(2026, 11, 8, 19, 0)
+    assert fascia_scaduta("15:00", "18:00", adesso, "2026-11-08") is True
+    assert fascia_scaduta("15:00", "18:00", datetime(2026, 11, 8, 17, 0), "2026-11-08") is False
+
+
+def test_giorno_illeggibile_non_fa_esplodere():
+    adesso = datetime(2026, 11, 8, 19, 0)
+    assert fascia_scaduta("15:00", "18:00", adesso, "non-una-data") is True
