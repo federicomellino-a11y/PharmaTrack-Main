@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
+import { useQueryClient } from '@tanstack/react-query';
+import { chiavi, letture } from '@/lib/api';
 import { API } from '@/lib/config';
 import { useDriverAuth } from '../../contexts/DriverAuthContext';
 import { useSocket } from '../../contexts/SocketContext';
@@ -40,6 +42,7 @@ const formatDateLabel = (dateString) => {
 };
 
 export default function DriverChat() {
+  const queryClient = useQueryClient();
   const { driver, logout } = useDriverAuth();
   const { messages: wsMessages, removeMessages, connected } = useSocket();
   const [messages, setMessages] = useState([]);
@@ -63,8 +66,11 @@ export default function DriverChat() {
 
   const fetchMessages = useCallback(async () => {
     try {
-      const response = await axios.get(`${API}/driver/messages`, { withCredentials: true });
-      const normalizedMessages = dedupeMessages(ensureArray(response.data));
+      const response = await queryClient.fetchQuery({
+        queryKey: chiavi.messaggiFattorino,
+        queryFn: letture.messaggiFattorino,
+      });
+      const normalizedMessages = dedupeMessages(ensureArray(response));
       normalizedMessages.forEach((message) => {
         if (message?.message_id) processedMessageIdsRef.current.add(message.message_id);
       });

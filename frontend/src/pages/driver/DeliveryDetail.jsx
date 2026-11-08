@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
+import { useQueryClient } from '@tanstack/react-query';
+import { chiavi, letture } from '@/lib/api';
+import { ensureArray } from '@/lib/collections';
 import { API } from '@/lib/config';
 import { requestWithOfflineQueue } from '@/lib/offlineQueue';
 import { queuePhoto, flushQueuedPhotos } from '@/lib/offlinePhotos';
@@ -30,6 +33,7 @@ L.Icon.Default.mergeOptions({
 });
 
 export default function DriverDeliveryDetail() {
+  const queryClient = useQueryClient();
   const { deliveryId } = useParams();
   const navigate = useNavigate();
   const { logout } = useDriverAuth();
@@ -47,8 +51,11 @@ export default function DriverDeliveryDetail() {
 
   const fetchDelivery = async () => {
     try {
-      const response = await axios.get(`${API}/driver/deliveries`, { withCredentials: true });
-      const found = response.data.find(d => d.delivery_id === deliveryId);
+      const response = await queryClient.fetchQuery({
+        queryKey: chiavi.consegneFattorino,
+        queryFn: letture.consegneFattorino,
+      });
+      const found = ensureArray(response).find(d => d.delivery_id === deliveryId);
       if (found) {
         setDelivery(found);
         if (found.customer_lat != null && found.customer_lng != null) {

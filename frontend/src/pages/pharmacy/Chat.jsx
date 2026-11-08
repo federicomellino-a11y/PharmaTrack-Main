@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { chiavi, letture } from '@/lib/api';
 import { API } from '@/lib/config';
 import { useQueryClient } from '@tanstack/react-query';
 import { useConversationsQuery } from '@/hooks/queries';
@@ -148,8 +149,11 @@ export default function ChatPage() {
     if (!selectedDriverId) return;
     if (!silent) setLoadingMessages(true);
     try {
-      const response = await axios.get(`${API}/messages/${selectedDriverId}`, { withCredentials: true });
-      const normalizedMessages = dedupeMessages(ensureArray(response.data));
+      const response = await queryClient.fetchQuery({
+        queryKey: chiavi.conversazione(selectedDriverId),
+        queryFn: letture.conversazione(selectedDriverId),
+      });
+      const normalizedMessages = dedupeMessages(ensureArray(response));
       normalizedMessages.forEach((message) => {
         if (message?.message_id) processedMessageIdsRef.current.add(message.message_id);
       });

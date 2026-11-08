@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { useQueryClient } from '@tanstack/react-query';
 import { useShiftsQuery, useDriversQuery } from '@/hooks/queries';
+import { chiavi, letture } from '@/lib/api';
 import { API } from '@/lib/config';
 import { Layout } from '../../components/Layout';
 import { Card, CardContent } from '../../components/ui/card';
@@ -78,9 +79,12 @@ export default function ShiftsPage() {
 
   const openConfirm = async (shift) => {
     try {
-      const detail = await axios.get(`${API}/shifts/${shift.shift_id}`, { withCredentials: true });
-      setConfirmShift(detail.data);
-      setConfirmCash((detail.data.driver_declared_cash ?? detail.data.totals?.cash_total ?? '').toString());
+      const detail = await queryClient.fetchQuery({
+        queryKey: chiavi.turno(shift.shift_id),
+        queryFn: letture.turno(shift.shift_id),
+      });
+      setConfirmShift(detail);
+      setConfirmCash((detail.driver_declared_cash ?? detail.totals?.cash_total ?? '').toString());
       setConfirmNote('');
     } catch {
       toast.error('Errore caricamento dettaglio');
@@ -111,8 +115,11 @@ export default function ShiftsPage() {
 
   const openDetail = async (shift) => {
     try {
-      const detail = await axios.get(`${API}/shifts/${shift.shift_id}`, { withCredentials: true });
-      setDetailShift(detail.data);
+      const detail = await queryClient.fetchQuery({
+        queryKey: chiavi.turno(shift.shift_id),
+        queryFn: letture.turno(shift.shift_id),
+      });
+      setDetailShift(detail);
     } catch {
       toast.error('Errore caricamento');
     }
