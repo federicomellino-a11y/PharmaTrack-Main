@@ -13,7 +13,11 @@ import { Package, Plus, Search, User, XCircle } from 'lucide-react';
    Estratto da Deliveries.jsx: stava nella stessa pagina della lista e degli altri
    quattro dialoghi. Riceve dallo stato della pagina solo cio' che usa.
 */
-export default function CreaConsegnaDialog({ activeCustomerIndex, applicaFascia, change_due, customerDropdownOpen, customerInputRef, customerSearchTerm, dialogCustomers, dialogOpen, fasciaScelta, form, frequentCustomers, handleCreate, openCreateCustomer, resetForm, selectCustomer, selectedCustomer, setActiveCustomerIndex, setCustomerDropdownOpen, setCustomerSearchTerm, setDialogOpen, setForm }) {
+export default function CreaConsegnaDialog({ modulo, activeCustomerIndex, applicaFascia, customerDropdownOpen, customerInputRef, customerSearchTerm, dialogCustomers, dialogOpen, frequentCustomers, handleCreate, openCreateCustomer, resetForm, selectCustomer, selectedCustomer, setActiveCustomerIndex, setCustomerDropdownOpen, setCustomerSearchTerm, setDialogOpen }) {
+  const { form, setForm, fasciaScelta, change_due } = modulo;
+
+
+
   return (
       <Dialog open={dialogOpen} onOpenChange={(o) => { if (!o) resetForm(); setDialogOpen(o); }}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">

@@ -11,7 +11,11 @@ import { formatCurrency } from '@/lib/format';
    Estratto da Deliveries.jsx: stava nella stessa pagina della lista e degli altri
    quattro dialoghi. Riceve dallo stato della pagina solo cio' che usa.
 */
-export default function ModificaConsegnaDialog({ change_due, editDialogOpen, form, handleEdit, setEditDialogOpen, setForm }) {
+export default function ModificaConsegnaDialog({ modulo, editDialogOpen, handleEdit, setEditDialogOpen }) {
+  const { form, setForm, change_due } = modulo;
+
+
+
   return (
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
         <DialogContent className="max-w-md">

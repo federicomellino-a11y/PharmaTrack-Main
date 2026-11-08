@@ -11,7 +11,11 @@ import { Calculator, ClipboardCheck } from 'lucide-react';
    Estratto da Deliveries.jsx: stava nella stessa pagina della lista e degli altri
    quattro dialoghi. Riceve dallo stato della pagina solo cio' che usa.
 */
-export default function SegnaProntaDialog({ change_due, form, handleMarkPronta, prontaDialogOpen, resetForm, setForm, setProntaDialogOpen, setSelectedDelivery }) {
+export default function SegnaProntaDialog({ modulo, handleMarkPronta, prontaDialogOpen, resetForm, setProntaDialogOpen, setSelectedDelivery }) {
+  const { form, setForm, change_due } = modulo;
+
+
+
   return (
       <Dialog open={prontaDialogOpen} onOpenChange={(o) => { if (!o) { setSelectedDelivery(null); resetForm(); } setProntaDialogOpen(o); }}>
         <DialogContent className="max-w-md">

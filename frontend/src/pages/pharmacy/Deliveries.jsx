@@ -34,6 +34,7 @@ const messaggioPiano = (errore, ripiego) =>
 import { useAuth } from '../../contexts/AuthContext';
 import { ensureArray } from '@/lib/collections';
 import { printDeliveryLabel } from '@/lib/printLabel';
+import useDeliveryForm, { normalizzaImporto } from '@/hooks/useDeliveryForm';
 import DeliveryRow from '../../components/deliveries/DeliveryRow';
 import CreaConsegnaDialog from '../../components/deliveries/CreaConsegnaDialog';
 import SegnaProntaDialog from '../../components/deliveries/SegnaProntaDialog';
@@ -158,11 +159,9 @@ export default function DeliveriesPage() {
     return Number.isFinite(ore) && minuti > ore * 60 + min;
   };
 
-  const [fasciaScelta, setFasciaScelta] = useState('subito');
-  const [form, setForm] = useState({
-    customer_id: 'none', notes: '', payment_method: 'cash',
-    amount: '', amount_given: '', scheduled_date: '', scheduled_time: '', slot_to: null, priority: 'normal'
-  });
+  // Stato del modulo consegna: vive in hooks/useDeliveryForm.js
+  const modulo = useDeliveryForm();
+  const { form, setForm, fasciaScelta, setFasciaScelta, change_due, amountValue, amountGivenValue } = modulo;
 
   // Stato per import Winfarm: dati pre-compilati dalla querystring
   const [winfarmPrefill, setWinfarmPrefill] = useState(null);
@@ -305,17 +304,12 @@ export default function DeliveriesPage() {
   }, [winfarmPrefill, customers]);
 
   const resetForm = () => {
-    setForm({ customer_id: 'none', notes: '', payment_method: 'cash', amount: '', amount_given: '', scheduled_date: '', scheduled_time: '', slot_to: null, priority: 'normal', nre: '' });
-    setFasciaScelta('subito');
+    modulo.reset();
     setCustomerSearchTerm('');
     setCustomerDropdownOpen(false);
   };
 
-  const normalizeMoney = (value) => {
-    if (value === '' || value === null || value === undefined) return null;
-    const parsed = parseFloat(value);
-    return Number.isNaN(parsed) ? null : parsed;
-  };
+  const normalizeMoney = (value) => normalizzaImporto(value);
 
   const validateCashForm = () => {
     const amount = normalizeMoney(form.amount);
@@ -643,10 +637,6 @@ export default function DeliveriesPage() {
   const selectedCustomer = safeCustomers.find(c => c.customer_id === form.customer_id) || null;
 
   // V28: ultima consegna del cliente selezionato (per "Ripeti")
-  const amountValue = normalizeMoney(form.amount);
-  const amountGivenValue = normalizeMoney(form.amount_given);
-  const change_due = amountValue !== null && amountGivenValue !== null
-    ? amountGivenValue - amountValue : null;
 
   if (loading) return <Layout title="Consegne"><div className="p-4"><ListSkeleton rows={8} /></div></Layout>;
 
@@ -785,17 +775,15 @@ export default function DeliveriesPage() {
       </button>
 
       <CreaConsegnaDialog
+        modulo={modulo}
         {...{
         activeCustomerIndex,
         applicaFascia,
-        change_due,
         customerDropdownOpen,
         customerInputRef,
         customerSearchTerm,
         dialogCustomers,
         dialogOpen,
-        fasciaScelta,
-        form,
         frequentCustomers,
         handleCreate,
         openCreateCustomer,
@@ -806,35 +794,34 @@ export default function DeliveriesPage() {
         setCustomerDropdownOpen,
         setCustomerSearchTerm,
         setDialogOpen,
-        setForm,
         }}
       />
 
       <SegnaProntaDialog
+
+        modulo={modulo}
         {...{
-        change_due,
-        form,
         handleMarkPronta,
         prontaDialogOpen,
         resetForm,
-        setForm,
         setProntaDialogOpen,
         setSelectedDelivery,
         }}
       />
 
       <ModificaConsegnaDialog
+
+        modulo={modulo}
         {...{
-        change_due,
         editDialogOpen,
-        form,
         handleEdit,
         setEditDialogOpen,
-        setForm,
         }}
       />
 
       <AssegnaConsegnaDialog
+
+        modulo={modulo}
         {...{
         assignDialogOpen,
         handleAssign,
@@ -845,10 +832,11 @@ export default function DeliveriesPage() {
       />
 
       <NuovoClienteDialog
+
+        modulo={modulo}
         {...{
         createCustomerOpen,
         creatingCustomer,
-        form,
         handleCreateCustomer,
         newCustomer,
         setCreateCustomerOpen,
