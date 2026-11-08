@@ -1,7 +1,7 @@
 
 # Build
 # Dipendenze
-# Emergent / Replit specifico
+# Residui dei tool con cui e' stato avviato il progetto (cartelle non piu' presenti)
 # Env (NON committare mai)
 # IDE
 # Logs / runtime
@@ -22,7 +22,6 @@
 .config/
 .coverage
 .credentials
-.emergent/
 .env
 .env.*
 .env.*.local
