@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
+import { chiavi, letture } from '@/lib/api';
 import { API } from '@/lib/config';
 import { useCustomersQuery } from '@/hooks/queries';
 import { ListSkeleton } from '../../components/Skeletons';
@@ -168,8 +169,11 @@ export default function CustomersPage() {
       setCustomerStats(buildInitialCustomerStats(customerSnapshot));
     }
     try {
-      const response = await axios.get(`${API}/customers/${customerId}/stats`, { withCredentials: true });
-      const nextStats = ensureObject(response.data);
+      const response = await queryClient.fetchQuery({
+        queryKey: chiavi.statsCliente(customerId),
+        queryFn: letture.statsCliente(customerId),
+      });
+      const nextStats = ensureObject(response);
       setCustomerStats(nextStats);
       setSelectedCustomer(nextStats.customer || customerSnapshot || null);
     } catch {

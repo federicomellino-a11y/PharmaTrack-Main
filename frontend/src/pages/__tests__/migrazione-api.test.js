@@ -18,17 +18,11 @@ import { describe, expect, it } from 'vitest';
 
 const PAGINE = join(process.cwd(), 'src', 'pages');
 
-// file -> quante chiamate axios.get e perche'
+// Migrazione finita: nelle pagine non resta NESSUNA lettura via axios, tranne
+// questi due casi che non sono letture di dati dell'app.
 const LETTURE_AMMESSE = {
-  'PublicTracking.jsx': { chiamate: 1, perche: 'lookup pubblico con token, nessuna sessione' },
-  'admin/Dashboard.jsx': { chiamate: 1, perche: 'dettaglio utente chiesto al volo' },
-  'driver/Chat.jsx': { chiamate: 1, perche: 'stream di messaggi, stato locale in tempo reale' },
-  'driver/DeliveryDetail.jsx': { chiamate: 1, perche: 'dettaglio con stato locale in tempo reale' },
-  'pharmacy/Chat.jsx': { chiamate: 1, perche: 'stream di messaggi' },
-  'pharmacy/Customers.jsx': { chiamate: 1, perche: 'statistiche del singolo cliente chieste al volo' },
-  'pharmacy/Drivers.jsx': { chiamate: 1, perche: 'statistiche del singolo fattorino chieste al volo' },
-  'pharmacy/Integrations.jsx': { chiamate: 1, perche: 'download del bridge come blob, non e una lettura' },
-  'pharmacy/Shifts.jsx': { chiamate: 2, perche: 'dettaglio turno aperto sotto domanda' },
+  'PublicTracking.jsx': { chiamate: 1, perche: 'lookup pubblico con token: nessuna sessione, nessuna cache condivisa' },
+  'pharmacy/Integrations.jsx': { chiamate: 1, perche: 'download di un file come blob, non e una lettura di dati' },
 };
 
 // Pagine che scrivono senza toccare la cache, e il motivo per cui va bene.
@@ -106,6 +100,23 @@ describe('migrazione axios -> react-query', () => {
       const pagina = pagine.find((p) => p.nome === nome);
       expect(pagina, `${nome} non trovata`).toBeTruthy();
       expect(pagina.sorgente, `${nome} non usa gli hook condivisi`).toMatch(/hooks\/queries/);
+    }
+  });
+});
+
+describe('un solo strato legge dal server', () => {
+  it('solo-api-js-legge: hooks e pagine non chiamano axios.get', () => {
+    const sorgenteHook = readFileSync(join(process.cwd(), 'src', 'hooks', 'queries.js'), 'utf8');
+    expect(sorgenteHook).not.toMatch(/axios\.get/);
+    const sorgenteApi = readFileSync(join(process.cwd(), 'src', 'lib', 'api.js'), 'utf8');
+    expect(sorgenteApi).toMatch(/axios\.get/);
+  });
+
+  it('ogni chiave ha la sua funzione di lettura', () => {
+    const api = readFileSync(join(process.cwd(), 'src', 'lib', 'api.js'), 'utf8');
+    for (const nome of ['statsCliente', 'statsFattorino', 'turno', 'conversazione', 'adminUtente']) {
+      expect(api).toMatch(new RegExp(`chiavi = \\{[\\s\\S]*${nome}`));
+      expect(api).toMatch(new RegExp(`letture = \\{[\\s\\S]*${nome}`));
     }
   });
 });

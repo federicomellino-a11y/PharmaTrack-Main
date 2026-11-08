@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useQueryClient } from '@tanstack/react-query';
 import { useDriversQuery } from '@/hooks/queries';
+import { chiavi, letture } from '@/lib/api';
 import { API } from '@/lib/config';
 import { Layout } from '../../components/Layout';
 import { Card, CardContent } from '../../components/ui/card';
@@ -313,8 +314,11 @@ export default function DriversPage() {
      setProfileStats(null);
      setProfileLoading(true);
      try {
-       const r = await axios.get(`${API}/drivers/${driver.driver_id}/stats`, { withCredentials: true });
-       setProfileStats(r.data);
+       const r = await queryClient.fetchQuery({
+         queryKey: chiavi.statsFattorino(driver.driver_id),
+         queryFn: letture.statsFattorino(driver.driver_id),
+       });
+       setProfileStats(r);
      } catch (err) {
        console.error('Errore caricamento stats:', err);
        toast.error('Errore caricamento statistiche');

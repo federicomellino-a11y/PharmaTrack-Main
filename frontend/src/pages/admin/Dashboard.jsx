@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import axios from 'axios'
 import { useQueryClient } from '@tanstack/react-query'
 import { API } from '@/lib/config'
+import { chiavi, letture } from '@/lib/api'
 import {
   ShieldCheck,
   RefreshCw,
@@ -107,8 +108,11 @@ export default function AdminDashboardPage() {
     setDetailsOpen(true)
 
     try {
-      const response = await axios.get(`${API}/admin/users/${user.user_id}/details`, { withCredentials: true })
-      setSelectedUserDetails(ensureObject(response.data))
+      const response = await queryClient.fetchQuery({
+        queryKey: chiavi.adminUtente(user.user_id),
+        queryFn: letture.adminUtente(user.user_id),
+      })
+      setSelectedUserDetails(ensureObject(response))
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Errore caricamento dettagli utente')
     } finally {
