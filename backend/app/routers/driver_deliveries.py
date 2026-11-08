@@ -1,9 +1,11 @@
 import logging
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends, Request
 
 from app.core.database import db
+from app.core.fasce import descrivi_fascia, fascia_scaduta
 from app.core.websocket import manager
 from app.core.security import (
     get_current_user, get_current_driver,
@@ -16,6 +18,7 @@ from app.core.shifts_service import (
 )
 
 logger = logging.getLogger(__name__)
+ROME_TZ = ZoneInfo("Europe/Rome")
 router = APIRouter()
 
 
@@ -30,9 +33,30 @@ async def get_driver_deliveries(status: Optional[str] = None, driver: dict = Dep
         else:
             query["status"] = status
     items = await db.deliveries.find(query, {"_id": 0}).sort("created_at", -1).to_list(100)
+
+    # Il fattorino deve vedere la promessa e sapere cosa e' gia' in ritardo:
+    # il calcolo sta qui, in un posto solo, con la stessa regola del Report.
+    adesso = datetime.now(ROME_TZ)
+    for consegna in items:
+        consegna["slot"] = descrivi_fascia(consegna.get("scheduled_time"), consegna.get("slot_to"))
+        consegna["slot_late"] = fascia_scaduta(
+            consegna.get("scheduled_time"),
+            consegna.get("slot_to"),
+            adesso,
+            consegna.get("scheduled_date") or consegna.get("created_at"),
+        ) and consegna.get("status") in ("assigned", "picked_up", "in_transit")
+
     if status in (None, "active") or not status:
         rank = {"urgent": 0, "high": 1, "normal": 2, "low": 3}
-        items.sort(key=lambda d: (rank.get(d.get("priority") or "normal", 2), d.get("scheduled_time") or "99:99", d.get("created_at") or ""))
+        # In ritardo prima di tutto, poi priorita', poi orario promesso.
+        items.sort(
+            key=lambda d: (
+                0 if d.get("slot_late") else 1,
+                rank.get(d.get("priority") or "normal", 2),
+                d.get("scheduled_time") or "99:99",
+                d.get("created_at") or "",
+            )
+        )
     return items
 
 @router.put("/driver/deliveries/{delivery_id}/status")
