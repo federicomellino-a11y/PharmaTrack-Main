@@ -25,6 +25,7 @@ import {
 import { toast } from 'sonner';
 
 // Il limite del piano arriva come 402: va spiegato, non mostrato come guasto.
+import { formatCurrency, formatDateTime } from '@/lib/format';
 const messaggioPiano = (errore, ripiego) =>
   errore?.response?.status === 402
     ? (errore.response.data?.detail || 'Limite del piano raggiunto.')
@@ -40,8 +41,6 @@ const STATUS_ICONS = { da_preparare: Clock, pending: Clock, pronta: ClipboardChe
 const PRIORITY_LABELS = { low: 'Bassa', normal: 'Normale', high: 'Alta', urgent: 'Urgente' };
 const PRIORITY_ICONS = { low: null, normal: null, high: AlertTriangle, urgent: AlertTriangle };
 
-const formatCurrency = (v) => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(v || 0);
-const formatDate = (d) => d ? new Date(d).toLocaleString('it-IT', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '-';
 
 const printDeliverySlip = (delivery, drivers, user) => {
   const driver = drivers.find(dr => dr.driver_id === delivery.driver_id);
@@ -801,7 +800,7 @@ export default function DeliveriesPage() {
                             </span>
                           )}
                           <span className="flex items-center gap-1">
-                            <Clock className="w-3 h-3" />{formatDate(d.created_at)}
+                            <Clock className="w-3 h-3" />{formatDateTime(d.created_at)}
                           </span>
                         </div>
                         {d.notes && (

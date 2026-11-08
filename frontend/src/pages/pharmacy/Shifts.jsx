@@ -22,9 +22,8 @@ import {
 import { toast } from 'sonner';
 import { ensureArray } from '@/lib/collections';
 
-const formatCurrency = (v) => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(v || 0);
-const formatDateTime = (d) => d ? new Date(d).toLocaleString('it-IT', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '-';
 
+import { formatCurrency, formatDateTime } from '@/lib/format';
 const STATUS_CONFIG = {
   open:             { label: 'In corso',          className: 'bg-teal-500/15 text-teal-600 dark:text-teal-300 border-teal-500/30' },
   closed_by_driver: { label: 'Da confermare',      className: 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30' },

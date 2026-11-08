@@ -21,6 +21,7 @@ import { toast } from 'sonner';
 import { ensureArray } from '@/lib/collections';
 
 
+import { formatDateTimeFull } from '@/lib/format';
 export default function ArchivePage() {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
@@ -77,16 +78,6 @@ export default function ArchivePage() {
     not_delivered: 'Non consegnata',
   };
 
-  const formatDate = (dateString) => {
-    if (!dateString) return '-';
-    return new Date(dateString).toLocaleDateString('it-IT', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
 
   const safeDeliveries = ensureArray(deliveries);
 
@@ -197,10 +188,10 @@ export default function ArchivePage() {
                       <div className="text-right flex-shrink-0">
                         <p className="text-sm text-muted-foreground flex items-center gap-1 justify-end">
                           <Calendar className="w-4 h-4" />
-                          {formatDate(delivery.actual_delivery || delivery.updated_at)}
+                          {formatDateTimeFull(delivery.actual_delivery || delivery.updated_at)}
                         </p>
                         <p className="text-xs text-muted-foreground/70 mt-1">
-                          Creata: {formatDate(delivery.created_at)}
+                          Creata: {formatDateTimeFull(delivery.created_at)}
                         </p>
                         <div className="flex gap-2 justify-end mt-2">
                           <Button

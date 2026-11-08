@@ -1,15 +1,14 @@
 import logging
 from datetime import datetime, timezone, timedelta
-from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Depends
 
+from app.core.clock import ROME_TZ
 from app.core.database import db
 from app.core.security import (
     get_current_user,
 )
 from app.core.cache import cache_get, cache_set
-
-ROME_TZ = ZoneInfo("Europe/Rome")
+from app.core.delivery_lifecycle import BILLED_STATUSES
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -48,7 +47,7 @@ async def get_statistics(user: dict = Depends(get_current_user)):
     for consegna in await db.deliveries.find(
         {
             "pharmacy_id": pharmacy_id,
-            "status": {"$in": ["delivered", "delivered_pending_confirmation"]},
+            "status": {"$in": list(BILLED_STATUSES)},
             "actual_delivery": {"$gte": today_start.isoformat()},
         },
         {"_id": 0, "amount": 1, "payment_method": 1},

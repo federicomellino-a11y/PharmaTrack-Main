@@ -3,6 +3,7 @@ import logging
 from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, HTTPException, Depends, Request
 
+from app.core.delivery_lifecycle import BILLED_STATUSES
 from app.core.database import db
 from app.core.passwords import hash_password
 # (nessun uso di app.core.config)
@@ -81,19 +82,19 @@ async def get_driver_stats(driver_id: str, user: dict = Depends(get_current_user
 
     today_count = sum(1 for d in deliveries
                       if (d.get("actual_delivery") or d.get("updated_at") or "").startswith(today)
-                      and d.get("status") in ["delivered", "delivered_pending_confirmation"])
+                      and d.get("status") in BILLED_STATUSES)
     week_count = sum(1 for d in deliveries
                      if (d.get("actual_delivery") or d.get("updated_at") or "") >= week_ago
-                     and d.get("status") in ["delivered", "delivered_pending_confirmation"])
+                     and d.get("status") in BILLED_STATUSES)
     month_count = sum(1 for d in deliveries
                       if (d.get("actual_delivery") or d.get("updated_at") or "") >= month_ago
-                      and d.get("status") in ["delivered", "delivered_pending_confirmation"])
+                      and d.get("status") in BILLED_STATUSES)
 
     cash_total = sum(float(d.get("amount") or 0) for d in deliveries
-                     if d.get("status") in ["delivered", "delivered_pending_confirmation"]
+                     if d.get("status") in BILLED_STATUSES
                      and d.get("payment_method") == "cash")
     pos_total = sum(float(d.get("amount") or 0) for d in deliveries
-                    if d.get("status") in ["delivered", "delivered_pending_confirmation"]
+                    if d.get("status") in BILLED_STATUSES
                     and d.get("payment_method") == "pos")
     revenue_total = cash_total + pos_total
 
@@ -115,7 +116,7 @@ async def get_driver_stats(driver_id: str, user: dict = Depends(get_current_user
     # Cliente più servito da questo fattorino
     customer_counts = {}
     for d in deliveries:
-        if d.get("status") not in ["delivered", "delivered_pending_confirmation"]:
+        if d.get("status") not in BILLED_STATUSES:
             continue
         cid = d.get("customer_id")
         if not cid:
@@ -137,7 +138,7 @@ async def get_driver_stats(driver_id: str, user: dict = Depends(get_current_user
 
     last_delivery = None
     delivered_sorted = sorted(
-        [d for d in deliveries if d.get("status") in ["delivered", "delivered_pending_confirmation"]],
+        [d for d in deliveries if d.get("status") in BILLED_STATUSES],
         key=lambda d: d.get("actual_delivery") or d.get("updated_at") or "",
         reverse=True,
     )

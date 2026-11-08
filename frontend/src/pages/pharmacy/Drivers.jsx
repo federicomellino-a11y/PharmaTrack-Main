@@ -25,6 +25,7 @@ import {
 import { toast } from 'sonner';
 
 // Il limite del piano arriva come 402: va spiegato, non mostrato come guasto.
+import { formatCurrency, formatDateTime } from '@/lib/format';
 const messaggioPiano = (errore, ripiego) =>
   errore?.response?.status === 402
     ? (errore.response.data?.detail || 'Limite del piano raggiunto.')
@@ -49,8 +50,6 @@ const generatePassword = () => {
  return pwd.sort(() => Math.random() - 0.5).join('');
 };
 
-const formatCurrency = (v) => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(v || 0);
-const formatDateTime = (d) => d ? new Date(d).toLocaleString('it-IT', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '-';
 
 export default function DriversPage() {
  const { user, updateProfile } = useAuth();

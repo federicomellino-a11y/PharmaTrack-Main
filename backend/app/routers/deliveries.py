@@ -7,6 +7,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional, List
 from fastapi import APIRouter, HTTPException, Depends, Response, Body
 
+from app.core.clock import adesso
 from app.core.database import db
 from cloudinary_config import PhotoManager
 from app.core.websocket import manager
@@ -22,6 +23,8 @@ from app.core.notifications import (
 from app.core.shifts_service import (
     _attach_delivery_to_open_shift,
 )
+from app.core.delivery_lifecycle import FOLLOW_UP_STATUSES
+from app.core.delivery_lifecycle import ARCHIVED_STATUSES
 from app.core.delivery_lifecycle import (
     build_cancel_updates,
     build_photo_cleanup,
@@ -31,16 +34,13 @@ from app.core.delivery_lifecycle import (
     can_restore,
     resolve_restore_target,
 )
-from app.models.schemas import DeliveryCreate, DeliveryUpdate, List, Optional
+from app.models.schemas import DeliveryCreate, DeliveryUpdate
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-WORKFLOW_STATUSES = {
-    "da_preparare", "pronta", "pending", "assigned", "picked_up", "in_transit",
-    "delivered_pending_confirmation", "delivered", "cancelled", "not_delivered",
-}
+WORKFLOW_STATUSES = set(FOLLOW_UP_STATUSES) | set(ARCHIVED_STATUSES)
 
 
 async def _log_delivery_audit(delivery, actor_type, actor_id, action, changes=None):
@@ -110,7 +110,7 @@ async def get_deliveries(response: Response, status: Optional[str] = None, drive
     query = {"pharmacy_id": user["user_id"]}
     if status:
         if status == "active":
-            query["status"] = {"$in": ["da_preparare", "pronta", "pending", "assigned", "picked_up", "in_transit", "delivered_pending_confirmation"]}
+            query["status"] = {"$in": list(FOLLOW_UP_STATUSES)}
         elif status == "pending_confirmation":
             query["status"] = "delivered_pending_confirmation"
         elif status == "completed":
@@ -557,11 +557,8 @@ TRACKING_TTL_HOURS = 72
 
 
 def _adesso_roma() -> datetime:
-    """Ora italiana, con ripiego su UTC se il fuso non e' disponibile."""
-    try:
-        return datetime.now(ROME_TZ)
-    except NameError:
-        return datetime.now(timezone.utc)
+    """Ora italiana (vedi app/core/clock.py)."""
+    return adesso()
 
 
 @router.post("/deliveries/{delivery_id}/share-link")

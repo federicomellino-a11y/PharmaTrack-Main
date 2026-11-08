@@ -3,6 +3,7 @@ import logging
 from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Depends, Request
 
+from app.core.delivery_lifecycle import FOLLOW_UP_STATUSES
 from app.core.database import db
 # (nessun uso di app.core.config)
 from app.core.security import (
@@ -76,7 +77,7 @@ async def get_customer_stats(customer_id: str, user: dict = Depends(get_current_
     total_deliveries = len(deliveries)
     completed_deliveries = sum(1 for delivery in deliveries if delivery.get("status") == "delivered")
     cancelled_deliveries = sum(1 for delivery in deliveries if delivery.get("status") == "cancelled")
-    active_deliveries = sum(1 for delivery in deliveries if delivery.get("status") in ["da_preparare", "pronta", "pending", "assigned", "picked_up", "in_transit", "delivered_pending_confirmation"])
+    active_deliveries = sum(1 for delivery in deliveries if delivery.get("status") in list(FOLLOW_UP_STATUSES))
     pending_deliveries = sum(1 for delivery in deliveries if delivery.get("status") in ["da_preparare", "pronta", "pending"])
 
     delivered_deliveries = [delivery for delivery in deliveries if delivery.get("status") == "delivered"]

@@ -41,8 +41,7 @@ import {
   useAdminDatabaseHealthQuery,
 } from '@/hooks/queries'
 
-const formatDate = (value) => (value ? new Date(value).toLocaleString('it-IT') : '-')
-const formatCurrency = (value) => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(Number(value || 0))
+import { formatCurrency, formatDateTimeLong } from '@/lib/format';
 const deliveryStatusLabel = {
   pending: 'In attesa',
   assigned: 'Assegnata',
@@ -273,7 +272,7 @@ export default function AdminDashboardPage() {
                         </div>
                         <p className="text-sm text-muted-foreground truncate mt-1">{user.email}</p>
                         <p className="text-sm mt-1">{user.pharmacy_name || 'Farmacia senza nome'}{user.pharmacy_phone ? ` · ${user.pharmacy_phone}` : ''}</p>
-                        <p className="text-xs text-muted-foreground mt-1">Creato il {formatDate(user.created_at)}</p>
+                        <p className="text-xs text-muted-foreground mt-1">Creato il {formatDateTimeLong(user.created_at)}</p>
                       </div>
 
                       <div className="grid grid-cols-3 gap-2 text-center min-w-[210px]">
@@ -347,7 +346,7 @@ export default function AdminDashboardPage() {
                       Database {databaseHealth?.status === 'ok' ? 'raggiungibile' : 'da verificare'}
                     </div>
                     <p className="text-sm text-muted-foreground mt-2">DB: {databaseHealth?.database || '-'}</p>
-                    <p className="text-sm text-muted-foreground">Aggiornato: {formatDate(databaseHealth?.generated_at)}</p>
+                    <p className="text-sm text-muted-foreground">Aggiornato: {formatDateTimeLong(databaseHealth?.generated_at)}</p>
                   </div>
 
                   <div className="grid sm:grid-cols-3 gap-3">
@@ -390,7 +389,7 @@ export default function AdminDashboardPage() {
                       <div>
                         <p className="font-medium">{user.pharmacy_name || user.name}</p>
                         <p className="text-sm text-muted-foreground truncate">{user.email}</p>
-                        <p className="text-xs text-muted-foreground mt-1">{formatDate(user.created_at)}</p>
+                        <p className="text-xs text-muted-foreground mt-1">{formatDateTimeLong(user.created_at)}</p>
                       </div>
                       <Badge variant={(user.is_active ?? true) ? 'secondary' : 'destructive'}>
                         {(user.is_active ?? true) ? 'Attivo' : 'Disattivato'}
@@ -421,7 +420,7 @@ export default function AdminDashboardPage() {
                     },
                     {
                       label: 'Ultimo controllo',
-                      value: formatDate(databaseHealth?.generated_at),
+                      value: formatDateTimeLong(databaseHealth?.generated_at),
                       icon: Clock3,
                       tone: 'text-muted-foreground',
                     },
@@ -511,7 +510,7 @@ export default function AdminDashboardPage() {
                         </div>
                         <p className="text-sm text-muted-foreground">{delivery.driver_name || 'Nessun fattorino'} · {delivery.payment_method?.toUpperCase() || '-'}</p>
                         <p className="text-sm font-semibold">{formatCurrency(delivery.amount)}</p>
-                        <p className="text-xs text-muted-foreground">Creata il {formatDate(delivery.created_at)}</p>
+                        <p className="text-xs text-muted-foreground">Creata il {formatDateTimeLong(delivery.created_at)}</p>
                       </div>
                     )) : (
                       <div className="py-8 text-center text-muted-foreground">Nessuna consegna recente disponibile.</div>
@@ -534,7 +533,7 @@ export default function AdminDashboardPage() {
                             </Badge>
                           </div>
                           <p className="text-sm text-muted-foreground mt-1">{driver.email || driver.phone || '-'}</p>
-                          <p className="text-xs text-muted-foreground mt-1">Ultima posizione: {formatDate(driver.last_location_update)}</p>
+                          <p className="text-xs text-muted-foreground mt-1">Ultima posizione: {formatDateTimeLong(driver.last_location_update)}</p>
                         </div>
                       )) : (
                         <div className="py-8 text-center text-muted-foreground">Nessun fattorino collegato.</div>
@@ -556,7 +555,7 @@ export default function AdminDashboardPage() {
                             </div>
                             <Bell className={`w-4 h-4 ${notification.is_read ? 'text-muted-foreground' : 'text-primary'}`} />
                           </div>
-                          <p className="text-xs text-muted-foreground mt-2">{formatDate(notification.created_at)}</p>
+                          <p className="text-xs text-muted-foreground mt-2">{formatDateTimeLong(notification.created_at)}</p>
                         </div>
                       )) : (
                         <div className="py-8 text-center text-muted-foreground">Nessuna notifica recente.</div>

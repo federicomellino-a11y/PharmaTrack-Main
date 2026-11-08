@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime, timezone
+from app.core.delivery_lifecycle import BILLED_STATUSES
 from app.core.database import db
 
 logger = logging.getLogger(__name__)
@@ -42,7 +43,7 @@ async def _shift_aggregate_totals(shift: dict) -> dict:
         if status == "cancelled":
             cancelled_count += 1
             continue
-        if status not in ["delivered", "delivered_pending_confirmation"]:
+        if status not in BILLED_STATUSES:
             continue
         delivered_count += 1
         if status == "delivered_pending_confirmation":

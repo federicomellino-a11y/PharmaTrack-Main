@@ -27,6 +27,7 @@ import { ensureArray, ensureObject } from '@/lib/collections';
 import { confirmAction } from '../../components/ConfirmDialog';
 
 
+import { formatCurrency, formatDate, formatDateTimeFull } from '@/lib/format';
 const statusLabels = {
   pending: 'In attesa',
   assigned: 'Assegnata',
@@ -55,26 +56,8 @@ const emptyForm = {
   place_id: '',
 };
 
-const formatDate = (dateString, options = { day: '2-digit', month: 'short', year: 'numeric' }) => {
-  if (!dateString) return '-';
-  return new Date(dateString).toLocaleDateString('it-IT', options);
-};
 
-const formatDateTime = (dateString) => {
-  if (!dateString) return '-';
-  return new Date(dateString).toLocaleString('it-IT', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-};
 
-const formatCurrency = (amount) => new Intl.NumberFormat('it-IT', {
-  style: 'currency',
-  currency: 'EUR',
-}).format(amount || 0);
 
 const calculateAge = (birthDate) => {
   if (!birthDate) return null;
@@ -504,7 +487,7 @@ export default function CustomersPage() {
                           {customer.email && <Badge variant="outline">Email presente</Badge>}
                         </div>
                         <p className="mt-1 text-sm text-muted-foreground">
-                          Cliente dal {formatDate(customer.created_at)} · Ultimo ordine {formatDateTime(stats?.last_order_at)}
+                          Cliente dal {formatDate(customer.created_at)} · Ultimo ordine {formatDateTimeFull(stats?.last_order_at)}
                         </p>
                       </div>
 
@@ -595,7 +578,7 @@ export default function CustomersPage() {
               icon={Clock}
               label="Ultima consegna"
               value={stats?.last_delivery ? formatDate(stats.last_delivery) : '-'}
-              hint={stats?.last_delivery ? formatDateTime(stats.last_delivery) : 'Ancora nessuna consegna conclusa'}
+              hint={stats?.last_delivery ? formatDateTimeFull(stats.last_delivery) : 'Ancora nessuna consegna conclusa'}
               accent="text-sky-500"
             />
             <CustomerMetricCard
@@ -653,7 +636,7 @@ export default function CustomersPage() {
                       </div>
                       <div>
                         <p className="text-muted-foreground">Creazione profilo</p>
-                        <p className="font-medium text-foreground">{formatDateTime(customer.created_at)}</p>
+                        <p className="font-medium text-foreground">{formatDateTimeFull(customer.created_at)}</p>
                       </div>
                     </div>
                   </div>
@@ -755,8 +738,8 @@ export default function CustomersPage() {
                             </div>
                             <p className="font-medium text-foreground">{delivery.items || delivery.notes || 'Consegna farmacia'}</p>
                             <p className="text-sm text-muted-foreground">
-                              Creata il {formatDateTime(delivery.created_at)}
-                              {delivery.actual_delivery ? ` · Consegnata il ${formatDateTime(delivery.actual_delivery)}` : ''}
+                              Creata il {formatDateTimeFull(delivery.created_at)}
+                              {delivery.actual_delivery ? ` · Consegnata il ${formatDateTimeFull(delivery.actual_delivery)}` : ''}
                             </p>
                             {delivery.notes && <p className="text-sm text-muted-foreground">Note: {delivery.notes}</p>}
                           </div>

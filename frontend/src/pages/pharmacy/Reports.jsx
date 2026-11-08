@@ -18,12 +18,11 @@ import { ensureArray } from '@/lib/collections';
 import { useAnalyticsQuery } from '@/hooks/queries';
 import { ListSkeleton } from '../../components/Skeletons';
 
+import { formatCurrency } from '@/lib/format';
 const periodLabels = { week: 'Settimana', month: 'Mese', quarter: 'Trimestre', year: 'Anno' };
 const minuti = (valore) => Number(valore || 0).toLocaleString('it-IT', { maximumFractionDigits: 1 });
 const GIORNI_LUNGHI = { lun: 'lunedì', mar: 'martedì', mer: 'mercoledì', gio: 'giovedì', ven: 'venerdì', sab: 'sabato', dom: 'domenica' };
 
-const formatCurrency = (amount) =>
-  new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(amount || 0);
 
 const EmptyState = ({ title, hint }) => (
   <div className="py-10 text-center">
