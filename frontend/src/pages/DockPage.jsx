@@ -9,7 +9,6 @@ import { Truck, Plus, RefreshCw, Search, ClipboardCheck, Package, Euro, XCircle,
 import { toast } from 'sonner';
 
 
-import { etichettaStato } from '@/lib/deliveryDisplay';
 export default function DockPage() {
   const queryClient = useQueryClient();
   const { data: deliveries = [] } = useDeliveriesQuery();
