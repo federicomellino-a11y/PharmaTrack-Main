@@ -215,7 +215,6 @@ class TestWinfarmImport:
     # 5) 404 when phone has no match and no name provided
     def test_404_when_phone_no_match_and_no_name(self, pharma_session):
         # Use a phone that surely won't match any customer
-        bogus = f"000000{uuid.uuid4().hex[:6]}"  # 12 chars of digits-ish
         # Ensure digits only so regex path triggers and fails
         bogus_digits = "9" * 12
         r = _do_import(

@@ -4,7 +4,7 @@ import importlib
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from middleware_security import SecurityHeadersMiddleware
+from app.core.security_middleware import SecurityHeadersMiddleware
 
 
 def _app_con_middleware():
@@ -64,7 +64,7 @@ def test_ambiente_locale_non_e_produzione(monkeypatch):
 
 # ── Difesa CSRF: l'origine delle richieste che scrivono ──────────────────────
 
-from middleware_security import OriginCheckMiddleware, origine_ammessa, origini_consentite  # noqa: E402
+from app.core.security_middleware import OriginCheckMiddleware, origine_ammessa, origini_consentite  # noqa: E402
 
 
 def _app_con_origine(consentite=None):

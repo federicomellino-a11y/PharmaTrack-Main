@@ -25,7 +25,7 @@ from app.routers import (
     archive, doctors, useful_numbers, notes, reports, integrations, shifts,
     analytics, photos, client_errors, csp_reports, admin_db, plan, staff,
 )
-from middleware_security import SecurityHeadersMiddleware
+from app.core.security_middleware import SecurityHeadersMiddleware
 
 setup_logging()
 init_sentry()
@@ -92,7 +92,7 @@ app.add_middleware(SlowAPIMiddleware)
 # Security headers from PR blocco-1: wired so they actually apply (were dead code)
 app.add_middleware(SecurityHeadersMiddleware)
 # Difesa CSRF: l'origine delle richieste che scrivono deve essere una delle nostre.
-from middleware_security import OriginCheckMiddleware, origini_consentite  # noqa: E402
+from app.core.security_middleware import OriginCheckMiddleware, origini_consentite  # noqa: E402
 app.add_middleware(OriginCheckMiddleware, consentite=origini_consentite(os.environ.get("CORS_ORIGINS")))
 
 # Gestione errori standardizzata

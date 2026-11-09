@@ -17,7 +17,7 @@ from fastapi import APIRouter, HTTPException, Depends, Request, UploadFile, File
 from app.core.database import db
 from app.core.websocket import manager
 from app.core.security import get_current_user, get_current_driver
-from cloudinary_config import PhotoManager
+from app.core.cloudinary_client import PhotoManager
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
