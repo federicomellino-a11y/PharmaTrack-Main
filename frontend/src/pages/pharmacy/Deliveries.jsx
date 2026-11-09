@@ -8,6 +8,7 @@ import { API } from '@/lib/config';
 import { FASCE, fasciaDi, testoFascia } from '@/lib/fasce';
 import { consegnaInRitardo } from '@/lib/deliveryDisplay';
 import BarraConsegne from '../../components/deliveries/BarraConsegne';
+import ListaConsegne from '../../components/deliveries/ListaConsegne';
 import { costruisciCsv, scaricaCsv } from '@/lib/consegneCsv';
 import { Layout } from '../../components/Layout';
 import { Card, CardContent } from '../../components/ui/card';
@@ -540,50 +541,27 @@ export default function DeliveriesPage() {
           onScheda={setActiveTab}
         />
 
-        {/* Deliveries list */}
-        {filtered.length === 0 ? (
-          <Card>
-            <CardContent className="py-16 text-center">
-              <Package className="w-12 h-12 mx-auto mb-3 text-muted-foreground/30" />
-              <p className="font-medium text-muted-foreground">
-                {listIsCapped && (
-                <p className="mb-2 rounded-lg bg-amber-500/10 px-3 py-2 text-[11px] text-amber-700 dark:text-amber-300">
-                  Stai vedendo le 500 consegne più recenti: usa la ricerca o l'archivio per le altre.
-                </p>
-              )}
-              {searchTerm ? 'Nessuna consegna trovata' : activeTab === 'active' ? 'Nessuna consegna attiva' : 'Archivio vuoto'}
-              </p>
-              {!searchTerm && activeTab === 'active' && (
-                <Button className="btn-primary mt-4" size="sm" onClick={() => { resetForm(); dialogOpenedAtRef.current = Date.now(); setDialogOpen(true); }}>
-                  <Plus className="w-4 h-4 mr-1.5" />Crea la prima consegna
-                </Button>
-              )}
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-2.5">
-{sorted.map((d) => (
-              <DeliveryRow
-                key={d.delivery_id}
-                d={d}
-                drivers={safeDrivers}
-                inRitardo={consegnaInRitardo}
-                handlers={{
-                  handleConfirmPayment,
-                  handleDisputePayment,
-                  handleAdvanceStatus,
-                  handleCancel,
-                  handleRestore,
-                  shareDelivery,
-                  onPrintSlip: stampaBolla,
-                  apriModifica,
-                  apriPronta,
-                  apriAssegna,
-                }}
-              />
-            ))}
-          </div>
-        )}
+        <ListaConsegne
+          consegne={sorted}
+          nessuna={filtered.length === 0}
+          cerca={searchTerm}
+          scheda={activeTab}
+          listIsCapped={listIsCapped}
+          fattorini={safeDrivers}
+          onNuova={() => { resetForm(); dialogOpenedAtRef.current = Date.now(); setDialogOpen(true); }}
+          gestori={{
+            handleConfirmPayment,
+            handleDisputePayment,
+            handleAdvanceStatus,
+            handleCancel,
+            handleRestore,
+            shareDelivery,
+            onPrintSlip: stampaBolla,
+            apriModifica,
+            apriPronta,
+            apriAssegna,
+          }}
+        />
       </div>
 
       <CreaConsegnaDialog
