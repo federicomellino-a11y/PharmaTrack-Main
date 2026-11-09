@@ -1,7 +1,7 @@
 """Cloudinary configuration and image management utilities."""
 import os
 import logging
-from typing import Dict, Optional, Any
+from typing import Any, Dict
 import cloudinary
 import cloudinary.uploader
 import cloudinary.api

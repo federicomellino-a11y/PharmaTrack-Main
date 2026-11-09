@@ -10,7 +10,7 @@ from fastapi import APIRouter, HTTPException, Depends, Response, Body
 from app.core.clock import adesso
 from app.core.cache import invalida_riepiloghi
 from app.core.database import db
-from cloudinary_config import PhotoManager
+from app.core.cloudinary_client import PhotoManager
 from app.core.websocket import manager
 # (nessun uso di app.core.config)
 from app.core.fasce import descrivi_fascia, fascia_scaduta, valida_fascia
