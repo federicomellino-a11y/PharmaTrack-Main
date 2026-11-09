@@ -30,7 +30,7 @@ import { toast } from 'sonner';
 
 // Il limite del piano arriva come 402: va spiegato, non mostrato come guasto.
 import printDeliverySlip from '@/lib/printDeliverySlip';
-import { formatCurrency, formatDateTime } from '@/lib/format';
+import { formatDateTime } from '@/lib/format';
 import { STATUS_LABELS, STATUS_ICONS, PRIORITY_LABELS, PRIORITY_ICONS } from '@/lib/deliveryDisplay';
 const messaggioPiano = (errore, ripiego) =>
   errore?.response?.status === 402
@@ -40,6 +40,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { ensureArray } from '@/lib/collections';
 import { printDeliveryLabel } from '@/lib/printLabel';
 import useDeliveryForm, { normalizzaImporto } from '@/hooks/useDeliveryForm';
+import useAzioniConsegna from '@/hooks/useAzioniConsegna';
 import DeliveryRow from '../../components/deliveries/DeliveryRow';
 import CreaConsegnaDialog from '../../components/deliveries/CreaConsegnaDialog';
 import SegnaProntaDialog from '../../components/deliveries/SegnaProntaDialog';
@@ -48,7 +49,6 @@ import { costruisciCorrezioneStato } from '@/lib/deliveryCorrection';
 import ModificaConsegnaDialog from '../../components/deliveries/ModificaConsegnaDialog';
 import AssegnaConsegnaDialog from '../../components/deliveries/AssegnaConsegnaDialog';
 import NuovoClienteDialog from '../../components/deliveries/NuovoClienteDialog';
-import { confirmAction } from '../../components/ConfirmDialog';
 
 
 
@@ -221,6 +221,11 @@ export default function DeliveriesPage() {
     setWinfarmPrefill(null);
   }, [winfarmPrefill, customers]);
 
+  const { confermaIncasso, contestaIncasso, annulla, ripristina, avanzaStato } = useAzioniConsegna({
+    ricarica: fetchData,
+    onAssegnaRichiesta: (consegna) => { setSelectedDelivery(consegna); setAssignDialogOpen(true); },
+  });
+
   const resetForm = () => {
     modulo.reset();
     setCustomerSearchTerm('');
@@ -308,21 +313,6 @@ export default function DeliveriesPage() {
     } catch { toast.error('Errore assegnazione'); }
   };
 
-  const handleCancel = async (id) => {
-    if (!(await confirmAction({ title: 'Annullare questa consegna?', description: "Potrai ripristinarla dalla sezione archivio.", confirmLabel: 'Annulla consegna', destructive: true }))) return;
-    try {
-      await axios.put(`${API}/deliveries/${id}`, { status: 'cancelled' }, { withCredentials: true });
-      toast.success('Consegna annullata'); fetchData();
-    } catch { toast.error('Errore'); }
-  };
-
-  const handleRestore = async (id) => {
-    try {
-      await axios.post(`${API}/deliveries/${id}/restore`, {}, { withCredentials: true });
-      toast.success('Consegna ripristinata'); fetchData();
-    } catch (error) { toast.error(error?.response?.data?.detail || 'Ripristino non riuscito'); }
-  };
-
   const repairCoordinates = async () => {
     setRepairing(true);
     try {
@@ -351,28 +341,6 @@ export default function DeliveriesPage() {
     toast.success(`${rows.length} consegne esportate`);
   };
 
-  const handleConfirmPayment = async (delivery) => {
-    const note = window.prompt(`Confermi l'incasso di ${formatCurrency(delivery.amount)} da ${delivery.customer_name}?\n\nLascia una nota se vuoi (opzionale).`, '');
-    if (note === null) return; // user cancelled
-    try {
-      await axios.post(`${API}/deliveries/${delivery.delivery_id}/confirm-payment`,
-        { confirmed_amount: delivery.amount, note: note || null },
-        { withCredentials: true });
-      toast.success('✓ Incasso confermato'); fetchData();
-    } catch (err) { toast.error(err.response?.data?.detail || 'Errore conferma'); }
-  };
-
-  const handleDisputePayment = async (delivery) => {
-    const reason = window.prompt(`Segnala un problema con l'incasso di ${delivery.customer_name}.\n\nMotivo (es: importo errato, manca parte del contante):`, '');
-    if (!reason || !reason.trim()) return;
-    try {
-      await axios.post(`${API}/deliveries/${delivery.delivery_id}/dispute-payment`,
-        { reason: reason.trim() },
-        { withCredentials: true });
-      toast.success('Contestazione registrata'); fetchData();
-    } catch (err) { toast.error(err.response?.data?.detail || 'Errore'); }
-  };
-
   const handleMarkPronta = async (e) => {
     e.preventDefault();
     if (!validateCashForm()) return;
@@ -390,26 +358,6 @@ export default function DeliveriesPage() {
       fetchData();
     } catch (err) { toast.error(err.response?.data?.detail || 'Errore'); }
   };
-
-  const handleAdvanceStatus = async (delivery) => {
-    const azione = avanzamentoFarmacia(delivery.status);
-    if (!azione) return;
-    const nextStatus = azione.stato;
-    if (delivery.status === 'assigned' && !delivery.driver_id) {
-      toast.error('Assegna prima un fattorino per avviare la consegna');
-      setSelectedDelivery(delivery);
-      setAssignDialogOpen(true);
-      return;
-    }
-    const label = azione.etichetta;
-    try {
-      await axios.put(`${API}/deliveries/${delivery.delivery_id}`,
-        { status: nextStatus }, { withCredentials: true });
-      toast.success(`✓ ${label}`);
-      fetchData();
-    } catch (err) { toast.error(err.response?.data?.detail || 'Errore aggiornamento stato'); }
-  };
-
 
   // Filter deliveries (memoizzato per evitare ricalcolo ad ogni render)
   const safeDeliveries = useMemo(() => ensureArray(deliveries), [deliveries]);
@@ -550,11 +498,11 @@ export default function DeliveriesPage() {
           fattorini={safeDrivers}
           onNuova={() => { resetForm(); dialogOpenedAtRef.current = Date.now(); setDialogOpen(true); }}
           gestori={{
-            handleConfirmPayment,
-            handleDisputePayment,
-            handleAdvanceStatus,
-            handleCancel,
-            handleRestore,
+            handleConfirmPayment: confermaIncasso,
+            handleDisputePayment: contestaIncasso,
+            handleAdvanceStatus: avanzaStato,
+            handleCancel: annulla,
+            handleRestore: ripristina,
             shareDelivery,
             onPrintSlip: stampaBolla,
             apriModifica,
