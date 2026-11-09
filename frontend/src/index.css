@@ -343,10 +343,16 @@
   display: flex;
   border-top: 1px solid hsl(var(--border));
   background: hsl(var(--card));
-  position: sticky;
+  /* Sempre in sovraimpressione: la barra segue lo schermo invece di stare in
+     fondo alla pagina. Con sticky spariva scorrendo, e per aggiungere una
+     consegna restava solo il pulsante flottante, che copriva i campi. */
+  position: fixed;
+  left: 0;
+  right: 0;
   bottom: 0;
   z-index: 30;
   padding-bottom: env(safe-area-inset-bottom);
+  box-shadow: 0 -6px 20px -12px rgba(0, 0, 0, 0.35);
 }
 @media (min-width: 1024px) { .pharmacy-bottom-nav { display: none; } }
 .pharmacy-bottom-nav a {
@@ -405,7 +411,7 @@
 .mobile-nav-item:hover { color: hsl(var(--primary)); }
 
 /* ===== CONTENT AREA ===== */
-.main-content-with-nav { padding-bottom: 72px; }
+.main-content-with-nav { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
 @media (min-width: 1024px) { .main-content-with-nav { padding-bottom: 1.25rem; } }
 
 /* ===== SPINNER ===== */

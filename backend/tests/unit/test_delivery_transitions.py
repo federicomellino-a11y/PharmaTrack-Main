@@ -7,6 +7,7 @@ qualcuno riapre un passaggio che falsa il fatturato (per esempio "consegnata" ->
 
 from app.core.delivery_lifecycle import (
     ORIGINI,
+    build_consegna_avvenuta,
     normalizza_stato,
     valuta_scrittura,
     TRANSIZIONI,
@@ -194,3 +195,18 @@ def test_nessun_router_inventa_un_origine():
             continue
         usi = [nome for nome, testo in sorgenti.items() if f'origine="{origine}"' in testo]
         assert len(usi) <= 1, f"origine {origine} dichiarata in {usi}"
+
+
+def test_l_orario_di_consegna_si_scrive_quando_il_pacco_arriva():
+    """Anche in attesa di incasso: e' l'arrivo, non l'incasso, a datare la consegna."""
+    adesso = "2026-11-09T21:30:00+00:00"
+    assert build_consegna_avvenuta("delivered_pending_confirmation", adesso) == {"actual_delivery": adesso}
+    assert build_consegna_avvenuta("delivered", adesso) == {"actual_delivery": adesso}
+    assert build_consegna_avvenuta("in_transit", adesso) == {}
+    assert build_consegna_avvenuta("pronta", adesso) == {}
+
+
+def test_l_orario_di_consegna_non_si_sovrascrive():
+    adesso = "2026-11-09T21:30:00+00:00"
+    consegna = {"actual_delivery": "2026-11-09T18:00:00+00:00"}
+    assert build_consegna_avvenuta("delivered", adesso, consegna) == {}

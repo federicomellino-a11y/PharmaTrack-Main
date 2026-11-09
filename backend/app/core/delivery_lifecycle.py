@@ -146,6 +146,10 @@ def build_photo_cleanup(photos: list[dict] | None) -> dict:
 
 # L'orario che segna ogni fase: senza, non si puo' misurare dove si perde tempo
 # (preparazione, attesa del fattorino, giro, conferma dell'incasso).
+# Il pacco e' arrivato: da qui l'orario di consegna esiste. Che i soldi siano
+# gia' confermati o ancora da confermare non c'entra, e' un'altra storia.
+STATI_CONSEGNATI = ("delivered_pending_confirmation", "delivered")
+
 FASE_ORARI = {
     "pronta": "pronta_at",
     "assigned": "assigned_at",
@@ -351,6 +355,20 @@ def build_phase_updates(stato: str, now_iso: str) -> dict:
     """L'orario della fase che si sta aprendo (niente, per gli stati senza fase)."""
     campo = FASE_ORARI.get(stato)
     return {campo: now_iso} if campo else {}
+
+
+def build_consegna_avvenuta(stato: str, now_iso: str, consegna: dict | None = None) -> dict:
+    """L'orario in cui il pacco e' arrivato, la prima volta che si sa.
+
+    Prima lo scriveva solo il passaggio a "incassata": una consegna ferma in
+    attesa di conferma restava senza orario, e il conteggio delle consegnate
+    oggi (e la cassa) la ignorava.
+    """
+    if stato not in STATI_CONSEGNATI:
+        return {}
+    if consegna and consegna.get("actual_delivery"):
+        return {}
+    return {"actual_delivery": now_iso}
 
 
 def build_force_updates(motivo: str, now_iso: str, actor_id: str) -> dict:

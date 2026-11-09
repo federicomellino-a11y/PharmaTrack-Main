@@ -689,14 +689,6 @@ export default function DeliveriesPage() {
         )}
       </div>
 
-      {/* FAB mobile: Nuova Consegna */}
-      <button
-        className="lg:hidden fixed bottom-24 right-4 z-30 w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-xl flex items-center justify-center active:scale-95 transition-transform"
-        onClick={() => { resetForm(); dialogOpenedAtRef.current = Date.now(); setDialogOpen(true); }}
-        aria-label="Nuova Consegna">
-        <Plus className="w-6 h-6" />
-      </button>
-
       <CreaConsegnaDialog
         modulo={modulo}
         {...{

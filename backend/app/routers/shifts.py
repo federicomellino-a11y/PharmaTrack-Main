@@ -5,6 +5,7 @@ from typing import Optional
 from app.core.delivery_lifecycle import valuta_scrittura
 from fastapi import APIRouter, HTTPException, Depends, Request
 
+from app.core.cache import invalida_riepiloghi
 from app.core.database import db
 from app.core.websocket import manager
 from app.core.security import (
@@ -254,6 +255,7 @@ async def pharmacy_settle_shift(shift_id: str, request: Request, user: dict = De
                     }
                 },
             )
+            await invalida_riepiloghi(user["user_id"])
 
     if shift.get("driver_id"):
         await manager.send_personal_message(
