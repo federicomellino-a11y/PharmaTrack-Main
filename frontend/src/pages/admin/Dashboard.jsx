@@ -41,15 +41,9 @@ import {
   useAdminDatabaseHealthQuery,
 } from '@/hooks/queries'
 
+import { STATUS_LABELS } from '@/lib/deliveryDisplay';
 import { formatCurrency, formatDateTimeLong } from '@/lib/format';
-const deliveryStatusLabel = {
-  pending: 'In attesa',
-  assigned: 'Assegnata',
-  picked_up: 'Ritirata',
-  in_transit: 'In transito',
-  delivered: 'Consegnata',
-  cancelled: 'Annullata',
-}
+const deliveryStatusLabel = STATUS_LABELS
 
 export default function AdminDashboardPage() {
   const { admin, logout } = useAdminAuth()

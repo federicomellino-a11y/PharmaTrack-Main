@@ -16,17 +16,30 @@ import {
   XCircle,
 } from 'lucide-react';
 
+/* Le fasi di una consegna, con il nome che si legge.
+
+   Fino a ieri le stesse fasi avevano tre nomi: "In attesa" in dashboard,
+   "Assegnata" nella bolla, "Da ritirare" al fattorino, "In transito" in admin.
+   Da qui in poi il nome e' uno, tranne dove il ruolo cambia davvero la domanda:
+   per il fattorino "Affidata" non significa niente, "Da ritirare" si'. */
 export const STATUS_LABELS = {
   da_preparare: 'Da preparare',
-  pending: 'Da preparare',
+  pending: 'Da preparare', // doppione storico: si legge come la fase che e'
   pronta: 'Pronta',
-  assigned: 'Assegnata',
+  assigned: 'Affidata',
   picked_up: 'Ritirata',
   in_transit: 'In consegna',
-  delivered_pending_confirmation: 'Da confermare incasso',
-  delivered: 'Consegnata',
+  delivered_pending_confirmation: 'Consegnata da incassare',
+  delivered: 'Incassata',
   cancelled: 'Annullata',
   not_delivered: 'Non consegnata',
+};
+
+/** Le stesse fasi viste dal fattorino: cosa deve fare, non dove sta la pratica. */
+export const ETICHETTE_FATTORINO = {
+  ...STATUS_LABELS,
+  assigned: 'Da ritirare',
+  delivered_pending_confirmation: 'Consegnata · in attesa farmacia',
 };
 
 export const STATUS_ICONS = {
