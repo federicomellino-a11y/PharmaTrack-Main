@@ -6,6 +6,7 @@ qualcuno riapre un passaggio che falsa il fatturato (per esempio "consegnata" ->
 """
 
 from app.core.delivery_lifecycle import (
+    normalizza_stato,
     TRANSIZIONI,
     TRANSIZIONI_FATTORINO,
     build_force_updates,
@@ -64,7 +65,11 @@ def test_il_fattorino_avanza_solo_il_giro():
     assert valuta_cambio_stato("in_transit", "delivered_pending_confirmation", ruolo="fattorino")["ok"]
     # non puo' saltare il ritiro ne' incassare
     assert not valuta_cambio_stato("assigned", "in_transit", ruolo="fattorino")["ok"]
-    assert not valuta_cambio_stato("in_transit", "delivered", ruolo="fattorino")["ok"]
+    # Il fattorino dal campo manda "delivered": e' la consegna fatta, e il
+    # backend la registra in attesa che la farmacia confermi l'incasso.
+    esito = valuta_cambio_stato("in_transit", "delivered", ruolo="fattorino")
+    assert esito["ok"]
+    assert normalizza_stato("in_transit", "delivered") == "delivered_pending_confirmation"
 
 
 def test_ogni_stato_della_tabella_e_uno_stato_vero():
@@ -105,3 +110,29 @@ def test_gli_stati_successivi_dipendono_dal_ruolo():
     assert "picked_up" in stati_successivi("pronta")
     assert "picked_up" not in stati_successivi("pronta", ruolo="fattorino")
     assert stati_successivi("stato_inventato") == ()
+
+class TestAvanzamentoDallaFarmacia:
+    """Le due azioni che il banco usa davvero: "Avvia" e "Consegnata"."""
+
+    def test_da_affidata_la_farmacia_puo_andare_direttamente_in_giro(self):
+        assert valuta_cambio_stato("assigned", "in_transit")["ok"] is True
+
+    def test_il_fattorino_resta_sul_passo_singolo(self):
+        esito = valuta_cambio_stato("assigned", "in_transit", ruolo="fattorino")
+        assert esito["ok"] is False
+
+    def test_delivered_da_una_consegna_in_giro_vale_consegnata_da_incassare(self):
+        assert normalizza_stato("in_transit", "delivered") == "delivered_pending_confirmation"
+        assert valuta_cambio_stato("in_transit", "delivered")["ok"] is True
+        assert valuta_cambio_stato("picked_up", "delivered")["ok"] is True
+
+    def test_dal_fattorino_delivered_e_accolto_come_consegna_fatta(self):
+        assert valuta_cambio_stato("in_transit", "delivered", ruolo="fattorino")["ok"] is True
+
+    def test_l_incasso_resta_un_passaggio_suo(self):
+        # da "in attesa incasso" delivered e' l'incasso: non si normalizza
+        assert normalizza_stato("delivered_pending_confirmation", "delivered") == "delivered"
+        assert valuta_cambio_stato("delivered_pending_confirmation", "delivered")["ok"] is True
+
+    def test_un_salto_ancora_illecito_resta_rifiutato(self):
+        assert valuta_cambio_stato("da_preparare", "delivered")["ok"] is False

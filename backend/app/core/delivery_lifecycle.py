@@ -160,7 +160,9 @@ TRANSIZIONI = {
     "da_preparare": ("pronta", "assigned", "cancelled"),
     "pending": ("pronta", "assigned", "cancelled"),
     "pronta": ("assigned", "picked_up", "cancelled"),
-    "assigned": ("picked_up", "pronta", "cancelled", "not_delivered"),
+    # Dal banco il fattorino ha gia' ritirato: la farmacia puo' portare avanti
+    # una consegna affidata direttamente "in giro" senza il passo intermedio.
+    "assigned": ("picked_up", "in_transit", "pronta", "cancelled", "not_delivered"),
     "picked_up": ("in_transit", "delivered_pending_confirmation", "not_delivered", "cancelled"),
     "in_transit": ("delivered_pending_confirmation", "not_delivered", "cancelled"),
     # Da "consegnata in attesa di incasso" si torna indietro solo se la farmacia
@@ -178,6 +180,19 @@ TRANSIZIONI_FATTORINO = {
     "picked_up": ("in_transit", "delivered_pending_confirmation", "not_delivered", "cancelled"),
     "in_transit": ("delivered_pending_confirmation", "not_delivered", "cancelled"),
 }
+
+
+def normalizza_stato(stato_attuale, nuovo):
+    """'delivered' vuol dire due cose a seconda di dove sei.
+
+    Da una consegna ancora in giro (in consegna, ritirata) 'delivered' e' il
+    fatto che il pacco sia arrivato: si registra come 'delivered_pending_confirmation',
+    perche' l'incasso non e' ancora confermato. Da 'delivered_pending_confirmation'
+    invece 'delivered' e' proprio l'incasso, e resta se stesso.
+    """
+    if nuovo == "delivered" and stato_attuale not in ("delivered_pending_confirmation", "delivered"):
+        return "delivered_pending_confirmation"
+    return nuovo
 
 
 def stati_successivi(stato: str, ruolo: str = "farmacia") -> tuple:
@@ -199,6 +214,9 @@ def valuta_cambio_stato(stato_attuale, nuovo, ruolo: str = "farmacia",
         return {"ok": False, "forzato": False, "errore": "Stato mancante"}
     if nuovo == stato_attuale:
         return {"ok": True, "forzato": False, "errore": None}
+    # 'delivered' detto da una consegna ancora in giro e' la consegna fatta,
+    # non l'incasso: si giudica e si registra come "consegnata da incassare".
+    nuovo = normalizza_stato(stato_attuale, nuovo)
     ammessi = stati_successivi(stato_attuale, ruolo)
     if nuovo in ammessi:
         return {"ok": True, "forzato": False, "errore": None}

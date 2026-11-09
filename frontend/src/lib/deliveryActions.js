@@ -53,4 +53,29 @@ export const prossimaAzione = (stato, ruolo = 'farmacia') => {
   };
 };
 
+/* L'avanzamento in un click della farmacia: dal banco il fattorino ha gia'
+   ritirato, quindi da "affidata" si va direttamente "in giro" (il backend lo
+   permette). L'ultimo passo non e' l'incasso: la consegna arriva in attesa che
+   la farmacia confermi i soldi, che resta un gesto suo. */
+const AVANZAMENTO_FARMACIA = {
+  assigned: 'in_transit',
+  picked_up: 'in_transit',
+  in_transit: 'delivered_pending_confirmation',
+};
+
+const ETICHETTE_AVANZAMENTO = {
+  in_transit: 'In consegna',
+  delivered_pending_confirmation: 'Consegnata da incassare',
+};
+
+/** Lo stato da mandare quando la farmacia preme "avanti", o null se non c'e'. */
+export const avanzamentoFarmacia = (stato) => {
+  const successivo = AVANZAMENTO_FARMACIA[stato];
+  if (!successivo) return null;
+  return {
+    stato: successivo,
+    etichetta: ETICHETTE_AVANZAMENTO[successivo] || STATUS_LABELS[successivo] || successivo,
+  };
+};
+
 export default prossimaAzione;
