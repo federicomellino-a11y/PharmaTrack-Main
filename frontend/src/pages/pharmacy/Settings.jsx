@@ -1,6 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { useDriversQuery, usePlanQuery } from '@/hooks/queries';
+import PianoCard from '../../components/settings/PianoCard';
+import DatiFarmaciaCard from '../../components/settings/DatiFarmaciaCard';
+import NotificheCard from '../../components/settings/NotificheCard';
+import FunzioniProCard from '../../components/settings/FunzioniProCard';
 import StaffCard from '../../components/StaffCard';
 import AddressAutocomplete from '../../components/AddressAutocomplete';
 import { API } from '@/lib/config';
@@ -216,64 +220,15 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
-        <Card className={provaFinita ? 'border-destructive/40' : ''} data-testid="carta-del-piano">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CreditCard className="w-5 h-5 text-primary" />Piano
-            </CardTitle>
-            <CardDescription>
-              {piano?.nome
-                ? `${piano.nome}${piano.prezzo_mese ? ` · ${piano.prezzo_mese} €/mese` : ''}`
-                : 'Nessun limite attivo su questo account'}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {piano?.in_prova && !provaFinita && (
-              <p className="text-sm">
-                Prova in corso, restano <span className="font-semibold">{Math.max(0, piano.giorni_rimasti ?? 0)} giorni</span>.
-              </p>
-            )}
-            {provaFinita && (
-              <p className="text-sm font-medium text-destructive">
-                La prova è finita: le consegne già aperte si chiudono, ma non se ne possono creare di nuove.
-              </p>
-            )}
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <div className="rounded-xl bg-secondary/40 p-3">
-                <p className="text-xs text-muted-foreground">Consegne questo mese</p>
-                <p className="font-bold tabular-nums">
-                  {uso.consegne_mese ?? 0}
-                  {limiti.max_consegne_mese ? ` / ${limiti.max_consegne_mese}` : ''}
-                </p>
-              </div>
-              <div className="rounded-xl bg-secondary/40 p-3">
-                <p className="text-xs text-muted-foreground">Fattorini attivi</p>
-                <p className="font-bold tabular-nums">
-                  {uso.fattorini ?? 0}
-                  {limiti.max_fattorini ? ` / ${limiti.max_fattorini}` : ''}
-                </p>
-              </div>
-            </div>
-            {vicinoAlTetto && !provaFinita && (
-              <p className="text-xs text-amber-600">
-                Sei vicino al tetto del piano: oltre, le creazioni si fermano finché non passi a un piano superiore.
-              </p>
-            )}
-            {piano?.catalogo?.length > 0 && (
-              <div className="space-y-1.5 pt-1">
-                {piano.catalogo.filter((voce) => voce.piano !== 'prova').map((voce) => (
-                  <div key={voce.piano} className="flex items-center justify-between rounded-lg border px-3 py-2 text-sm">
-                    <span className="font-medium">{voce.nome}</span>
-                    <span className="text-muted-foreground">
-                      {voce.prezzo_mese} €/mese · {voce.max_fattorini} fattorini · {voce.max_consegne_mese} consegne
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
+      <PianoCard
+        {...{
+        limiti,
+        piano,
+        provaFinita,
+        uso,
+        vicinoAlTetto,
+        }}
+      />
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2"><User className="w-5 h-5 text-primary" />Profilo Account</CardTitle>
@@ -321,132 +276,31 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2"><Building2 className="w-5 h-5 text-primary" />Dati Farmacia</CardTitle>
-            <CardDescription>Configura le informazioni della tua farmacia</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <Label>Nome Farmacia</Label>
-                <Input
-                  value={formData.pharmacy_name}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, pharmacy_name: e.target.value }))}
-                  placeholder="Es. Farmacia Centrale"
-                />
-              </div>
+      <DatiFarmaciaCard
+        {...{
+        activeDrivers,
+        formData,
+        handleSubmit,
+        saving,
+        setFormData,
+        settings,
+        }}
+      />
 
-              <div>
-                <AddressAutocomplete
-                  label="Indirizzo Farmacia"
-                  value={formData.pharmacy_address}
-                  onChange={(value) => setFormData((prev) => ({ ...prev, pharmacy_address: value, pharmacy_lat: null, pharmacy_lng: null }))}
-                  onAddressSelect={(selection) => setFormData((prev) => ({
-                    ...prev,
-                    pharmacy_address: selection.address,
-                    pharmacy_lat: selection.lat,
-                    pharmacy_lng: selection.lng,
-                  }))}
-                  placeholder="Es. Via Roma 123, Milano"
-                  id="settings-pharmacy-address"
-                />
-                {formData.pharmacy_lat && formData.pharmacy_lng && (
-                  <p className="text-xs text-emerald-600 mt-2">Indirizzo farmacia verificato sulla mappa</p>
-                )}
-              </div>
-
-              <div>
-                <Label>Telefono Farmacia</Label>
-                <Input
-                  value={formData.pharmacy_phone}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, pharmacy_phone: e.target.value }))}
-                  placeholder="Es. +39 02 1234567"
-                />
-              </div>
-
-              <Separator />
-
-              <div>
-                <Label>Fattorino Predefinito</Label>
-                <Select
-                  value={formData.default_driver_id || 'none'}
-                  onValueChange={(value) => setFormData((prev) => ({ ...prev, default_driver_id: value === 'none' ? '' : value }))}
-                >
-                  <SelectTrigger><SelectValue placeholder="Nessun fattorino predefinito" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Nessuno</SelectItem>
-                    {activeDrivers.map((driver) => (
-                      <SelectItem key={driver.driver_id} value={driver.driver_id}>{driver.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground mt-1">Questo fattorino sarà suggerito automaticamente per le nuove consegne</p>
-              </div>
-
-              <Button type="submit" disabled={saving}>
-                <Save className="w-4 h-4 mr-2" />
-                {saving ? 'Salvataggio...' : 'Salva Modifiche'}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2"><Bell className="w-5 h-5 text-primary" />Notifiche</CardTitle>
-            <CardDescription>Attiva o disattiva le notifiche push sul dispositivo</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-center justify-between p-3 rounded-lg bg-secondary/30 gap-3">
-              <div>
-                <p className="font-medium">Notifiche browser</p>
-                <p className="text-xs text-muted-foreground">Ricevi notifiche push sul dispositivo</p>
-              </div>
-              <Switch checked={settings.notifications_enabled} onCheckedChange={(checked) => setSettings((prev) => ({ ...prev, notifications_enabled: checked }))} />
-            </div>
-
-            <div className="flex items-center justify-between p-3 rounded-lg bg-secondary/30 gap-3">
-              <div>
-                <p className="font-medium">Suoni notifiche</p>
-                <p className="text-xs text-muted-foreground">Riproduci un suono quando arriva un nuovo evento</p>
-              </div>
-              <Switch checked={settings.sound_enabled} onCheckedChange={(checked) => setSettings((prev) => ({ ...prev, sound_enabled: checked }))} />
-            </div>
-
-            <div className="rounded-lg border border-border p-4 space-y-3">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="font-medium">Stato permesso notifiche</p>
-                  <p className="text-xs text-muted-foreground">Se bloccato, va riabilitato dalle impostazioni del browser.</p>
-                </div>
-                <Badge variant="outline" className={notificationPermissionInfo.className}>{notificationPermissionInfo.label}</Badge>
-              </div>
-
-              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/60 pt-3">
-                <div>
-                  <p className="font-medium">Push reali via service worker</p>
-                  <p className="text-xs text-muted-foreground">Funzionano anche con app in background se browser, PWA e backend sono configurati.</p>
-                </div>
-                <Badge variant="outline" className={pushSubscribed ? 'bg-emerald-500/15 text-emerald-600 border-emerald-500/30' : pushConfigured ? 'bg-amber-500/15 text-amber-600 border-amber-500/30' : 'bg-muted text-muted-foreground border-border'}>
-                  {!pushSupported ? 'Non supportate' : pushSubscribed ? 'Attive' : pushConfigured ? 'Da attivare' : 'Backend non configurato'}
-                </Badge>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                <Button type="button" variant="outline" onClick={handleRequestPermission}>
-                  <BellRing className="w-4 h-4 mr-2" />Abilita permesso
-                </Button>
-                <Button type="button" variant="outline" onClick={handleEnableRealPush} disabled={pushLoading || !pushSupported || !pushConfigured}>
-                  <Bell className="w-4 h-4 mr-2" />{pushLoading ? 'Attivazione...' : 'Attiva push reali'}
-                </Button>
-                <Button type="button" variant="outline" onClick={handleDisableRealPush} disabled={pushLoading || !pushSubscribed}>
-                  <Bell className="w-4 h-4 mr-2" />Disattiva push
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      <NotificheCard
+        {...{
+        handleDisableRealPush,
+        handleEnableRealPush,
+        handleRequestPermission,
+        notificationPermissionInfo,
+        pushConfigured,
+        pushLoading,
+        pushSubscribed,
+        pushSupported,
+        setSettings,
+        settings,
+        }}
+      />
 
         <Card>
           <CardHeader>
@@ -502,32 +356,10 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-purple-500/30 bg-gradient-to-br from-purple-500/5 to-primary/5">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2"><Crown className="w-5 h-5 text-purple-400" />Funzioni PRO</CardTitle>
-            <CardDescription>Funzionalità avanzate in arrivo</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-3">
-              {[
-                { title: 'Assegnazione automatica', desc: 'Assegna al fattorino più vicino' },
-                { title: 'Ottimizzazione percorsi', desc: 'Calcola il percorso più efficiente' },
-                { title: 'Report avanzati', desc: 'Analisi dettagliate con export' },
-                { title: 'Multi-farmacia', desc: 'Gestisci più sedi' },
-                { title: 'API esterne', desc: 'Integra con altri software' },
-              ].map((feature) => (
-                <div key={feature.title} className="flex items-center gap-3 p-3 rounded-lg bg-background/50">
-                  <div className="w-8 h-8 rounded bg-purple-500/20 flex items-center justify-center"><Lock className="w-4 h-4 text-purple-400" /></div>
-                  <div>
-                    <p className="font-medium text-sm">{feature.title}</p>
-                    <p className="text-xs text-muted-foreground">{feature.desc}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <p className="text-xs text-center text-muted-foreground mt-4">Queste funzioni saranno disponibili presto!</p>
-          </CardContent>
-        </Card>
+      <FunzioniProCard
+        {...{
+        }}
+      />
 
         <Card className="border-destructive/30">
           <CardHeader>
