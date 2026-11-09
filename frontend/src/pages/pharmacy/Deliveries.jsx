@@ -6,6 +6,9 @@ import AddressAutocomplete from '../../components/AddressAutocomplete';
 import axios from 'axios';
 import { API } from '@/lib/config';
 import { FASCE, fasciaDi, testoFascia } from '@/lib/fasce';
+import { consegnaInRitardo } from '@/lib/deliveryDisplay';
+import BarraConsegne from '../../components/deliveries/BarraConsegne';
+import { costruisciCsv, scaricaCsv } from '@/lib/consegneCsv';
 import { Layout } from '../../components/Layout';
 import { Card, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
@@ -73,25 +76,6 @@ export default function DeliveriesPage() {
   const [prontaDialogOpen, setProntaDialogOpen] = useState(false);
   const [selectedDelivery, setSelectedDelivery] = useState(null);
   // La fascia scelta è uno stato suo: derivarla dai valori non permetteva
-  // di passare a "Orario preciso" quando i valori coincidevano con una fascia.
-  // Una consegna e' "in ritardo" quando e' ancora da fare e la fascia promessa
-  // e' passata: stessa regola del Report e dell'elenco del fattorino.
-  const inRitardo = (consegna) => {
-    if (!consegna?.scheduled_time) return false;
-    if (!['da_preparare', 'pronta', 'pending', 'assigned', 'picked_up', 'in_transit'].includes(consegna.status)) return false;
-    const fine = (consegna.slot_to || consegna.scheduled_time).slice(0, 5);
-    const giorno = consegna.scheduled_date || (consegna.created_at ? consegna.created_at.slice(0, 10) : null);
-    if (giorno) {
-      const oggi = new Date().toLocaleDateString('sv-SE');
-      if (giorno < oggi) return true;
-      if (giorno > oggi) return false;
-    }
-    const adesso = new Date();
-    const minuti = adesso.getHours() * 60 + adesso.getMinutes();
-    const [ore, min] = fine.split(':').map(Number);
-    return Number.isFinite(ore) && minuti > ore * 60 + min;
-  };
-
   // Stato del modulo consegna: vive in hooks/useDeliveryForm.js
   const modulo = useDeliveryForm();
   const { form, setForm, fasciaScelta, setFasciaScelta, change_due, amountValue, amountGivenValue } = modulo;
@@ -362,37 +346,7 @@ export default function DeliveriesPage() {
       toast.info('Nessuna consegna da esportare');
       return;
     }
-    const esc = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
-    const header = ['Data', 'Cliente', 'Telefono', 'Indirizzo', 'Stato', 'Fattorino', 'Pagamento', 'Importo', 'Pagato con', 'Resto', 'Riferimento vendita', 'Motivo mancata consegna', 'Priorita', 'Note'];
-    const lines = [header.join(',')];
-    rows.forEach((d) => {
-      const driver = safeDrivers.find((dr) => dr.driver_id === d.driver_id);
-      lines.push([
-        d.created_at ? new Date(d.created_at).toLocaleString('it-IT') : '',
-        d.customer_name,
-        d.customer_phone,
-        d.customer_address,
-        STATUS_LABELS[d.status] || d.status,
-        driver?.name || '',
-        d.payment_method === 'cash' ? 'Contanti' : 'POS',
-        d.amount != null ? String(d.amount).replace('.', ',') : '',
-        d.amount_given != null ? String(d.amount_given).replace('.', ',') : '',
-        d.change_due != null ? String(d.change_due).replace('.', ',') : '',
-        d.external_ref || '',
-        d.failure_reason || '',
-        PRIORITY_LABELS[d.priority] || '',
-        d.notes || '',
-      ].map(esc).join(','));
-    });
-    const blob = new Blob([`\ufeff${lines.join('\n')}`], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `consegne-${new Date().toISOString().slice(0, 10)}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
+    scaricaCsv(costruisciCsv(rows, safeDrivers));
     toast.success(`${rows.length} consegne esportate`);
   };
 
@@ -567,81 +521,24 @@ export default function DeliveriesPage() {
     <Layout title="Consegne">
       <div className="space-y-4 animate-fade-in-up" data-testid="deliveries-page">
 
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold">Consegne</h1>
-            <p className="text-sm text-muted-foreground">
-              {activeCount} attive · {pendingCount} in attesa
-              {pendingConfirmCount > 0 && (
-                <span className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 font-semibold text-xs">
-                  <Euro className="w-3 h-3" />{pendingConfirmCount} da confermare incasso
-                </span>
-              )}
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => { setRefreshing(true); fetchData(); }} disabled={refreshing}>
-              <RefreshCw className={`w-4 h-4 mr-1.5 ${refreshing ? 'animate-spin' : ''}`} />
-              Aggiorna
-            </Button>
-            <Button className="btn-primary hidden sm:inline-flex" size="sm" onClick={() => { resetForm(); dialogOpenedAtRef.current = Date.now(); setDialogOpen(true); }}>
-              <Plus className="w-4 h-4 mr-1.5" />Nuova Consegna
-            </Button>
-          </div>
-        </div>
-
-        {/* Filters */}
-        <div className="flex flex-col sm:flex-row gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input placeholder="Cerca cliente, indirizzo, note..." value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)} className="pl-9 h-9" />
-          </div>
-          <Select value={filterDriver} onValueChange={setFilterDriver}>
-            <SelectTrigger className="w-full sm:w-44 h-9">
-              <Filter className="w-3.5 h-3.5 mr-1.5 text-muted-foreground" />
-              <SelectValue placeholder="Fattorino" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Tutti i fattorini</SelectItem>
-              <SelectItem value="unassigned">Non assegnate</SelectItem>
-              {safeDrivers.filter(d => d.is_active).map(d => (
-                <SelectItem key={d.driver_id} value={d.driver_id}>{d.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-10 sm:h-9 w-full sm:w-auto"
-            onClick={exportCsv}
-            data-testid="export-deliveries-csv"
-          >
-            <Download className="w-4 h-4 mr-1.5" />Esporta CSV
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-10 sm:h-9 w-full sm:w-auto"
-            onClick={repairCoordinates}
-            disabled={repairing}
-            title="Ricalcola le coordinate delle consegne aperte con indirizzi approssimativi"
-            data-testid="repair-coordinates"
-          >
-            <MapPin className="w-4 h-4 mr-1.5" />{repairing ? 'Riparo...' : 'Ripara indirizzi'}
-          </Button>
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full sm:w-auto">
-            <TabsList className="h-10 sm:h-9 w-full sm:w-auto">
-              <TabsTrigger value="active" className="flex-1 sm:flex-none text-[11px] sm:text-xs px-2 sm:px-3">Attive {activeCount > 0 && <span className="ml-1 px-1.5 py-0 text-[10px] rounded-full bg-primary/15 text-primary font-bold">{activeCount}</span>}</TabsTrigger>
-              <TabsTrigger value="pending_confirmation" className="flex-1 sm:flex-none text-[11px] sm:text-xs px-2 sm:px-3">
-                <Euro className="w-3 h-3 mr-1" />Da incassare
-                {pendingConfirmCount > 0 && <span className="ml-1 px-1.5 py-0 text-[10px] rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 font-bold">{pendingConfirmCount}</span>}
-              </TabsTrigger>
-              <TabsTrigger value="completed" className="flex-1 sm:flex-none text-[11px] sm:text-xs px-2 sm:px-3">Completate</TabsTrigger>
-            </TabsList>
-          </Tabs>
-        </div>
+        <BarraConsegne
+          attive={activeCount}
+          inAttesa={pendingCount}
+          daConfermare={pendingConfirmCount}
+          inAggiornamento={refreshing}
+          inRiparazione={repairing}
+          cerca={searchTerm}
+          fattorino={filterDriver}
+          fattorini={safeDrivers}
+          scheda={activeTab}
+          onAggiorna={() => { setRefreshing(true); fetchData(); }}
+          onNuova={() => { resetForm(); dialogOpenedAtRef.current = Date.now(); setDialogOpen(true); }}
+          onCerca={setSearchTerm}
+          onFattorino={setFilterDriver}
+          onEsporta={exportCsv}
+          onRipara={repairCoordinates}
+          onScheda={setActiveTab}
+        />
 
         {/* Deliveries list */}
         {filtered.length === 0 ? (
@@ -670,7 +567,7 @@ export default function DeliveriesPage() {
                 key={d.delivery_id}
                 d={d}
                 drivers={safeDrivers}
-                inRitardo={inRitardo}
+                inRitardo={consegnaInRitardo}
                 handlers={{
                   handleConfirmPayment,
                   handleDisputePayment,

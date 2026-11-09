@@ -80,3 +80,25 @@ export function soldiConsegna(consegna) {
     resto: conResto ? Math.round((pagato - importo) * 100) / 100 : 0,
   };
 }
+
+
+/**
+ * Una consegna e' "in ritardo" quando e' ancora da fare e la fascia promessa e'
+ * passata. La regola stava dentro la pagina Consegne: non si poteva provare
+ * senza montare la pagina e l'ora veniva presa dall'orologio.
+ */
+export function consegnaInRitardo(consegna, adesso = new Date()) {
+  if (!consegna?.scheduled_time) return false;
+  const daFare = ['da_preparare', 'pronta', 'pending', 'assigned', 'picked_up', 'in_transit'];
+  if (!daFare.includes(consegna.status)) return false;
+  const fine = (consegna.slot_to || consegna.scheduled_time).slice(0, 5);
+  const giorno = consegna.scheduled_date || (consegna.created_at ? consegna.created_at.slice(0, 10) : null);
+  if (giorno) {
+    const oggi = adesso.toLocaleDateString('sv-SE');
+    if (giorno < oggi) return true;
+    if (giorno > oggi) return false;
+  }
+  const minuti = adesso.getHours() * 60 + adesso.getMinutes();
+  const [ore, min] = fine.split(':').map(Number);
+  return Number.isFinite(ore) && minuti > ore * 60 + min;
+}
