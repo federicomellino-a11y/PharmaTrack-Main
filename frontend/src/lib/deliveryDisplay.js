@@ -62,3 +62,21 @@ export const PRIORITY_ICONS = { low: null, normal: null, high: AlertTriangle, ur
 export const etichettaStato = (stato) => STATUS_LABELS[stato] || stato || '';
 export const iconaStato = (stato) => STATUS_ICONS[stato] || null;
 export const etichettaPriorita = (priorita) => PRIORITY_LABELS[priorita] || '';
+
+
+/**
+ * I soldi di una consegna, come vanno letti al banco.
+ * `incasso` e' quanto entra davvero (il resto torna al cliente), `pagato` e'
+ * quello che il cliente ha messo sul tavolo. Prima la riga mostrava in grande
+ * il pagato, e sembrava che la farmacia avesse incassato anche il resto.
+ */
+export function soldiConsegna(consegna) {
+  const importo = Number(consegna?.amount) || 0;
+  const pagato = Number(consegna?.amount_given) || null;
+  const conResto = consegna?.payment_method === 'cash' && pagato !== null && pagato > importo;
+  return {
+    incasso: importo,
+    pagato: conResto ? pagato : null,
+    resto: conResto ? Math.round((pagato - importo) * 100) / 100 : 0,
+  };
+}

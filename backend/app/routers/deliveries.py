@@ -8,6 +8,7 @@ from typing import Optional, List
 from fastapi import APIRouter, HTTPException, Depends, Response, Body
 
 from app.core.clock import adesso
+from app.core.cache import invalida_riepiloghi
 from app.core.database import db
 from cloudinary_config import PhotoManager
 from app.core.websocket import manager
@@ -27,14 +28,15 @@ from app.core.delivery_creation import costruisci_consegna
 from app.core.delivery_lifecycle import FOLLOW_UP_STATUSES
 from app.core.delivery_lifecycle import ARCHIVED_STATUSES
 from app.core.delivery_lifecycle import (
-    valuta_scrittura,
     build_cancel_updates,
+    build_consegna_avvenuta,
+    build_force_updates,
+    build_phase_updates,
     build_photo_cleanup,
     build_restore_updates,
     can_hard_delete,
     resolve_restore_target,
-    build_phase_updates,
-    build_force_updates,
+    valuta_scrittura,
 )
 from app.models.schemas import DeliveryCreate, DeliveryUpdate
 
@@ -228,6 +230,7 @@ async def create_delivery(delivery: DeliveryCreate, user: dict = Depends(get_cur
         external_ref=delivery.external_ref,
     )
     await db.deliveries.insert_one(delivery_data)
+    await invalida_riepiloghi(user["user_id"])
     # Log audit NRE (tracciabilità legale, Garante 2025)
     if delivery_data.get("nre"):
         await db.audit_log.insert_one({
@@ -387,8 +390,10 @@ async def update_delivery(delivery_id: str, update: DeliveryUpdate, user: dict =
             update_data["cancelled_at"] = datetime.now(timezone.utc).isoformat()
             if update.status == "not_delivered":
                 update_data["failure_reason"] = (getattr(update, "failure_reason", None) or "Non specificato")[:200]
-        if update.status == "delivered":
-            update_data["actual_delivery"] = datetime.now(timezone.utc).isoformat()
+        # Il pacco e' arrivato: l'orario si scrive qui, non solo quando arriva
+        # la conferma dell'incasso, se no le consegnate di oggi restano zero.
+        update_data.update(build_consegna_avvenuta(
+            update.status, datetime.now(timezone.utc).isoformat(), delivery))
     if update.notes is not None: update_data["notes"] = update.notes
     if getattr(update, "failure_reason", None) and update.status not in ("cancelled", "not_delivered"):
         update_data["failure_reason"] = update.failure_reason[:200]
@@ -407,6 +412,7 @@ async def update_delivery(delivery_id: str, update: DeliveryUpdate, user: dict =
     if update.scheduled_time is not None: update_data["scheduled_time"] = update.scheduled_time
     if update.priority is not None: update_data["priority"] = update.priority
     await db.deliveries.update_one({"delivery_id": delivery_id}, {"$set": update_data})
+    await invalida_riepiloghi(delivery["pharmacy_id"])
     if update.driver_id:
         await _attach_delivery_to_open_shift(update.driver_id, delivery_id)
         await manager.send_personal_message({"type": "new_delivery", "delivery_id": delivery_id}, update.driver_id, "driver")
@@ -449,6 +455,7 @@ async def restore_delivery(delivery_id: str, user: dict = Depends(get_current_us
     await db.deliveries.update_one(
         {"delivery_id": delivery_id, "pharmacy_id": user["user_id"]}, {"$set": updates}
     )
+    await invalida_riepiloghi(user["user_id"])
     ripristinata = await db.deliveries.find_one({"delivery_id": delivery_id}, {"_id": 0})
     await _log_delivery_audit(
         ripristinata or delivery, "pharmacy", user["user_id"], "restore",
@@ -494,6 +501,7 @@ async def cancel_delivery(
     await db.deliveries.update_one(
         {"delivery_id": delivery_id, "pharmacy_id": user["user_id"]}, {"$set": updates}
     )
+    await invalida_riepiloghi(user["user_id"])
     annullata = await db.deliveries.find_one({"delivery_id": delivery_id}, {"_id": 0})
     await _log_delivery_audit(
         annullata or delivery, "pharmacy", user["user_id"], "cancel",
@@ -558,6 +566,7 @@ async def delete_delivery(delivery_id: str, user: dict = Depends(get_current_use
     result = await db.deliveries.delete_one(
         {"delivery_id": delivery_id, "pharmacy_id": user["user_id"]}
     )
+    await invalida_riepiloghi(user["user_id"])
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Consegna non trovata")
     if delivery.get("driver_id"):

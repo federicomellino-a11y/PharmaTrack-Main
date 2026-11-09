@@ -1,4 +1,5 @@
 import { puoAnnullare, puoRipristinare } from '@/lib/deliveryActions';
+import { soldiConsegna } from '@/lib/deliveryDisplay';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { Card, CardContent } from '../ui/card';
@@ -141,24 +142,23 @@ export default function DeliveryRow({ d, drivers, inRitardo, handlers }) {
                       <div className="flex sm:flex-col items-center sm:items-end gap-2 sm:gap-1 shrink-0">
                         {d.amount && (
                           <div className="text-right">
-                            {/* Importo da incassare dal cliente:
-                                - cash con amount_given valorizzato → mostro amount_given (es. cliente paga con 10 su vendita di 8)
-                                - altrimenti → mostro amount (POS o cash perfetto) */}
+                            {/* In grande l'incasso reale, cioe' quanto entra davvero:
+                                il resto che il cliente si riprende non e' incasso.
+                                Quando paga con un taglio piu' grande, il contante
+                                ricevuto e il resto stanno sotto, in piccolo. */}
                             {(() => {
-                              const showsGiven = d.payment_method === 'cash' && d.amount_given && d.amount_given > d.amount;
-                              const principal = showsGiven ? d.amount_given : d.amount;
-                              const change = showsGiven ? (d.amount_given - d.amount) : 0;
+                              const soldi = soldiConsegna(d);
                               return (
                                 <>
-                                  <p className="font-bold text-base text-primary">{formatCurrency(principal)}</p>
+                                  <p className="font-bold text-base text-primary" data-testid={`amount-${d.delivery_id}`}>{formatCurrency(soldi.incasso)}</p>
                                   <p className="text-xs text-muted-foreground flex items-center gap-1 justify-end">
                                     {d.payment_method === 'cash'
                                       ? <><Banknote className="w-3 h-3" />Contanti</>
                                       : <><CreditCard className="w-3 h-3" />POS</>}
                                   </p>
-                                  {showsGiven && (
-                                    <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight">
-                                      Vendita {formatCurrency(d.amount)} · Resto {formatCurrency(change)}
+                                  {soldi.pagato !== null && (
+                                    <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight whitespace-nowrap">
+                                      Pagato {formatCurrency(soldi.pagato)} · Resto {formatCurrency(soldi.resto)}
                                     </p>
                                   )}
                                 </>

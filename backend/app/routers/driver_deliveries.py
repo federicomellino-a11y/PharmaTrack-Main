@@ -8,6 +8,7 @@ from app.core.delivery_lifecycle import (
     build_phase_updates,
     valuta_scrittura,
 )
+from app.core.cache import invalida_riepiloghi
 from app.core.database import db
 from app.core.fasce import descrivi_fascia, fascia_scaduta
 from app.core.websocket import manager
@@ -93,6 +94,7 @@ async def update_delivery_status_driver(delivery_id: str, request: Request, driv
         # POS: pagamento già transitato, ma serve comunque conferma del bigliettino → resta pending_confirmation
         # cash: serve consegna fisica del contante → resta pending_confirmation
     await db.deliveries.update_one({"delivery_id": delivery_id}, {"$set": update_data})
+    await invalida_riepiloghi(delivery["pharmacy_id"])
     try:
         await db.audit_log.insert_one({
             "delivery_id": delivery_id,
@@ -177,6 +179,7 @@ async def confirm_delivery_payment(delivery_id: str, request: Request, user: dic
         update_data["confirm_note"] = str(confirm_note)[:500]
 
     await db.deliveries.update_one({"delivery_id": delivery_id}, {"$set": update_data})
+    await invalida_riepiloghi(delivery["pharmacy_id"])
 
     # Notifica al fattorino
     if delivery.get("driver_id"):
@@ -218,6 +221,7 @@ async def dispute_delivery_payment(delivery_id: str, request: Request, user: dic
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
     await db.deliveries.update_one({"delivery_id": delivery_id}, {"$set": update_data})
+    await invalida_riepiloghi(delivery["pharmacy_id"])
 
     if delivery.get("driver_id"):
         await manager.send_personal_message(

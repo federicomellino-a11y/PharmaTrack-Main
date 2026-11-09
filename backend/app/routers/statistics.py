@@ -8,7 +8,7 @@ from app.core.security import (
     get_current_user,
 )
 from app.core.cache import cache_get, cache_set
-from app.core.delivery_lifecycle import BILLED_STATUSES
+from app.core.delivery_lifecycle import BILLED_STATUSES, STATI_CONSEGNATI
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -32,14 +32,14 @@ async def get_statistics(user: dict = Depends(get_current_user)):
     now_local = datetime.now(ROME_TZ)
     today_start = now_local.replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc)
     today_deliveries = await db.deliveries.count_documents({"pharmacy_id": pharmacy_id, "created_at": {"$gte": today_start.isoformat()}})
-    today_completed = await db.deliveries.count_documents({"pharmacy_id": pharmacy_id, "status": "delivered", "actual_delivery": {"$gte": today_start.isoformat()}})
+    today_completed = await db.deliveries.count_documents({"pharmacy_id": pharmacy_id, "status": {"$in": list(STATI_CONSEGNATI)}, "actual_delivery": {"$gte": today_start.isoformat()}})
     weekly_data = []
     for i in range(6, -1, -1):
         day = datetime.now(ROME_TZ) - timedelta(days=i)
         day_start = day.replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc)
         day_end = day_start + timedelta(days=1)
         count = await db.deliveries.count_documents({"pharmacy_id": pharmacy_id, "created_at": {"$gte": day_start.isoformat(), "$lt": day_end.isoformat()}})
-        completed = await db.deliveries.count_documents({"pharmacy_id": pharmacy_id, "status": "delivered", "actual_delivery": {"$gte": day_start.isoformat(), "$lt": day_end.isoformat()}})
+        completed = await db.deliveries.count_documents({"pharmacy_id": pharmacy_id, "status": {"$in": list(STATI_CONSEGNATI)}, "actual_delivery": {"$gte": day_start.isoformat(), "$lt": day_end.isoformat()}})
         weekly_data.append({"date": day_start.strftime("%Y-%m-%d"), "day": day_start.strftime("%a"), "total": count, "completed": completed})
     # --- Cassa di oggi: quanto e' entrato, diviso contanti e POS ---
     # Serve al banco alla sera: si guarda un numero, non si ricostruisce.

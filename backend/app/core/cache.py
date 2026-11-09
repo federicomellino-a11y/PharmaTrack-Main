@@ -65,3 +65,17 @@ async def cache_invalidate_prefix(prefix: str):
             return
     for k in [k for k in _mem if k.startswith(prefix)]:
         _mem.pop(k, None)
+
+
+async def invalida_riepiloghi(pharmacy_id: str):
+    """I numeri del giorno non devono restare fermi dopo una scrittura.
+
+    Statistics e analytics stanno in cache 30 secondi per non martellare il
+    database, ma nessuno la svuotava quando cambiava qualcosa: la farmacia
+    chiudeva una consegna e per mezzo minuto la home mostrava ancora i valori di
+    prima (cassa a zero, completate ferme).
+    """
+    if not pharmacy_id:
+        return
+    await cache_invalidate_prefix(f"statistics:{pharmacy_id}")
+    await cache_invalidate_prefix(f"analytics:{pharmacy_id}")
