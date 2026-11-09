@@ -101,3 +101,55 @@ test('una rotta protetta senza sessione porta al login, non a una pagina bianca'
   await page.waitForURL(/\/login/, { timeout: 15_000 });
   await expect(page.locator('body')).toContainText(/Accedi|Email|Password/i);
 });
+
+/*
+ * La dashboard del fattorino era l'unica pagina senza nessuno che la guardasse:
+ * le rotte /driver nei test verificavano solo i reindirizzamenti senza sessione.
+ * Un'estrazione andata male li' non l'avrebbe vista nessuno fino al turno dopo.
+ */
+test('Dashboard fattorino: si carica con la sessione del fattorino', async ({ page }) => {
+  await page.route('**/api/**', async (route) => {
+    const url = new URL(route.request().url());
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(mockApiResponse(url.pathname)),
+    });
+  });
+  await page.route('**/ws**', (route) => route.abort());
+
+  const erroriPagina = [];
+  page.on('pageerror', (err) => erroriPagina.push(err.message));
+
+  await page.goto('/driver', { waitUntil: 'domcontentloaded' });
+
+  await expect(page.getByTestId('driver-dashboard')).toBeVisible();
+  // Il turno e la testata sono i due pezzi usciti dalla pagina.
+  await expect(page.getByTestId('driver-start-shift-btn')).toBeVisible();
+  await expect(page.getByText('Luca Bianchi')).toBeVisible();
+  await expect(page.getByText('La schermata bianca è stata intercettata')).toHaveCount(0);
+  expect(erroriPagina, `errori JS: ${erroriPagina.join(' | ')}`).toHaveLength(0);
+});
+
+/* Stessa ragione della dashboard fattorino: /admin nei test copriva solo il
+   redirect senza sessione, quindi la pagina vera non la guardava nessuno. */
+test('Console admin: si carica con la sessione amministratore', async ({ page }) => {
+  await page.route('**/api/**', async (route) => {
+    const url = new URL(route.request().url());
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(mockApiResponse(url.pathname)),
+    });
+  });
+  await page.route('**/ws**', (route) => route.abort());
+
+  const erroriPagina = [];
+  page.on('pageerror', (err) => erroriPagina.push(err.message));
+
+  await page.goto('/admin', { waitUntil: 'domcontentloaded' });
+
+  await expect(page.getByText('Console super admin')).toBeVisible();
+  await expect(page.getByText('La schermata bianca è stata intercettata')).toHaveCount(0);
+  expect(erroriPagina, `errori JS: ${erroriPagina.join(' | ')}`).toHaveLength(0);
+});

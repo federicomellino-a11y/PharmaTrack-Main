@@ -33,6 +33,12 @@ export const delivery = {
   driver_name: 'Luca Bianchi',
 };
 
+export const adminUser = {
+  admin_id: 'a-test-1',
+  name: 'Super Admin',
+  email: 'admin@test.it',
+};
+
 export const driver = {
   driver_id: 'd-test-1',
   name: 'Luca Bianchi',
@@ -80,6 +86,10 @@ export function mockApiResponse(pathname) {
   if (path === '/health') return { status: 'ok' };
   if (path === '/monitoring/config') return { sentry_dsn: null };
   if (path === '/photos/config') return { enabled: true };
+  if (path === '/admin/me') return adminUser;
+  if (path === '/driver/me') return driver;
+  if (path.startsWith('/driver/shift')) return shift;
+  if (path.startsWith('/driver/deliveries')) return [delivery];
   if (path === '/statistics') return statistics;
   if (path.startsWith('/deliveries')) return [delivery];
   if (path.startsWith('/drivers')) return [driver];
