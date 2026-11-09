@@ -243,6 +243,21 @@ async def setup_indexes():
     except Exception as exc:  # noqa: BLE001
         logger.warning("Pulizia notifiche non completata: %s", exc)
 
+    # ── Consegne: stesse chiavi su tutti i documenti ──
+    # Le consegne nate dalla farmacia non avevano la chiave imported_from (quelle
+    # importate da Winfarm l'avevano). Ora il costruttore la scrive sempre, ma i
+    # documenti vecchi resterebbero diversi: qui si allineano una volta sola, e
+    # ai riavvii successivi non c'e' piu' niente da fare.
+    try:
+        allineate = await db.deliveries.update_many(
+            {"imported_from": {"$exists": False}},
+            {"$set": {"imported_from": None}},
+        )
+        if allineate.modified_count:
+            logger.info("Consegne allineate su imported_from: %d", allineate.modified_count)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Allineamento consegne non completato: %s", exc)
+
     # ── Chat: thread multipli per farmacia/fattorino ──
     await safe_create_index(db.chat_threads, [("pharmacy_id", pymongo.ASCENDING), ("driver_id", pymongo.ASCENDING), ("status", pymongo.ASCENDING), ("created_at", pymongo.DESCENDING)], name="chat_threads_pair_idx", background=True)
     await safe_create_index(db.chat_threads, [("conversation_id", pymongo.ASCENDING)], unique=True, name="chat_threads_id_idx", background=True)
