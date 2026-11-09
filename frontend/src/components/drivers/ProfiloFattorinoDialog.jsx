@@ -1,3 +1,4 @@
+import { vehicleLabels } from '@/lib/drivers';
 import { Badge } from '../ui/badge';
 import { Banknote } from 'lucide-react';
 import { BarChart3 } from 'lucide-react';
@@ -21,9 +22,9 @@ import { formatDateTime } from '@/lib/format';
 
    Estratto da Drivers.jsx: riceve dallo stato della pagina solo cio' che usa.
 */
-export default function ProfiloFattorinoDialog({ handleEdit, profileDriver, profileLoading, profileStats, setProfileDriver, setProfileStats, vehicleLabels }) {
+export default function ProfiloFattorinoDialog({ chiudiProfilo, handleEdit, profileDriver, profileLoading, profileStats }) {
   return (
- <Dialog open={!!profileDriver} onOpenChange={(o) => { if (!o) { setProfileDriver(null); setProfileStats(null); } }}>
+ <Dialog open={!!profileDriver} onOpenChange={(o) => { if (!o) chiudiProfilo(); }}>
    <DialogContent className="max-w-2xl max-h-[88vh] overflow-y-auto" data-testid="driver-profile-dialog">
      <DialogHeader>
        <DialogTitle className="flex items-center gap-3">
@@ -144,8 +145,8 @@ export default function ProfiloFattorinoDialog({ handleEdit, profileDriver, prof
      )}
 
      <DialogFooter className="gap-2">
-       <Button variant="outline" onClick={() => { setProfileDriver(null); setProfileStats(null); }}>Chiudi</Button>
-       <Button onClick={() => { const d = profileDriver; setProfileDriver(null); handleEdit(d); }}>
+       <Button variant="outline" onClick={chiudiProfilo}>Chiudi</Button>
+       <Button onClick={() => { const scelto = profileDriver; chiudiProfilo(); handleEdit(scelto); }}>
          <Pencil className="w-3.5 h-3.5 mr-1.5" />Modifica
        </Button>
      </DialogFooter>
