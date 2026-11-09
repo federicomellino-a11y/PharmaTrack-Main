@@ -72,6 +72,11 @@ def test_annullamento_senza_motivo_resta_pulito():
 def test_non_si_annulla_due_volte():
     assert can_cancel("cancelled") is False
     assert can_cancel("assigned") is True
+    # Una consegna incassata o archiviata non si annulla: si ripristina e poi si
+    # annulla, se e' proprio il caso. Prima l'elenco diceva il contrario.
+    assert can_cancel("delivered") is False
+    assert can_cancel("delivered_pending_confirmation") is False
+    assert can_cancel("not_delivered") is False
 
 
 def test_cancellazione_fisica_solo_per_righe_chiuse():
