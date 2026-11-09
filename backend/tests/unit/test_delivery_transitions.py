@@ -6,7 +6,9 @@ qualcuno riapre un passaggio che falsa il fatturato (per esempio "consegnata" ->
 """
 
 from app.core.delivery_lifecycle import (
+    ORIGINI,
     normalizza_stato,
+    valuta_scrittura,
     TRANSIZIONI,
     TRANSIZIONI_FATTORINO,
     build_force_updates,
@@ -136,3 +138,59 @@ class TestAvanzamentoDallaFarmacia:
 
     def test_un_salto_ancora_illecito_resta_rifiutato(self):
         assert valuta_cambio_stato("da_preparare", "delivered")["ok"] is False
+
+class TestPortaUnica:
+    """Ogni gesto che scrive lo stato passa da valuta_scrittura, con la sua regola."""
+
+    def test_la_sequenza_normale_e_quella_della_tabella(self):
+        assert valuta_scrittura("pronta", "assigned")["ok"]
+        assert not valuta_scrittura("pronta", "in_transit")["ok"]
+
+    def test_annullamento(self):
+        assert valuta_scrittura("pronta", "cancelled", origine="annullamento")["ok"]
+        assert not valuta_scrittura("delivered", "cancelled", origine="annullamento")["ok"]
+        # non si annulla due volte
+        assert not valuta_scrittura("cancelled", "cancelled", origine="annullamento")["ok"]
+
+    def test_ripristino(self):
+        assert valuta_scrittura("cancelled", "pronta", origine="ripristino")["ok"]
+        assert valuta_scrittura("delivered", "assigned", origine="ripristino")["ok"]
+        assert not valuta_scrittura("in_transit", "pronta", origine="ripristino")["ok"]
+        # un documento vecchio con previous_status "pending" deve potersi riaprire
+        assert valuta_scrittura("cancelled", "pending", origine="ripristino")["ok"]
+
+    def test_conferma_incasso(self):
+        assert valuta_scrittura("delivered_pending_confirmation", "delivered", origine="conferma_incasso")["ok"]
+        assert not valuta_scrittura("in_transit", "delivered", origine="conferma_incasso")["ok"]
+
+    def test_contestazione(self):
+        assert valuta_scrittura("delivered", "delivered_pending_confirmation", origine="contestazione")["ok"]
+        assert not valuta_scrittura("pronta", "delivered_pending_confirmation", origine="contestazione")["ok"]
+
+    def test_chiusura_turno(self):
+        assert valuta_scrittura("delivered_pending_confirmation", "delivered", origine="chiusura_turno")["ok"]
+        assert not valuta_scrittura("delivered", "delivered", origine="chiusura_turno")["ok"]
+
+    def test_foto_di_consegna(self):
+        assert valuta_scrittura("in_transit", "delivered_pending_confirmation", origine="pod")["ok"]
+        assert not valuta_scrittura("pronta", "delivered_pending_confirmation", origine="pod")["ok"]
+
+    def test_fattorino_rimosso(self):
+        assert valuta_scrittura("in_transit", "pronta", origine="fattorino_rimosso")["ok"]
+        assert not valuta_scrittura("delivered", "pronta", origine="fattorino_rimosso")["ok"]
+
+    def test_ogni_origine_e_dichiarata(self):
+        assert valuta_scrittura("pronta", "assigned", origine="inventata")["ok"] is False
+
+
+def test_nessun_router_inventa_un_origine():
+    """Un gesto nuovo che scrive lo stato deve passare di qui, non avere una sua via."""
+    from pathlib import Path
+
+    radice = Path(__file__).resolve().parents[2] / "app" / "routers"
+    sorgenti = {p.name: p.read_text() for p in radice.glob("*.py")}
+    for origine in ORIGINI:
+        if origine == "aggiornamento":
+            continue
+        usi = [nome for nome, testo in sorgenti.items() if f'origine="{origine}"' in testo]
+        assert len(usi) <= 1, f"origine {origine} dichiarata in {usi}"

@@ -5,9 +5,8 @@ from fastapi import APIRouter, HTTPException, Depends, Request
 
 from app.core.clock import ROME_TZ
 from app.core.delivery_lifecycle import (
-    BILLED_STATUSES,
-    valuta_cambio_stato,
     build_phase_updates,
+    valuta_scrittura,
 )
 from app.core.database import db
 from app.core.fasce import descrivi_fascia, fascia_scaduta
@@ -79,7 +78,7 @@ async def update_delivery_status_driver(delivery_id: str, request: Request, driv
     # Driver "delivered" → diventa pending_confirmation (la farmacia deve confermare l'incasso)
     effective_status = "delivered_pending_confirmation" if new_status == "delivered" else new_status
     # Il fattorino non forza niente: la sua sequenza e' quella e basta.
-    esito = valuta_cambio_stato(delivery.get("status"), effective_status, ruolo="fattorino")
+    esito = valuta_scrittura(delivery.get("status"), effective_status, origine="aggiornamento", ruolo="fattorino")
     if not esito["ok"]:
         raise HTTPException(status_code=409, detail=esito["errore"])
     adesso_iso = datetime.now(timezone.utc).isoformat()
@@ -147,8 +146,9 @@ async def confirm_delivery_payment(delivery_id: str, request: Request, user: dic
     delivery = await db.deliveries.find_one({"delivery_id": delivery_id, "pharmacy_id": user["user_id"]}, {"_id": 0})
     if not delivery:
         raise HTTPException(status_code=404, detail="Consegna non trovata")
-    if delivery.get("status") not in BILLED_STATUSES:
-        raise HTTPException(status_code=400, detail="La consegna non è in attesa di conferma incasso")
+    esito_incasso = valuta_scrittura(delivery.get("status"), "delivered", origine="conferma_incasso")
+    if not esito_incasso["ok"]:
+        raise HTTPException(status_code=400, detail=esito_incasso["errore"])
     if delivery.get("payment_collected") is True and delivery.get("status") == "delivered":
         raise HTTPException(status_code=400, detail="Incasso già confermato")
 
@@ -203,11 +203,11 @@ async def dispute_delivery_payment(delivery_id: str, request: Request, user: dic
     body = await request.json()
     # Si contesta un incasso: in attesa di conferma o gia' confermato. Su una
     # consegna in corso non c'e' niente da contestare e lo stato non si tocca.
-    if delivery.get("status") not in BILLED_STATUSES:
-        raise HTTPException(
-            status_code=409,
-            detail=f"L'incasso si contesta solo da una consegna in attesa di conferma o confermata (ora: {delivery.get('status')})",
-        )
+    esito_contestazione = valuta_scrittura(
+        delivery.get("status"), "delivered_pending_confirmation", origine="contestazione"
+    )
+    if not esito_contestazione["ok"]:
+        raise HTTPException(status_code=409, detail=esito_contestazione["errore"])
     reason = body.get("reason") or "Contestazione incasso"
     update_data = {
         "status": "delivered_pending_confirmation",
