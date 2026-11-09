@@ -4,6 +4,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useDriversQuery } from '@/hooks/queries';
 import { chiavi, letture } from '@/lib/api';
 import { API } from '@/lib/config';
+import AutistaDialog from '../../components/drivers/AutistaDialog';
+import CredenzialiDialog from '../../components/drivers/CredenzialiDialog';
 import { Layout } from '../../components/Layout';
 import { Card, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
@@ -33,23 +35,6 @@ const messaggioPiano = (errore, ripiego) =>
 import { ensureArray } from '@/lib/collections';
 import { useAuth } from '../../contexts/AuthContext';
 import { confirmAction } from '../../components/ConfirmDialog';
-
-const generatePassword = () => {
- const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
- const lower = 'abcdefghjkmnpqrstuvwxyz';
- const digits = '23456789';
- const special = '!@#$%';
- const all = upper + lower + digits + special;
- let pwd = [
-   upper[Math.floor(Math.random() * upper.length)],
-   lower[Math.floor(Math.random() * lower.length)],
-   digits[Math.floor(Math.random() * digits.length)],
-   special[Math.floor(Math.random() * special.length)],
- ];
- for (let i = 0; i < 6; i++) pwd.push(all[Math.floor(Math.random() * all.length)]);
- return pwd.sort(() => Math.random() - 0.5).join('');
-};
-
 
 export default function DriversPage() {
  const { user, updateProfile } = useAuth();
@@ -353,182 +338,29 @@ export default function DriversPage() {
  )}
 
  {/* Dialog */}
- <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
- <DialogContent className="max-w-md">
- <DialogHeader>
- <DialogTitle className="text-foreground">
- {editingDriver ? 'Modifica Fattorino' : 'Nuovo Fattorino'}
- </DialogTitle>
- </DialogHeader>
- <form onSubmit={handleSubmit}>
- <div className="space-y-4 py-4">
- <div className="form-group">
- <Label htmlFor="name">Nome completo *</Label>
- <Input
- id="name"
- value={formData.name}
- onChange={(e) => setFormData({ ...formData, name: e.target.value })}
- placeholder="Marco Verdi"
- required
- className=""
- data-testid="driver-name-input"
- />
- </div>
- <div className="form-group">
- <Label htmlFor="phone">Telefono *</Label>
- <Input
- id="phone"
- value={formData.phone}
- onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
- placeholder="+39 333 1234567"
- required
- className=""
- data-testid="driver-phone-input"
- />
- </div>
- <div className="form-group">
- <Label htmlFor="email">Email (per accesso) *</Label>
- <Input
- id="email"
- type="email"
- value={formData.email}
- onChange={(e) => setFormData({ ...formData, email: e.target.value })}
- placeholder="marco@email.com"
- required
- disabled={!!editingDriver}
- className="disabled:opacity-50"
- data-testid="driver-email-input"
- />
- </div>
- <div className="form-group">
- <Label htmlFor="password">
- Password {editingDriver ? '(lascia vuoto per non modificare)' : '*'}
- </Label>
- <div className="flex gap-2">
- <div className="relative flex-1">
- <Input
- id="password"
- type={showPassword ? 'text' : 'password'}
- value={formData.password}
- onChange={(e) => setFormData({ ...formData, password: e.target.value })}
- placeholder="••••••••"
- required={!editingDriver}
- className="pr-10"
- autoComplete="new-password"
- data-testid="driver-password-input"
- />
- <button
- type="button"
- onClick={() => setShowPassword(!showPassword)}
- className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-zinc-300"
- >
- {showPassword ? <EyeOff className="w-4 h-4"/> : <Eye className="w-4 h-4"/>}
- </button>
- </div>
- <Button
- type="button"
- variant="outline"
- size="sm"
- className="shrink-0 gap-1 border-primary/40 text-primary hover:bg-primary/10"
- onClick={() => {
-   const pwd = generatePassword();
-   setFormData(f => ({ ...f, password: pwd }));
-   setShowPassword(true);
- }}
- title="Genera password sicura"
- >
- <Zap className="w-3.5 h-3.5" />Genera
- </Button>
- </div>
- </div>
- <div className="form-group">
- <Label>Tipo veicolo</Label>
- <Select
- value={formData.vehicle_type}
- onValueChange={(value) => setFormData({ ...formData, vehicle_type: value })}
- >
- <SelectTrigger className=""data-testid="driver-vehicle-select">
- <SelectValue />
- </SelectTrigger>
- <SelectContent className="">
- <SelectItem value="scooter">Scooter</SelectItem>
- <SelectItem value="bike">Bicicletta</SelectItem>
- <SelectItem value="car">Auto</SelectItem>
- <SelectItem value="van">Furgone</SelectItem>
- </SelectContent>
- </Select>
- </div>
- </div>
- <DialogFooter>
- <Button
- type="button"
- variant="outline"
- onClick={() => setDialogOpen(false)}
- className=""
- >
- Annulla
- </Button>
- <Button
- type="submit"
- className="btn-primary"
- data-testid="save-driver-btn"
- >
- {editingDriver ? 'Salva Modifiche' : 'Crea Fattorino'}
- </Button>
- </DialogFooter>
- </form>
- </DialogContent>
- </Dialog>
+      <AutistaDialog
+        {...{
+        dialogOpen,
+        editingDriver,
+        formData,
+        handleSubmit,
+        setDialogOpen,
+        setFormData,
+        setShowPassword,
+        showPassword,
+        }}
+      />
  </div>
 
  {/* Credentials Dialog (shown after creating a new driver) */}
- <Dialog open={!!credentialsDialog} onOpenChange={() => setCredentialsDialog(null)}>
- <DialogContent className="max-w-md">
- <DialogHeader>
- <DialogTitle className="flex items-center gap-2 text-foreground">
- <KeyRound className="w-5 h-5 text-primary" />
- Fattorino creato!
- </DialogTitle>
- </DialogHeader>
- <div className="space-y-4 py-2">
- <p className="text-sm text-muted-foreground">
- Condividi queste credenziali con <span className="text-foreground font-semibold">{credentialsDialog?.name}</span> per permettergli di accedere all'app.
- </p>
- <div className="space-y-2">
- <Label className="text-muted-foreground text-xs uppercase tracking-wide">Email</Label>
- <div className="flex items-center gap-2 bg-secondary rounded-lg px-3 py-2">
- <span className="flex-1 text-sm text-foreground font-mono">{credentialsDialog?.email}</span>
- <button type="button" onClick={() => copyToClipboard(credentialsDialog?.email, 'email')}
- className="text-muted-foreground hover:text-primary transition-colors">
- {copied === 'email' ? <Check className="w-4 h-4 text-primary" /> : <Copy className="w-4 h-4" />}
- </button>
- </div>
- </div>
- <div className="space-y-2">
- <Label className="text-muted-foreground text-xs uppercase tracking-wide">Password</Label>
- <div className="flex items-center gap-2 bg-secondary rounded-lg px-3 py-2">
- <span className="flex-1 text-sm text-foreground font-mono">{credentialsDialog?.password}</span>
- <button type="button" onClick={() => copyToClipboard(credentialsDialog?.password, 'pwd')}
- className="text-muted-foreground hover:text-primary transition-colors">
- {copied === 'pwd' ? <Check className="w-4 h-4 text-primary" /> : <Copy className="w-4 h-4" />}
- </button>
- </div>
- </div>
- <button type="button"
- onClick={() => copyToClipboard(`Email: ${credentialsDialog?.email}\nPassword: ${credentialsDialog?.password}`, 'all')}
- className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-teal-500/30 text-primary hover:bg-primary/10 transition-colors text-sm font-medium">
- {copied === 'all' ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
- {copied === 'all' ? 'Copiato!' : 'Copia tutto'}
- </button>
- <p className="text-xs text-muted-foreground text-center">Salva queste credenziali — non potrai recuperare la password in seguito.</p>
- </div>
- <DialogFooter>
- <Button onClick={() => setCredentialsDialog(null)} className="btn-primary w-full">
- Fatto
- </Button>
- </DialogFooter>
- </DialogContent>
- </Dialog>
+      <CredenzialiDialog
+        {...{
+        copied,
+        copyToClipboard,
+        credentialsDialog,
+        setCredentialsDialog,
+        }}
+      />
 
  {/* Profile Driver Dialog (stats) */}
  <Dialog open={!!profileDriver} onOpenChange={(o) => { if (!o) { setProfileDriver(null); setProfileStats(null); } }}>
