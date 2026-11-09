@@ -14,6 +14,7 @@ import {
   Play, Square, Euro, AlertCircle, Wallet, Clock
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { ETICHETTE_FATTORINO as statusLabels } from '@/lib/deliveryDisplay';
 import { ensureArray } from '@/lib/collections';
 import { useQueryClient } from '@tanstack/react-query';
 import { useDriverDeliveriesQuery, useDriverShiftQuery } from '@/hooks/queries';
@@ -279,13 +280,6 @@ export default function DriverDashboard() {
   const handleRefresh = () => {
     setRefreshing(true);
     fetchDeliveries();
-  };
-
-  const statusLabels = {
-    assigned: 'Da ritirare',
-    picked_up: 'Ritirata',
-    in_transit: 'In consegna',
-    delivered_pending_confirmation: 'Consegnata · in attesa farmacia',
   };
 
   const safeDeliveries = ensureArray(deliveries);

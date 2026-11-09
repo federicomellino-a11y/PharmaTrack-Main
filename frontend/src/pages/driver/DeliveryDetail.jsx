@@ -3,6 +3,8 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import { useQueryClient } from '@tanstack/react-query';
 import { chiavi, letture } from '@/lib/api';
+import { prossimaAzione } from '@/lib/deliveryActions';
+import { ETICHETTE_FATTORINO } from '@/lib/deliveryDisplay';
 import { ensureArray } from '@/lib/collections';
 import { API } from '@/lib/config';
 import { requestWithOfflineQueue } from '@/lib/offlineQueue';
@@ -181,24 +183,15 @@ export default function DriverDeliveryDetail() {
     } finally { setPhotoUploading(false); }
   };
 
-  const statusLabels = {
-    assigned: 'Da ritirare',
-    picked_up: 'Ritirata',
-    in_transit: 'In consegna',
-    delivered: 'Consegnata'
-  };
+  const statusLabels = ETICHETTE_FATTORINO;
+
+  // Le icone restano qui: sono disegno, non regola. Il passo no, sta in lib.
+  const ICONE_AZIONE = { picked_up: Package, in_transit: Play, delivered: CheckCircle2 };
 
   const getNextAction = () => {
-    switch (delivery?.status) {
-      case 'assigned':
-        return { label: 'Ritira', status: 'picked_up', icon: Package };
-      case 'picked_up':
-        return { label: 'Parti', status: 'in_transit', icon: Play };
-      case 'in_transit':
-        return { label: 'Consegnato', status: 'delivered', icon: CheckCircle2 };
-      default:
-        return null;
-    }
+    const azione = prossimaAzione(delivery?.status, 'fattorino');
+    if (!azione) return null;
+    return { label: azione.etichetta, status: azione.stato, icon: ICONE_AZIONE[azione.stato] };
   };
 
   if (loading) {

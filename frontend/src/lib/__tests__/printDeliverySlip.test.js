@@ -67,7 +67,7 @@ describe('costruisciBollaConsegna', () => {
   });
 
   it('usa le etichette italiane e ripiega sul valore grezzo', () => {
-    expect(costruisciBollaConsegna(consegna)).toContain('Assegnata');
+    expect(costruisciBollaConsegna(consegna)).toContain('Affidata');
     expect(costruisciBollaConsegna({ ...consegna, status: 'nuovo_stato' })).toContain('nuovo_stato');
     expect(costruisciBollaConsegna({ ...consegna, payment_method: 'bonifico' })).toContain('bonifico');
   });

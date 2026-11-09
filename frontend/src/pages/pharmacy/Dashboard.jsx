@@ -31,6 +31,7 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
+import { STATUS_LABELS as statusLabels } from '@/lib/deliveryDisplay';
 import { formatCurrency } from '@/lib/format';
 const customerIcon = new L.DivIcon({
   className: '',
@@ -168,7 +169,6 @@ export default function PharmacyDashboard() {
       mounted = false;
     };
   }, [user]);
-  const statusLabels = { pending: 'In attesa', assigned: 'Assegnata', picked_up: 'Ritirata', in_transit: 'In consegna' };
 
   if (loading) return (
     <Layout title="Dashboard">

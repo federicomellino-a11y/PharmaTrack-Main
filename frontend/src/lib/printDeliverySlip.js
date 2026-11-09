@@ -15,14 +15,7 @@ import { toast } from 'sonner';
 import { formatCurrency } from './format';
 
 const ETICHETTE_PAGAMENTO = { cash: 'Contanti', pos: 'POS', other: 'Altro' };
-const ETICHETTE_STATO = {
-  pending: 'In attesa',
-  assigned: 'Assegnata',
-  picked_up: 'Ritirata',
-  in_transit: 'In consegna',
-  delivered: 'Consegnata',
-  cancelled: 'Annullata',
-};
+import { STATUS_LABELS as ETICHETTE_STATO } from './deliveryDisplay';
 
 export const esc = (valore) => String(valore ?? '')
   .replace(/&/g, '&amp;')

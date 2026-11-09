@@ -6,14 +6,8 @@
 
 import { ensureArray } from './collections';
 
-export const statusLabels = {
-  pending: 'In attesa',
-  assigned: 'Assegnata',
-  picked_up: 'Ritirata',
-  in_transit: 'In consegna',
-  delivered: 'Consegnata',
-  cancelled: 'Annullata',
-};
+// Le etichette stanno in un posto solo: lib/deliveryDisplay.js
+export { STATUS_LABELS as statusLabels } from './deliveryDisplay';
 
 export const paymentLabels = {
   cash: 'Contanti',
