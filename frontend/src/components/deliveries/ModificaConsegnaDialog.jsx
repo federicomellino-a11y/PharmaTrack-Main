@@ -5,12 +5,18 @@ import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Textarea } from '../ui/textarea';
 import { formatCurrency } from '@/lib/format';
+import { STATUS_LABELS } from '@/lib/deliveryDisplay';
 
 /* Modifica di una consegna esistente.
 
    Estratto da Deliveries.jsx: stava nella stessa pagina della lista e degli altri
    quattro dialoghi. Riceve dallo stato della pagina solo cio' che usa.
 */
+/** Gli stati che la farmacia puo' scegliere a mano.
+    'pending' resta fuori: e' il doppione storico di 'da_preparare'. */
+export const STATI_MODIFICABILI = Object.entries(STATUS_LABELS)
+  .filter(([valore]) => valore !== 'pending');
+
 export default function ModificaConsegnaDialog({ modulo, editDialogOpen, handleEdit, setEditDialogOpen }) {
   const { form, setForm, change_due } = modulo;
 
@@ -64,6 +70,27 @@ export default function ModificaConsegnaDialog({ modulo, editDialogOpen, handleE
                   onChange={e => setForm({...form, scheduled_time: e.target.value})} />
               </div>
             </div>
+            <div className="form-group">
+              <Label>Stato</Label>
+              <Select value={form.status || ''} onValueChange={v => setForm({ ...form, status: v })}>
+                <SelectTrigger><SelectValue placeholder="Non cambiare" /></SelectTrigger>
+                <SelectContent>
+                  {STATI_MODIFICABILI.map(([valore, etichetta]) => (
+                    <SelectItem key={valore} value={valore}>{etichetta}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                La sequenza normale la segue la consegna da sola: qui si corregge.
+              </p>
+            </div>
+            {form.status && (
+              <div className="form-group">
+                <Label>Motivo della correzione</Label>
+                <Input value={form.force_reason || ''} onChange={e => setForm({ ...form, force_reason: e.target.value })}
+                  placeholder="Serve se lo stato non e' il passo successivo" />
+              </div>
+)}
             <div className="form-group">
               <Label>Note</Label>
               <Textarea value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} className="min-h-[80px]" />

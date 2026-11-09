@@ -39,6 +39,7 @@ import useDeliveryForm, { normalizzaImporto } from '@/hooks/useDeliveryForm';
 import DeliveryRow from '../../components/deliveries/DeliveryRow';
 import CreaConsegnaDialog from '../../components/deliveries/CreaConsegnaDialog';
 import SegnaProntaDialog from '../../components/deliveries/SegnaProntaDialog';
+import { costruisciCorrezioneStato } from '@/lib/deliveryCorrection';
 import ModificaConsegnaDialog from '../../components/deliveries/ModificaConsegnaDialog';
 import AssegnaConsegnaDialog from '../../components/deliveries/AssegnaConsegnaDialog';
 import NuovoClienteDialog from '../../components/deliveries/NuovoClienteDialog';
@@ -304,7 +305,8 @@ export default function DeliveriesPage() {
         amount_given: normalizeMoney(form.amount_given),
         scheduled_date: form.scheduled_date || null,
         scheduled_time: form.scheduled_time || null,
-        slot_to: form.slot_to || null
+        slot_to: form.slot_to || null,
+        ...costruisciCorrezioneStato(selectedDelivery, form.status, form.force_reason),
       }, { withCredentials: true });
       toast.success('Aggiornata');
       setEditDialogOpen(false); resetForm(); fetchData();
@@ -498,7 +500,7 @@ export default function DeliveriesPage() {
   // markup della riga, il che rendeva impossibile leggerla senza la pagina.
   const apriModifica = (delivery) => {
     setSelectedDelivery(delivery);
-    setForm({ ...form, notes: delivery.notes || '', payment_method: delivery.payment_method || 'cash', amount: delivery.amount || '', amount_given: delivery.amount_given || '', scheduled_date: delivery.scheduled_date || '', scheduled_time: delivery.scheduled_time || '', slot_to: delivery.slot_to || null });
+    setForm({ ...form, notes: delivery.notes || '', payment_method: delivery.payment_method || 'cash', amount: delivery.amount || '', amount_given: delivery.amount_given || '', scheduled_date: delivery.scheduled_date || '', scheduled_time: delivery.scheduled_time || '', slot_to: delivery.slot_to || null, status: delivery.status || null, force_reason: '' });
     setFasciaScelta((fasciaDi(delivery.scheduled_time, delivery.slot_to) || { valore: 'subito' }).valore);
     setEditDialogOpen(true);
   };

@@ -30,6 +30,9 @@ export const MODULO_VUOTO = {
   slot_to: null,
   priority: 'normal',
   nre: '',
+    // Solo nella modifica: lo stato scelto e il motivo di una correzione.
+    status: null,
+    force_reason: '',
 };
 
 export default function useDeliveryForm() {
