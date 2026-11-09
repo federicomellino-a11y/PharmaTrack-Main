@@ -201,6 +201,13 @@ async def dispute_delivery_payment(delivery_id: str, request: Request, user: dic
     if not delivery:
         raise HTTPException(status_code=404, detail="Consegna non trovata")
     body = await request.json()
+    # Si contesta un incasso: in attesa di conferma o gia' confermato. Su una
+    # consegna in corso non c'e' niente da contestare e lo stato non si tocca.
+    if delivery.get("status") not in BILLED_STATUSES:
+        raise HTTPException(
+            status_code=409,
+            detail=f"L'incasso si contesta solo da una consegna in attesa di conferma o confermata (ora: {delivery.get('status')})",
+        )
     reason = body.get("reason") or "Contestazione incasso"
     update_data = {
         "status": "delivered_pending_confirmation",

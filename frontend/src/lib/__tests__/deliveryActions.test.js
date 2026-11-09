@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { avanzamentoFarmacia, prossimaAzione, statoSuccessivo } from '../deliveryActions';
+import {
+  avanzamentoFarmacia,
+  prossimaAzione,
+  puoAnnullare,
+  puoRipristinare,
+  statoSuccessivo,
+} from '../deliveryActions';
 
 describe('statoSuccessivo', () => {
   it('la farmacia percorre le sei fasi in ordine', () => {
@@ -67,5 +73,30 @@ describe('avanzamentoFarmacia', () => {
     for (const stato of ['da_preparare', 'pronta', 'delivered', 'cancelled', 'not_delivered', undefined]) {
       expect(avanzamentoFarmacia(stato)).toBeNull();
     }
+  });
+});
+
+describe('Cosa si puo fare in ogni stato', () => {
+  it('si annulla finche la consegna e in giro', () => {
+    for (const stato of ['da_preparare', 'pending', 'pronta', 'assigned', 'picked_up', 'in_transit']) {
+      expect(puoAnnullare(stato)).toBe(true);
+    }
+  });
+
+  it('non si annulla quello che e gia finito o da incassare', () => {
+    for (const stato of ['delivered_pending_confirmation', 'delivered', 'cancelled', 'not_delivered', undefined]) {
+      expect(puoAnnullare(stato)).toBe(false);
+    }
+  });
+
+  it('si riapre quello che e in archivio, compresa una consegna chiusa per sbaglio', () => {
+    expect(puoRipristinare('cancelled')).toBe(true);
+    expect(puoRipristinare('not_delivered')).toBe(true);
+    expect(puoRipristinare('delivered')).toBe(true);
+  });
+
+  it('in attesa di incasso il gesto e la conferma o la contestazione, non il ripristino', () => {
+    expect(puoRipristinare('delivered_pending_confirmation')).toBe(false);
+    expect(puoRipristinare('in_transit')).toBe(false);
   });
 });

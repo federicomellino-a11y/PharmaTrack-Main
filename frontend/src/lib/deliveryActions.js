@@ -78,4 +78,19 @@ export const avanzamentoFarmacia = (stato) => {
   };
 };
 
+/* Cosa si puo' fare su una consegna ferma in un certo stato. Prima queste
+   regole vivevano dentro il JSX come confronti di stringhe, e la fila di
+   pulsanti offriva azioni che il backend poi rifiutava con un 409. */
+const FASI_ANNULLABILI = ['da_preparare', 'pending', 'pronta', 'assigned', 'picked_up', 'in_transit'];
+/* Il backend riapre tutto cio' che e' in archivio (can_restore). Qui resta
+   fuori solo "consegnata da incassare", dove la lista mostra gia' i suoi due
+   gesti (conferma incasso, contesta): un terzo pulsante confonderebbe. */
+const FASI_RIPRISTINABILI = ['delivered', 'cancelled', 'not_delivered'];
+
+/** Si annulla finche' la consegna e' in giro; da "in attesa di incasso" si contesta, non si annulla. */
+export const puoAnnullare = (stato) => FASI_ANNULLABILI.includes(stato);
+
+/** Si riapre una consegna annullata o segnata come non consegnata. */
+export const puoRipristinare = (stato) => FASI_RIPRISTINABILI.includes(stato);
+
 export default prossimaAzione;

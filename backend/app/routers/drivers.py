@@ -192,9 +192,17 @@ async def delete_driver(driver_id: str, user: dict = Depends(richiedi_titolare))
     result = await db.drivers.delete_one({"driver_id": driver_id, "pharmacy_id": user["user_id"]})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Fattorino non trovato")
+    # Le consegne in mano a questo fattorino tornano da preparare: via anche
+    # gli orari delle fasi che non sono piu' avvenute, se no restano scritti
+    # come se il pacco fosse stato ritirato.
     await db.deliveries.update_many(
-        {"driver_id": driver_id, "pharmacy_id": user["user_id"], "status": {"$in": ["assigned", "picked_up", "in_transit"]}},
-        {"$set": {"driver_id": None, "status": "pronta"}}
+        {"driver_id": driver_id, "pharmacy_id": user["user_id"],
+         "status": {"$in": ["assigned", "picked_up", "in_transit"]}},
+        {
+            "$set": {"driver_id": None, "status": "pronta",
+                     "updated_at": datetime.now(timezone.utc).isoformat()},
+            "$unset": {"assigned_at": "", "picked_up_at": "", "in_transit_at": ""},
+        },
     )
     await db.driver_sessions.delete_many({"driver_id": driver_id})
     await db.push_subscriptions.delete_many({"user_id": driver_id, "user_type": "driver"})

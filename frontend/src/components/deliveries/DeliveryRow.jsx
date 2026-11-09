@@ -1,3 +1,4 @@
+import { puoAnnullare, puoRipristinare } from '@/lib/deliveryActions';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { Card, CardContent } from '../ui/card';
@@ -221,7 +222,7 @@ onClick={() => apriPronta(d)}>
                                 <CheckCircle2 className="w-3 h-3 mr-1" />Consegnata
                               </Button>
                             )}
-                            {d.status !== 'delivered_pending_confirmation' && (
+                            {puoAnnullare(d.status) && (
                               <Button variant="outline" size="sm" className="h-7 px-2 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
                                 data-testid={`cancel-delivery-${d.delivery_id}`}
                                 onClick={() => handleCancel(d.delivery_id)}>
@@ -240,7 +241,7 @@ onClick={() => apriPronta(d)}>
                               <Printer className="w-3 h-3 mr-1" />Etichetta
                             </Button>
                           )}
-                          {d.status === 'cancelled' && (
+                          {puoRipristinare(d.status) && (
                               <Button variant="outline" size="sm" className="h-7 px-2 text-xs"
                                 data-testid={`restore-delivery-${d.delivery_id}`}
                                 onClick={() => handleRestore(d.delivery_id)}>

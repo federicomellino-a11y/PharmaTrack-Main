@@ -23,8 +23,9 @@ BILLED_STATUSES = ("delivered", "delivered_pending_confirmation")
 FOLLOW_UP_STATUSES = ACTIVE_STATUSES + ("delivered_pending_confirmation",)
 
 # Stati da cui si puo' annullare: tutto tranne cio' che e' gia' annullato.
-CANCELLABLE_STATUSES = ("da_preparare", "pronta", "pending", "assigned", "picked_up", "in_transit",
-                        "delivered_pending_confirmation", "delivered", "not_delivered")
+# L'elenco non si ricopia: lo decide la tabella delle transizioni (una regola sola).
+# Un elenco a parte diceva che si poteva annullare anche una consegna gia' incassata
+# o gia' archiviata, mentre il PUT generico lo rifiutava: due verita' sullo stesso gesto.
 
 # Campi che testimoniano un incasso: se una consegna consegnata viene riaperta
 # vanno azzerati, altrimenti i report continuano a contarla come incassata.
@@ -54,7 +55,7 @@ def can_restore(status: str) -> bool:
 
 
 def can_cancel(status: str) -> bool:
-    return status in CANCELLABLE_STATUSES and status != "cancelled"
+    return "cancelled" in stati_successivi(status, "farmacia")
 
 
 def can_hard_delete(status: str) -> bool:
@@ -168,8 +169,9 @@ TRANSIZIONI = {
     # Da "consegnata in attesa di incasso" si torna indietro solo se la farmacia
     # contesta il pagamento: la consegna e' di nuovo in giro.
     "delivered_pending_confirmation": ("delivered", "in_transit", "not_delivered"),
-    # Chiuse: si riaprono soltanto dal ripristino, che ha gia' le sue regole.
-    "delivered": (),
+    # Incassata: si riapre solo per contestare l'incasso (importo sbagliato,
+    # contante mai arrivato), che la riporta in attesa di conferma.
+    "delivered": ("delivered_pending_confirmation",),
     "not_delivered": (),
     "cancelled": (),
 }
