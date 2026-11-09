@@ -232,7 +232,6 @@ async def setup_indexes():
         logger.warning("Pulizia residui pubblici non completata: %s", exc)
 
     # ── Notifiche: indici e pulizia (le notifiche non devono crescere senza limite) ──
-    await safe_create_index(db.notifications, [("user_id", pymongo.ASCENDING), ("user_type", pymongo.ASCENDING), ("created_at", pymongo.DESCENDING)], name="notifications_user_created_idx", background=True)
     await safe_create_index(db.notifications, [("created_at", pymongo.ASCENDING)], name="notifications_created_idx", background=True)
     try:
         now = datetime.now(timezone.utc)
