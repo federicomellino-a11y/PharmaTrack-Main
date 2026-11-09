@@ -45,9 +45,13 @@ def costruisci_consegna(
     """Il documento di una consegna nuova, con lo stato iniziale di coda.
 
     `status` e' sempre "da_preparare": l'assegnazione e' un passo separato, anche
-    quando un fattorino e' gia' scelto. `imported_from` compare solo per le
-    consegne che arrivano da fuori, cosi' i documenti creati dalla farmacia
-    restano identici a prima.
+    quando un fattorino e' gia' scelto.
+
+    Le due strade (farmacia e Winfarm) producono lo stesso insieme di chiavi: la
+    consegna scritta a mano ha `imported_from` a None, quella importata a
+    "winfarm". Prima la chiave mancava del tutto nelle consegne della farmacia,
+    e chi leggeva il documento doveva sapere da dove veniva per sapere se
+    aspettarsi quel campo.
     """
     momento = adesso or datetime.now(timezone.utc).isoformat()
 
@@ -57,8 +61,8 @@ def costruisci_consegna(
         "customer_id": customer["customer_id"],
         "driver_id": driver_id,
         "customer_name": customer["name"],
-        "customer_phone": (customer.get("phone") or "") if imported_from else customer["phone"],
-        "customer_address": (customer.get("address") or "") if imported_from else customer["address"],
+        "customer_phone": customer.get("phone") or "",
+        "customer_address": customer.get("address") or "",
         "customer_lat": customer.get("customer_lat"),
         "customer_lng": customer.get("customer_lng"),
         "notes": notes,
@@ -80,7 +84,6 @@ def costruisci_consegna(
         "nre": nre or None,
         "client_meta": client_meta or None,
         "external_ref": external_ref or None,
+        "imported_from": imported_from or None,
     }
-    if imported_from:
-        consegna["imported_from"] = imported_from
     return consegna
