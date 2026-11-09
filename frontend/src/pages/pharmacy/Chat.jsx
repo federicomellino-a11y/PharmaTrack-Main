@@ -6,16 +6,17 @@ import { API } from '@/lib/config';
 import { useQueryClient } from '@tanstack/react-query';
 import { useConversationsQuery } from '@/hooks/queries';
 import { Layout } from '../../components/Layout';
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
+import { Card, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { ScrollArea } from '../../components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '../../components/ui/avatar';
 import { Badge } from '../../components/ui/badge';
 import { useSocket } from '../../contexts/SocketContext';
+import TestataChat from '../../components/chat/TestataChat';
+import ListaConversazioni from '../../components/chat/ListaConversazioni';
 import {
-  MessageSquare, Send, Truck, ArrowLeft, Search, Phone, Wifi,
-  WifiOff, CircleDot, Check, CheckCheck
+  MessageSquare, Send, Truck, ArrowLeft, Phone, WifiOff, Check, CheckCheck
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ensureArray } from '@/lib/collections';
@@ -337,100 +338,23 @@ export default function ChatPage() {
   return (
     <Layout title="Chat">
       <div className="space-y-4" data-testid="chat-page">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Chat fattorini</h1>
-            <p className="text-sm text-muted-foreground">Messaggi rapidi per indirizzi, note cliente, pagamenti e aggiornamenti operativi.</p>
-          </div>
-          {driverId && (
-            <div className="flex w-fit gap-2" data-testid="chat-thread-actions">
-              <button type="button" onClick={handleNewChat}
-                className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-secondary transition-colors"
-                data-testid="chat-new-button">+ Nuova chat</button>
-              <button type="button" onClick={handleCloseChat}
-                className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-secondary transition-colors"
-                data-testid="chat-close-button">Chiudi chat</button>
-              {threadClosed && (
-                <span className="self-center rounded-lg bg-amber-500/10 px-2 py-1 text-[11px] font-medium text-amber-700">
-                  Chiusa
-                </span>
-              )}
-            </div>
-          )}
-          <Badge variant={connected ? 'secondary' : 'outline'} className="w-fit gap-2 px-3 py-1">
-            {connected ? <Wifi className="h-3.5 w-3.5" /> : <WifiOff className="h-3.5 w-3.5" />}
-            {connected ? 'Tempo reale attivo' : 'Riconnessione in corso'}
-          </Badge>
-        </div>
+        <TestataChat
+          driverId={driverId}
+          threadClosed={threadClosed}
+          connected={connected}
+          onNuova={handleNewChat}
+          onChiudi={handleCloseChat}
+        />
 
         <div className="grid h-[calc(100vh-11.5rem)] gap-4 md:grid-cols-[320px,1fr]">
-          <Card className={`${driverId ? 'hidden md:flex' : 'flex'} min-h-0 flex-col`}>
-            <CardHeader className="gap-3 border-b pb-4">
-              <div>
-                <CardTitle className="text-lg">Conversazioni</CardTitle>
-                <p className="text-sm text-muted-foreground">{filteredConversations.length} fattorini disponibili</p>
-              </div>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  value={searchTerm}
-                  onChange={(event) => setSearchTerm(event.target.value)}
-                  placeholder="Cerca fattorino…"
-                  className="pl-9"
-                />
-              </div>
-            </CardHeader>
-            <ScrollArea className="flex-1">
-              <div className="space-y-1 p-2">
-                {filteredConversations.length === 0 ? (
-                  <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-                    Nessun fattorino trovato.
-                  </div>
-                ) : filteredConversations.map((conversation) => (
-                  <button
-                    key={conversation.driver_id}
-                    onClick={() => handleSelectConversation(conversation)}
-                    className={`w-full rounded-2xl border p-3 text-left transition-colors ${
-                      driverId === conversation.driver_id
-                        ? 'border-primary bg-primary/10'
-                        : 'border-transparent hover:border-border hover:bg-secondary/60'
-                    }`}
-                    data-testid={`chat-driver-${conversation.driver_id}`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <Avatar className="h-10 w-10">
-                        <AvatarFallback className="bg-primary/10 text-primary">
-                          {conversation.driver_name?.charAt(0) || 'F'}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="truncate font-medium text-foreground">{conversation.driver_name}</p>
-                          <span className="text-[11px] text-muted-foreground">{formatConversationTime(conversation.last_message_at)}</span>
-                        </div>
-                        <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-                          <CircleDot className={`h-3 w-3 ${conversation.is_active ? 'text-emerald-500' : 'text-muted-foreground'}`} />
-                          <span className="truncate">{conversation.vehicle_type || 'Fattorino'}</span>
-                        </div>
-                        <div className="mt-2 flex items-start justify-between gap-2">
-                          <p className="line-clamp-2 text-sm text-muted-foreground">
-                            {conversation.last_message
-                              ? `${conversation.last_sender_type === 'pharmacy' ? 'Tu: ' : ''}${conversation.last_message}`
-                              : 'Nessun messaggio ancora inviato'}
-                          </p>
-                          {conversation.unread_count > 0 && (
-                            <span className="inline-flex min-w-6 items-center justify-center rounded-full bg-primary px-2 py-0.5 text-[11px] font-semibold text-primary-foreground">
-                              {conversation.unread_count}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </ScrollArea>
-          </Card>
+          <ListaConversazioni
+            driverId={driverId}
+            conversazioni={filteredConversations}
+            cerca={searchTerm}
+            onCerca={setSearchTerm}
+            onSeleziona={handleSelectConversation}
+          />
+
 
           {!driverId && (
             <Card className="md:hidden border-dashed border-primary/30 bg-primary/5">
