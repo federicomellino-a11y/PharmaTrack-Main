@@ -30,8 +30,8 @@ import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
 import { Badge } from '../../components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../../components/ui/dialog'
 import { useAdminAuth } from '../../contexts/AdminAuthContext'
+import DettaglioAccountDialog from '../../components/admin/DettaglioAccountDialog'
 import { toast } from 'sonner'
 import { ensureArray, ensureObject } from '@/lib/collections'
 import {
@@ -41,9 +41,7 @@ import {
   useAdminDatabaseHealthQuery,
 } from '@/hooks/queries'
 
-import { STATUS_LABELS } from '@/lib/deliveryDisplay';
-import { formatCurrency, formatDateTimeLong } from '@/lib/format';
-const deliveryStatusLabel = STATUS_LABELS
+import { formatDateTimeLong } from '@/lib/format';
 
 export default function AdminDashboardPage() {
   const { admin, logout } = useAdminAuth()
@@ -434,139 +432,16 @@ export default function AdminDashboardPage() {
         </Tabs>
       </main>
 
-      <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
-        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{selectedDetailUser?.pharmacy_name || selectedDetailUser?.name || 'Dettagli account'}</DialogTitle>
-            <DialogDescription>
-              Vista completa di account, consegne recenti, fattorini collegati e notifiche salvate.
-            </DialogDescription>
-          </DialogHeader>
-
-          {detailsLoading ? (
-            <div className="py-16 flex items-center justify-center"><div className="spinner" /></div>
-          ) : selectedUserDetails ? (
-            <div className="space-y-6">
-              <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-4">
-                {[
-                  { label: 'Clienti', value: selectedUserDetails.stats?.customers || 0, icon: Users },
-                  { label: 'Fattorini', value: selectedUserDetails.stats?.drivers || 0, icon: Truck },
-                  { label: 'Consegne', value: selectedUserDetails.stats?.deliveries || 0, icon: Package },
-                  { label: 'Sessioni', value: selectedUserDetails.stats?.sessions || 0, icon: Database },
-                ].map((item) => (
-                  <Card key={item.label}>
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <p className="text-sm text-muted-foreground">{item.label}</p>
-                        <item.icon className="w-4 h-4 text-primary" />
-                      </div>
-                      <p className="text-2xl font-black">{item.value}</p>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Anagrafica account</CardTitle>
-                </CardHeader>
-                <CardContent className="grid md:grid-cols-2 gap-4 text-sm">
-                  <div className="space-y-2">
-                    <p><span className="text-muted-foreground">Nome:</span> {selectedDetailUser?.name || '-'}</p>
-                    <p><span className="text-muted-foreground">Email:</span> {selectedDetailUser?.email || '-'}</p>
-                    <p><span className="text-muted-foreground">Telefono farmacia:</span> {selectedDetailUser?.pharmacy_phone || '-'}</p>
-                  </div>
-                  <div className="space-y-2">
-                    <p><span className="text-muted-foreground">Farmacia:</span> {selectedDetailUser?.pharmacy_name || '-'}</p>
-                    <p><span className="text-muted-foreground">Indirizzo:</span> {selectedDetailUser?.pharmacy_address || '-'}</p>
-                    <div className="flex items-center gap-2">
-                      <span className="text-muted-foreground">Stato:</span>
-                      <Badge variant={(selectedDetailUser?.is_active ?? true) ? 'secondary' : 'destructive'}>
-                        {(selectedDetailUser?.is_active ?? true) ? 'Attivo' : 'Disattivato'}
-                      </Badge>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <div className="grid xl:grid-cols-[1.1fr_1fr] gap-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Consegne recenti</CardTitle>
-                    <CardDescription>Ultime operazioni associate alla farmacia selezionata.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    {detailRecentDeliveries.length ? detailRecentDeliveries.map((delivery) => (
-                      <div key={delivery.delivery_id} className="rounded-2xl border border-border p-3 space-y-1">
-                        <div className="flex items-center justify-between gap-2 flex-wrap">
-                          <p className="font-medium">{delivery.customer_name || 'Cliente non disponibile'}</p>
-                          <Badge variant="outline">{deliveryStatusLabel[delivery.status] || delivery.status}</Badge>
-                        </div>
-                        <p className="text-sm text-muted-foreground">{delivery.driver_name || 'Nessun fattorino'} · {delivery.payment_method?.toUpperCase() || '-'}</p>
-                        <p className="text-sm font-semibold">{formatCurrency(delivery.amount)}</p>
-                        <p className="text-xs text-muted-foreground">Creata il {formatDateTimeLong(delivery.created_at)}</p>
-                      </div>
-                    )) : (
-                      <div className="py-8 text-center text-muted-foreground">Nessuna consegna recente disponibile.</div>
-                    )}
-                  </CardContent>
-                </Card>
-
-                <div className="space-y-6">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Fattorini collegati</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      {detailDrivers.length ? detailDrivers.map((driver) => (
-                        <div key={driver.driver_id} className="rounded-2xl border border-border p-3">
-                          <div className="flex items-center justify-between gap-2">
-                            <p className="font-medium">{driver.name}</p>
-                            <Badge variant={(driver.is_active ?? true) ? 'secondary' : 'destructive'}>
-                              {(driver.is_active ?? true) ? 'Attivo' : 'Disattivato'}
-                            </Badge>
-                          </div>
-                          <p className="text-sm text-muted-foreground mt-1">{driver.email || driver.phone || '-'}</p>
-                          <p className="text-xs text-muted-foreground mt-1">Ultima posizione: {formatDateTimeLong(driver.last_location_update)}</p>
-                        </div>
-                      )) : (
-                        <div className="py-8 text-center text-muted-foreground">Nessun fattorino collegato.</div>
-                      )}
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Notifiche recenti</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      {detailRecentNotifications.length ? detailRecentNotifications.map((notification) => (
-                        <div key={notification.notification_id} className="rounded-2xl border border-border p-3">
-                          <div className="flex items-start justify-between gap-3">
-                            <div>
-                              <p className="font-medium">{notification.title}</p>
-                              <p className="text-sm text-muted-foreground mt-1">{notification.message || notification.body || 'Nessun contenuto disponibile'}</p>
-                            </div>
-                            <Bell className={`w-4 h-4 ${notification.is_read ? 'text-muted-foreground' : 'text-primary'}`} />
-                          </div>
-                          <p className="text-xs text-muted-foreground mt-2">{formatDateTimeLong(notification.created_at)}</p>
-                        </div>
-                      )) : (
-                        <div className="py-8 text-center text-muted-foreground">Nessuna notifica recente.</div>
-                      )}
-                    </CardContent>
-                  </Card>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-900 dark:text-amber-100 flex items-start gap-2">
-              <AlertTriangle className="w-4 h-4 mt-0.5" />
-              Impossibile caricare i dettagli dell'account selezionato.
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      <DettaglioAccountDialog
+        open={detailsOpen}
+        onOpenChange={setDetailsOpen}
+        utente={selectedDetailUser}
+        dettagli={selectedUserDetails}
+        consegneRecenti={detailRecentDeliveries}
+        fattorini={detailDrivers}
+        notifiche={detailRecentNotifications}
+        caricamento={detailsLoading}
+      />
     </div>
   )
 }

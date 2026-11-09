@@ -5,6 +5,8 @@ import axios from 'axios';
 import { API } from '@/lib/config';
 import { useDriverAuth } from '../../contexts/DriverAuthContext';
 import { Card, CardContent } from '../../components/ui/card';
+import TestataFattorino from '../../components/driver/TestataFattorino';
+import CardTurno from '../../components/driver/CardTurno';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { Avatar, AvatarFallback } from '../../components/ui/avatar';
@@ -302,108 +304,10 @@ export default function DriverDashboard() {
 
   return (
     <div className="dark min-h-screen bg-[#09090B] pb-20" data-testid="driver-dashboard">
-      <header className="sticky top-0 z-40 glass px-4 py-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Avatar className="w-10 h-10">
-              <AvatarFallback className="bg-teal-500/20 text-teal-400">
-                {driver?.name?.charAt(0)}
-              </AvatarFallback>
-            </Avatar>
-            <div>
-              <p className="font-semibold text-white">{driver?.name}</p>
-              <p className="text-xs text-zinc-500">{driver?.vehicle_type}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleRefresh}
-              disabled={refreshing}
-              className="text-zinc-400"
-            >
-              <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
-            </Button>
-          </div>
-        </div>
-      </header>
+      <TestataFattorino driver={driver} refreshing={refreshing} onAggiorna={handleRefresh} />
 
       <div className="px-4 py-4 space-y-4">
-        {/* Card TURNO */}
-        <Card className={`border ${shift ? (shift.status === 'open' ? 'border-teal-500/30 bg-teal-500/5' : 'border-amber-500/40 bg-amber-500/5') : 'border-zinc-800 bg-zinc-900/50'}`}>
-          <CardContent className="p-4">
-            {!shift ? (
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="rounded-2xl p-2.5 bg-zinc-800 text-zinc-300">
-                    <Wallet className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <p className="font-semibold text-white">Inizia turno</p>
-                    <p className="text-xs text-zinc-400 mt-0.5">Apri il giro per tracciare incassi e consegne</p>
-                  </div>
-                </div>
-                <Button
-                  onClick={handleStartShift}
-                  disabled={shiftLoading}
-                  className="bg-teal-500 hover:bg-teal-600 text-black font-semibold"
-                  data-testid="driver-start-shift-btn"
-                >
-                  <Play className="w-4 h-4 mr-1.5" />Inizia
-                </Button>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className={`rounded-2xl p-2 ${shift.status === 'open' ? 'bg-teal-500/20 text-teal-300' : 'bg-amber-500/20 text-amber-300'}`}>
-                      {shift.status === 'open' ? <Wallet className="h-5 w-5" /> : <AlertCircle className="h-5 w-5" />}
-                    </div>
-                    <div>
-                      <p className="font-semibold text-white">
-                        {shift.status === 'open' ? 'Turno aperto' : 'In attesa conferma farmacia'}
-                      </p>
-                      <p className="text-xs text-zinc-400">
-                        Iniziato {new Date(shift.started_at).toLocaleTimeString('it-IT', {hour:'2-digit', minute:'2-digit'})}
-                      </p>
-                    </div>
-                  </div>
-                  {shift.status === 'open' && (
-                    <Button
-                      onClick={handleCloseShift}
-                      disabled={shiftLoading}
-                      className="bg-amber-500 hover:bg-amber-600 text-black font-semibold"
-                      size="sm"
-                      data-testid="driver-close-shift-btn"
-                    >
-                      <Square className="w-4 h-4 mr-1.5" />Chiudi
-                    </Button>
-                  )}
-                </div>
-                <div className="grid grid-cols-3 gap-2 text-center">
-                  <div className="rounded-lg bg-zinc-900/70 p-2">
-                    <p className="text-lg font-bold text-white">{shift.totals?.delivered_count ?? 0}</p>
-                    <p className="text-[10px] text-zinc-500 uppercase tracking-wider">Consegne</p>
-                  </div>
-                  <div className="rounded-lg bg-zinc-900/70 p-2">
-                    <p className="text-lg font-bold text-emerald-400">€{(shift.totals?.cash_total ?? 0).toFixed(2)}</p>
-                    <p className="text-[10px] text-zinc-500 uppercase tracking-wider">Contanti</p>
-                  </div>
-                  <div className="rounded-lg bg-zinc-900/70 p-2">
-                    <p className="text-lg font-bold text-sky-400">€{(shift.totals?.pos_total ?? 0).toFixed(2)}</p>
-                    <p className="text-[10px] text-zinc-500 uppercase tracking-wider">POS</p>
-                  </div>
-                </div>
-                {shift.status === 'closed_by_driver' && (
-                  <p className="text-xs text-amber-300 bg-amber-500/10 rounded-lg px-3 py-2">
-                    Hai chiuso il turno dichiarando €{(shift.driver_declared_cash ?? 0).toFixed(2)}. Aspetta la conferma della farmacia.
-                  </p>
-                )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <CardTurno shift={shift} inCorso={shiftLoading} onInizia={handleStartShift} onChiudi={handleCloseShift} />
 
         <div className="grid grid-cols-2 gap-3">
           <Card className="bg-zinc-900/50 border-zinc-800">
