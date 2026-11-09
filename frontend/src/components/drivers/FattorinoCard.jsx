@@ -1,3 +1,4 @@
+import { vehicleLabels } from '@/lib/drivers';
 import { Badge } from '../ui/badge';
 import { BarChart3 } from 'lucide-react';
 import { Button } from '../ui/button';
@@ -15,7 +16,7 @@ import { Truck } from 'lucide-react';
 
    Estratto da Drivers.jsx: riceve dallo stato della pagina solo cio' che usa.
 */
-export default function FattorinoCard({ apriProfilo, driver, handleDelete, handleEdit, handleSetDefaultDriver, handleToggleActive, index, user, vehicleLabels }) {
+export default function FattorinoCard({ apriProfilo, driver, handleDelete, handleEdit, handleSetDefaultDriver, handleToggleActive, index, user }) {
   return (
  <Card
  key={driver.driver_id}
