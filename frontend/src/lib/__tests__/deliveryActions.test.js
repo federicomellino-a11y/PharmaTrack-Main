@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { prossimaAzione, statoSuccessivo } from '../deliveryActions';
+import { avanzamentoFarmacia, prossimaAzione, statoSuccessivo } from '../deliveryActions';
 
 describe('statoSuccessivo', () => {
   it('la farmacia percorre le sei fasi in ordine', () => {
@@ -47,5 +47,25 @@ describe('prossimaAzione', () => {
     const azione = prossimaAzione('in_transit');
     expect(azione.stato).toBe('delivered_pending_confirmation');
     expect(azione.etichetta).toBe('Conferma incasso');
+  });
+});
+
+describe('avanzamentoFarmacia', () => {
+  it('da affidata va direttamente in giro, come fa il banco', () => {
+    expect(avanzamentoFarmacia('assigned')).toEqual({ stato: 'in_transit', etichetta: 'In consegna' });
+    expect(avanzamentoFarmacia('picked_up')).toEqual({ stato: 'in_transit', etichetta: 'In consegna' });
+  });
+
+  it("l'ultimo passo porta in attesa di incasso, non a incassata", () => {
+    expect(avanzamentoFarmacia('in_transit')).toEqual({
+      stato: 'delivered_pending_confirmation',
+      etichetta: 'Consegnata da incassare',
+    });
+  });
+
+  it('non avanza una consegna ferma', () => {
+    for (const stato of ['da_preparare', 'pronta', 'delivered', 'cancelled', 'not_delivered', undefined]) {
+      expect(avanzamentoFarmacia(stato)).toBeNull();
+    }
   });
 });

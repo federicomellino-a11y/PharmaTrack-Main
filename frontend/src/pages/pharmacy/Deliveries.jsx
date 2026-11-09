@@ -39,6 +39,7 @@ import useDeliveryForm, { normalizzaImporto } from '@/hooks/useDeliveryForm';
 import DeliveryRow from '../../components/deliveries/DeliveryRow';
 import CreaConsegnaDialog from '../../components/deliveries/CreaConsegnaDialog';
 import SegnaProntaDialog from '../../components/deliveries/SegnaProntaDialog';
+import { avanzamentoFarmacia } from '@/lib/deliveryActions';
 import { costruisciCorrezioneStato } from '@/lib/deliveryCorrection';
 import ModificaConsegnaDialog from '../../components/deliveries/ModificaConsegnaDialog';
 import AssegnaConsegnaDialog from '../../components/deliveries/AssegnaConsegnaDialog';
@@ -395,13 +396,6 @@ export default function DeliveriesPage() {
     toast.success(`${rows.length} consegne esportate`);
   };
 
-  const handleMarkDelivered = async (id) => {
-    try {
-      await axios.put(`${API}/deliveries/${id}`, { status: 'delivered' }, { withCredentials: true });
-      toast.success('✓ Consegnata!'); fetchData();
-    } catch { toast.error('Errore'); }
-  };
-
   const handleConfirmPayment = async (delivery) => {
     const note = window.prompt(`Confermi l'incasso di ${formatCurrency(delivery.amount)} da ${delivery.customer_name}?\n\nLascia una nota se vuoi (opzionale).`, '');
     if (note === null) return; // user cancelled
@@ -443,20 +437,16 @@ export default function DeliveriesPage() {
   };
 
   const handleAdvanceStatus = async (delivery) => {
-    const next = {
-      assigned: 'in_transit',
-      picked_up: 'in_transit',
-      in_transit: 'delivered',
-    };
-    const nextStatus = next[delivery.status];
-    if (!nextStatus) return;
+    const azione = avanzamentoFarmacia(delivery.status);
+    if (!azione) return;
+    const nextStatus = azione.stato;
     if (delivery.status === 'assigned' && !delivery.driver_id) {
       toast.error('Assegna prima un fattorino per avviare la consegna');
       setSelectedDelivery(delivery);
       setAssignDialogOpen(true);
       return;
     }
-    const label = nextStatus === 'in_transit' ? 'In consegna' : 'Consegnata';
+    const label = azione.etichetta;
     try {
       await axios.put(`${API}/deliveries/${delivery.delivery_id}`,
         { status: nextStatus }, { withCredentials: true });
