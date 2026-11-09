@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException, Depends, Request, Response
 
 from app.core.database import db
 from app.core.websocket import manager
+from app.core.delivery_creation import costruisci_consegna
 from app.core.security import (
     get_current_user,
 )
@@ -223,35 +224,16 @@ async def _winfarm_create_delivery(pharmacy_id: str, body: dict) -> dict:
             {"$set": {"fiscal_code": codice_fiscale}})
         customer["fiscal_code"] = codice_fiscale
 
-    now_iso = datetime.now(timezone.utc).isoformat()
-    delivery_data = {
-        "delivery_id": f"del_{uuid.uuid4().hex[:12]}",
-        "pharmacy_id": pharmacy_id,
-        "customer_id": customer["customer_id"],
-        "driver_id": None,
-        "customer_name": customer["name"],
-        "customer_phone": customer.get("phone") or "",
-        "customer_address": customer.get("address") or "",
-        "customer_lat": customer.get("customer_lat"),
-        "customer_lng": customer.get("customer_lng"),
-        "notes": notes,
-        "status": "da_preparare",
-        "payment_method": normalizza_pagamento(payment_method),
-        "amount": amount_val,
-        "amount_given": None,
-        "change_due": None,
-        "payment_collected": False,
-        "scheduled_date": None,
-        "scheduled_time": None,
-        "priority": "normal",
-        "estimated_delivery": None,
-        "actual_delivery": None,
-        "created_at": now_iso,
-        "updated_at": now_iso,
-        "auto_assigned": False,
-        "imported_from": "winfarm",
-        "external_ref": external_ref,
-    }
+    delivery_data = costruisci_consegna(
+        pharmacy_id=pharmacy_id,
+        customer=customer,
+        delivery_id=f"del_{uuid.uuid4().hex[:12]}",
+        notes=notes,
+        payment_method=normalizza_pagamento(payment_method),
+        amount=amount_val,
+        imported_from="winfarm",
+        external_ref=external_ref,
+    )
     await db.deliveries.insert_one(delivery_data)
 
     await create_notification_internal(
