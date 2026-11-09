@@ -29,99 +29,15 @@ import { confirmAction } from '../../components/ConfirmDialog';
 
 
 import { formatCurrency, formatDate, formatDateTimeFull } from '@/lib/format';
-const statusLabels = {
-  pending: 'In attesa',
-  assigned: 'Assegnata',
-  picked_up: 'Ritirata',
-  in_transit: 'In consegna',
-  delivered: 'Consegnata',
-  cancelled: 'Annullata',
-};
-
-const paymentLabels = {
-  cash: 'Contanti',
-  pos: 'POS',
-  other: 'Altro',
-};
-
-const emptyForm = {
-  name: '',
-  phone: '',
-  extra_phones: [],
-  address: '',
-  email: '',
-  fiscal_code: '',
-  notes: '',
-  customer_lat: null,
-  customer_lng: null,
-  place_id: '',
-};
-
-
-
-
-const calculateAge = (birthDate) => {
-  if (!birthDate) return null;
-  const today = new Date();
-  const birth = new Date(birthDate);
-  let age = today.getFullYear() - birth.getFullYear();
-  const monthDiff = today.getMonth() - birth.getMonth();
-  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) age -= 1;
-  return age >= 0 ? age : null;
-};
-
-const mergeCustomerIntoList = (customers, updatedCustomer) => {
-  const safeCustomers = ensureArray(customers);
-  const exists = safeCustomers.some((customer) => customer.customer_id === updatedCustomer.customer_id);
-  if (!exists) return [updatedCustomer, ...safeCustomers];
-  return safeCustomers.map((customer) => (
-    customer.customer_id === updatedCustomer.customer_id ? { ...customer, ...updatedCustomer } : customer
-  ));
-};
-
-const buildInitialCustomerStats = (customer) => ({
-  customer,
-  stats: {
-    total_deliveries: 0,
-    completed_deliveries: 0,
-    cancelled_deliveries: 0,
-    active_deliveries: 0,
-    pending_deliveries: 0,
-    total_spent: 0,
-    average_order_value: 0,
-    completion_rate: 0,
-    cancellation_rate: 0,
-    last_delivery: null,
-    last_order_at: null,
-    delivered_this_month: 0,
-    preferred_payment_method: null,
-    average_days_between_orders: null,
-    payment_breakdown: {
-      cash: { count: 0, total: 0 },
-      pos: { count: 0, total: 0 },
-      other: { count: 0, total: 0 },
-    },
-    verified_address: customer?.customer_lat != null && customer?.customer_lng != null,
-  },
-  recent_deliveries: [],
-});
-
-const CustomerMetricCard = ({ icon: Icon, label, value, hint, accent = 'text-primary' }) => (
-  <Card>
-    <CardContent className="p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
-          <p className="mt-2 text-xl font-semibold text-foreground">{value}</p>
-          {hint && <p className="mt-1 text-xs text-muted-foreground">{hint}</p>}
-        </div>
-        <div className="rounded-2xl bg-primary/10 p-2.5">
-          <Icon className={`w-5 h-5 ${accent}`} />
-        </div>
-      </div>
-    </CardContent>
-  </Card>
-);
+import CustomerMetricCard from '../../components/customers/CustomerMetricCard';
+import {
+  buildInitialCustomerStats,
+  calculateAge,
+  emptyForm,
+  mergeCustomerIntoList,
+  paymentLabels,
+  statusLabels,
+} from '@/lib/customers';
 
 export default function CustomersPage() {
   const queryClient = useQueryClient();
