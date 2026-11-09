@@ -10,6 +10,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
 from app.core.database import db, client
+from app.core.legacy_deliveries import allinea_testi_consegne
 from app.core.websocket import manager
 from app.core.security import normalize_session_expiry
 from app.core.config import ADMIN_EMAIL, ADMIN_PASSWORD, IS_PRODUCTION
@@ -257,6 +258,17 @@ async def setup_indexes():
             logger.info("Consegne allineate su imported_from: %d", allineate.modified_count)
     except Exception as exc:  # noqa: BLE001
         logger.warning("Allineamento consegne non completato: %s", exc)
+
+    # ── Consegne: telefono e indirizzo sempre stringa ──
+    # I documenti vecchi hanno None dove il costruttore oggi scrive "": la
+    # differenza si vede nei link tel:, nella mappa e nell'export (vedi
+    # app/core/legacy_deliveries.py).
+    try:
+        testi_allineati = await allinea_testi_consegne(db)
+        if testi_allineati:
+            logger.info("Consegne allineate su telefono/indirizzo: %d", testi_allineati)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Allineamento testi consegne non completato: %s", exc)
 
     # ── Chat: thread multipli per farmacia/fattorino ──
     await safe_create_index(db.chat_threads, [("pharmacy_id", pymongo.ASCENDING), ("driver_id", pymongo.ASCENDING), ("status", pymongo.ASCENDING), ("created_at", pymongo.DESCENDING)], name="chat_threads_pair_idx", background=True)
