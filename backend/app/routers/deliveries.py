@@ -23,6 +23,7 @@ from app.core.notifications import (
 from app.core.shifts_service import (
     _attach_delivery_to_open_shift,
 )
+from app.core.delivery_creation import costruisci_consegna
 from app.core.delivery_lifecycle import FOLLOW_UP_STATUSES
 from app.core.delivery_lifecycle import ARCHIVED_STATUSES
 from app.core.delivery_lifecycle import (
@@ -208,31 +209,23 @@ async def create_delivery(delivery: DeliveryCreate, user: dict = Depends(get_cur
             if best:
                 selected_driver_id, assigned_driver = best["driver_id"], best
 
-    change_due = None
-    if delivery.payment_method == "cash" and delivery.amount is not None and delivery.amount_given is not None:
-        change_due = delivery.amount_given - delivery.amount
-
-    delivery_data = {
-        "delivery_id": f"del_{uuid.uuid4().hex[:12]}",
-        "pharmacy_id": user["user_id"],
-        "customer_id": delivery.customer_id,
-        "driver_id": assigned_driver["driver_id"] if assigned_driver else None,
-        "customer_name": customer["name"], "customer_phone": customer["phone"], "customer_address": customer["address"],
-        "customer_lat": customer.get("customer_lat"), "customer_lng": customer.get("customer_lng"),
-        "notes": delivery.notes,
-        "status": "da_preparare",  # sempre in coda: l'assegnazione e' un passo a parte
-        "payment_method": delivery.payment_method, "amount": delivery.amount,
-        "amount_given": delivery.amount_given, "change_due": change_due, "payment_collected": False,
-        "scheduled_date": delivery.scheduled_date, "scheduled_time": inizio_fascia,
-        "slot_to": fine_fascia,
-        "priority": delivery.priority,
-        "estimated_delivery": None, "actual_delivery": None,
-        "created_at": datetime.now(timezone.utc).isoformat(), "updated_at": datetime.now(timezone.utc).isoformat(),
-        "auto_assigned": False,  # in coda: non ancora assegnata
-        "nre": (getattr(delivery, "nre", None) or None),
-        "client_meta": (getattr(delivery, "client_meta", None) or None),
-        "external_ref": delivery.external_ref or None,
-    }
+    delivery_data = costruisci_consegna(
+        pharmacy_id=user["user_id"],
+        customer=customer,
+        delivery_id=f"del_{uuid.uuid4().hex[:12]}",
+        driver_id=assigned_driver["driver_id"] if assigned_driver else None,
+        notes=delivery.notes,
+        payment_method=delivery.payment_method,
+        amount=delivery.amount,
+        amount_given=delivery.amount_given,
+        scheduled_date=delivery.scheduled_date,
+        scheduled_time=inizio_fascia,
+        slot_to=fine_fascia,
+        priority=delivery.priority,
+        nre=getattr(delivery, "nre", None),
+        client_meta=getattr(delivery, "client_meta", None),
+        external_ref=delivery.external_ref,
+    )
     await db.deliveries.insert_one(delivery_data)
     # Log audit NRE (tracciabilità legale, Garante 2025)
     if delivery_data.get("nre"):
