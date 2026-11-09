@@ -45,11 +45,17 @@ def test_resto_solo_in_contanti_con_entrambe_le_cifre():
     assert calcola_resto("cash", None, 10) is None
 
 
-def test_la_farmacia_non_ha_imported_from_il_bot_si():
-    assert "imported_from" not in _consegna()
+def test_la_farmacia_ha_imported_from_a_none_il_bot_a_winfarm():
+    assert _consegna()["imported_from"] is None
     consegna = _consegna(imported_from="winfarm")
     assert consegna["imported_from"] == "winfarm"
     assert consegna["nre"] is None and consegna["client_meta"] is None
+
+
+def test_le_due_strade_producono_lo_stesso_insieme_di_chiavi():
+    farmacia = _consegna()
+    bot = _consegna(imported_from="winfarm")
+    assert set(farmacia) == set(bot), "le due strade scrivono documenti diversi"
 
 
 def test_campi_facoltativi_vuoti_diventano_none():
@@ -67,6 +73,14 @@ def test_cliente_senza_telefono_non_rompe_l_import():
     )
     assert consegna["customer_phone"] == ""
     assert consegna["customer_address"] == "Via Verdi 3"
+
+
+def test_anche_la_farmacia_non_lascia_telefono_a_none():
+    cliente = {"customer_id": "cust_3", "name": "Luca", "address": "Via Blu 9"}
+    consegna = costruisci_consegna(
+        pharmacy_id="farma_1", customer=cliente, delivery_id="del_y", payment_method="cash")
+    assert consegna["customer_phone"] == ""
+    assert consegna["imported_from"] is None
 
 
 def test_le_due_creazioni_usano_il_costruttore():
