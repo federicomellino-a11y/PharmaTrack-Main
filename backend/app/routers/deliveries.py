@@ -27,14 +27,12 @@ from app.core.delivery_creation import costruisci_consegna
 from app.core.delivery_lifecycle import FOLLOW_UP_STATUSES
 from app.core.delivery_lifecycle import ARCHIVED_STATUSES
 from app.core.delivery_lifecycle import (
+    valuta_scrittura,
     build_cancel_updates,
     build_photo_cleanup,
     build_restore_updates,
-    can_cancel,
     can_hard_delete,
-    can_restore,
     resolve_restore_target,
-    valuta_cambio_stato,
     build_phase_updates,
     build_force_updates,
 )
@@ -353,7 +351,11 @@ async def update_delivery(delivery_id: str, update: DeliveryUpdate, user: dict =
         if not own_driver:
             raise HTTPException(status_code=400, detail="Fattorino non valido per questa farmacia")
         update_data["driver_id"] = update.driver_id
-        if delivery["status"] in ["pending", "da_preparare", "pronta"]:
+        # Assegnare il fattorino porta la consegna ad "affidata", ma solo se la
+        # tabella lo consente: la regola non si ricopia qui.
+        if update.status is None and valuta_scrittura(
+            delivery["status"], "assigned", origine="aggiornamento"
+        )["ok"]:
             update_data["status"] = "assigned"
             update_data.update(build_phase_updates(
                 "assigned", datetime.now(timezone.utc).isoformat()))
@@ -363,9 +365,10 @@ async def update_delivery(delivery_id: str, update: DeliveryUpdate, user: dict =
             raise HTTPException(status_code=400, detail="Assegna prima un fattorino per avviare la consegna")
         if update.status not in WORKFLOW_STATUSES:
             raise HTTPException(status_code=400, detail="Stato non valido")
-        esito = valuta_cambio_stato(
+        esito = valuta_scrittura(
             delivery.get("status"),
             update.status,
+            origine="aggiornamento",
             ruolo="farmacia",
             forzato=bool(getattr(update, "force", False)),
             motivo=getattr(update, "force_reason", None),
@@ -436,14 +439,12 @@ async def restore_delivery(delivery_id: str, user: dict = Depends(get_current_us
     )
     if not delivery:
         raise HTTPException(status_code=404, detail="Consegna non trovata")
-    if not can_restore(delivery.get("status")):
-        raise HTTPException(
-            status_code=400,
-            detail="Solo le consegne in archivio (consegnate, annullate o non consegnate) possono essere ripristinate",
-        )
+    target = resolve_restore_target(delivery)
+    esito = valuta_scrittura(delivery.get("status"), target, origine="ripristino")
+    if not esito["ok"]:
+        raise HTTPException(status_code=400, detail=esito["errore"])
 
     now = datetime.now(timezone.utc).isoformat()
-    target = resolve_restore_target(delivery)
     updates = build_restore_updates(delivery, target, now)
     await db.deliveries.update_one(
         {"delivery_id": delivery_id, "pharmacy_id": user["user_id"]}, {"$set": updates}
@@ -483,8 +484,9 @@ async def cancel_delivery(
     )
     if not delivery:
         raise HTTPException(status_code=404, detail="Consegna non trovata")
-    if not can_cancel(delivery.get("status")):
-        raise HTTPException(status_code=400, detail="Questa consegna non puo' essere annullata")
+    esito = valuta_scrittura(delivery.get("status"), "cancelled", origine="annullamento")
+    if not esito["ok"]:
+        raise HTTPException(status_code=400, detail=esito["errore"])
 
     motivo = (payload or {}).get("reason") if isinstance(payload, dict) else None
     now = datetime.now(timezone.utc).isoformat()

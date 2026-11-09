@@ -51,11 +51,11 @@ def resolve_restore_target(delivery: dict) -> str:
 
 
 def can_restore(status: str) -> bool:
-    return status in ARCHIVED_STATUSES
+    return valuta_scrittura(status, "pronta", origine="ripristino")["ok"]
 
 
 def can_cancel(status: str) -> bool:
-    return "cancelled" in stati_successivi(status, "farmacia")
+    return valuta_scrittura(status, "cancelled", origine="annullamento")["ok"]
 
 
 def can_hard_delete(status: str) -> bool:
@@ -201,6 +201,109 @@ def stati_successivi(stato: str, ruolo: str = "farmacia") -> tuple:
     """Gli stati in cui si puo' andare da qui, per questo ruolo."""
     tabella = TRANSIZIONI_FATTORINO if ruolo == "fattorino" else TRANSIZIONI
     return tabella.get(stato, ())
+
+
+# Ogni scrittura dello stato di una consegna passa da valuta_scrittura(). La
+# sequenza normale e' la tabella qui sopra; sotto ci sono le altre origini, cioe'
+# i gesti che la farmacia fa da sempre (annullare, ripristinare, confermare
+# l'incasso, contestarlo, chiudere il turno, confermare le foto, togliere un
+# fattorino). Prima ognuno aveva la sua regola dentro il router, e quando la
+# tabella si stringeva qualcuno la scavalcava da un'altra porta.
+ORIGINI = (
+    "aggiornamento",
+    "annullamento",
+    "ripristino",
+    "conferma_incasso",
+    "contestazione",
+    "chiusura_turno",
+    "pod",
+    "fattorino_rimosso",
+)
+
+# Da dove un ripristino puo' far ripartire una consegna archiviata: gli stessi
+# stati attivi, cosi' non c'e' un secondo elenco da tenere allineato (e i
+# documenti vecchi, che possono avere previous_status "pending", si riaprono).
+STATI_RIPRISTINABILI = ACTIVE_STATUSES
+# Gli stati che un fattorino rimosso lascia dietro di se'.
+STATI_FATTORINO_RIMOSSO = ("assigned", "picked_up", "in_transit")
+
+
+def _esito(ok, errore=None, origine=None, forzato=False):
+    return {"ok": ok, "forzato": forzato, "errore": errore, "origine": origine}
+
+
+def valuta_scrittura(stato_attuale, nuovo, origine: str = "aggiornamento",
+                     ruolo: str = "farmacia", forzato: bool = False,
+                     motivo: str | None = None) -> dict:
+    """Se questo gesto puo' scrivere questo stato, e con quale regola.
+
+    E' l'unica porta: i router non decidono piu' da soli se un passaggio e'
+    ammesso. Ogni origine dichiara la sua regola qui accanto alla tabella, cosi'
+    una regola nuova si aggiunge in un posto solo e si vede insieme alle altre.
+    """
+    if not nuovo:
+        return _esito(False, "Stato mancante", origine)
+
+    if origine == "aggiornamento":
+        if nuovo == stato_attuale:
+            return _esito(True, None, origine, forzato)
+        esito = valuta_cambio_stato(stato_attuale, nuovo, ruolo=ruolo,
+                                    forzato=forzato, motivo=motivo)
+        esito["origine"] = origine
+        return esito
+
+    if origine == "annullamento":
+        if stato_attuale == "cancelled":
+            return _esito(False, "Questa consegna e' gia' annullata", origine)
+        if nuovo != "cancelled":
+            return _esito(False, f"L'annullamento porta a 'cancelled', non a '{nuovo}'", origine)
+        if "cancelled" not in stati_successivi(stato_attuale, ruolo):
+            return _esito(False, f"Una consegna in '{stato_attuale}' non si annulla: si ripristina e poi si annulla", origine)
+        return _esito(True, None, origine)
+
+    if origine == "ripristino":
+        if stato_attuale not in ARCHIVED_STATUSES:
+            return _esito(False, f"Si ripristina solo una consegna in archivio (ora: {stato_attuale})", origine)
+        if nuovo not in STATI_RIPRISTINABILI:
+            return _esito(False, f"Una consegna ripristinata torna in giro, non in '{nuovo}'", origine)
+        return _esito(True, None, origine)
+
+    if origine == "conferma_incasso":
+        if nuovo != "delivered":
+            return _esito(False, f"La conferma dell'incasso chiude la consegna, non la porta in '{nuovo}'", origine)
+        if stato_attuale not in BILLED_STATUSES:
+            return _esito(False, f"Non c'e' un incasso da confermare in '{stato_attuale}'", origine)
+        return _esito(True, None, origine)
+
+    if origine == "contestazione":
+        if nuovo != "delivered_pending_confirmation":
+            return _esito(False, f"La contestazione riapre l'incasso, non porta in '{nuovo}'", origine)
+        if stato_attuale not in BILLED_STATUSES:
+            return _esito(False, f"Non c'e' un incasso da contestare in '{stato_attuale}'", origine)
+        return _esito(True, None, origine)
+
+    if origine == "chiusura_turno":
+        if nuovo != "delivered":
+            return _esito(False, f"La chiusura del turno conferma gli incassi, non porta in '{nuovo}'", origine)
+        if stato_attuale != "delivered_pending_confirmation":
+            return _esito(False, f"Si conferma solo un incasso in attesa (ora: {stato_attuale})", origine)
+        return _esito(True, None, origine)
+
+    if origine == "pod":
+        if nuovo != "delivered_pending_confirmation":
+            return _esito(False, f"Le foto di consegna portano in attesa di incasso, non in '{nuovo}'", origine)
+        if stato_attuale not in ("picked_up", "in_transit"):
+            return _esito(False, f"Le foto si confermano su una consegna in giro (ora: {stato_attuale})", origine)
+        return _esito(True, None, origine)
+
+    if origine == "fattorino_rimosso":
+        if nuovo not in ("pronta", "assigned"):
+            return _esito(False, f"Senza fattorino la consegna torna da preparare, non in '{nuovo}'", origine)
+        if stato_attuale not in STATI_FATTORINO_RIMOSSO:
+            return _esito(False, f"Una consegna in '{stato_attuale}' non era in mano al fattorino", origine)
+        return _esito(True, None, origine)
+
+    return _esito(False, f"Origine sconosciuta: {origine}", origine)
 
 
 def valuta_cambio_stato(stato_attuale, nuovo, ruolo: str = "farmacia",

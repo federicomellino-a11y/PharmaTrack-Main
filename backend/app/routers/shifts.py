@@ -2,6 +2,7 @@ import uuid
 import logging
 from datetime import datetime, timezone
 from typing import Optional
+from app.core.delivery_lifecycle import valuta_scrittura
 from fastapi import APIRouter, HTTPException, Depends, Request
 
 from app.core.database import db
@@ -229,23 +230,30 @@ async def pharmacy_settle_shift(shift_id: str, request: Request, user: dict = De
 
     # Conferma tutti gli incassi delle consegne in pending_confirmation di questo turno
     if confirm_all_deliveries and shift.get("delivery_ids"):
-        await db.deliveries.update_many(
-            {
-                "delivery_id": {"$in": shift["delivery_ids"]},
-                "pharmacy_id": user["user_id"],
-                "status": "delivered_pending_confirmation",
-            },
-            {
-                "$set": {
-                    "status": "delivered",
-                    "payment_collected": True,
-                    "payment_confirmed_at": now,
-                    "payment_confirmed_by": user["user_id"],
-                    "payment_confirmed_via_shift": shift_id,
-                    "updated_at": now,
-                }
-            },
-        )
+        # Chiudere il turno conferma gli incassi, ma quali consegne si possono
+        # chiudere lo dice valuta_scrittura: qui si raccolgono solo quelle che
+        # la regola ammette, invece di fidarsi di un filtro scritto a mano.
+        da_confermare = []
+        async for candidata in db.deliveries.find(
+            {"delivery_id": {"$in": shift["delivery_ids"]}, "pharmacy_id": user["user_id"]},
+            {"_id": 0, "delivery_id": 1, "status": 1},
+        ):
+            if valuta_scrittura(candidata.get("status"), "delivered", origine="chiusura_turno")["ok"]:
+                da_confermare.append(candidata["delivery_id"])
+        if da_confermare:
+            await db.deliveries.update_many(
+                {"delivery_id": {"$in": da_confermare}, "pharmacy_id": user["user_id"]},
+                {
+                    "$set": {
+                        "status": "delivered",
+                        "payment_collected": True,
+                        "payment_confirmed_at": now,
+                        "payment_confirmed_by": user["user_id"],
+                        "payment_confirmed_via_shift": shift_id,
+                        "updated_at": now,
+                    }
+                },
+            )
 
     if shift.get("driver_id"):
         await manager.send_personal_message(

@@ -11,6 +11,7 @@ import tempfile
 from datetime import datetime, timezone
 from typing import Optional
 
+from app.core.delivery_lifecycle import valuta_scrittura
 from fastapi import APIRouter, HTTPException, Depends, Request, UploadFile, File, Form, Response
 
 from app.core.database import db
@@ -152,8 +153,9 @@ async def confirm_pod(delivery_id: str, user: dict = Depends(get_current_user)) 
     )
     if not delivery:
         raise HTTPException(status_code=404, detail="Consegna non trovata")
-    if delivery.get("status") not in ("in_transit", "picked_up"):
-        raise HTTPException(status_code=409, detail=f"Stato non confermabile: {delivery.get('status')}")
+    esito_pod = valuta_scrittura(delivery.get("status"), "delivered_pending_confirmation", origine="pod")
+    if not esito_pod["ok"]:
+        raise HTTPException(status_code=409, detail=esito_pod["errore"])
 
     photos = await db.delivery_photos.find(
         {"delivery_id": delivery_id}, {"_id": 0}

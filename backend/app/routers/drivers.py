@@ -3,7 +3,7 @@ import logging
 from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, HTTPException, Depends, Request
 
-from app.core.delivery_lifecycle import BILLED_STATUSES
+from app.core.delivery_lifecycle import BILLED_STATUSES, STATI_FATTORINO_RIMOSSO, valuta_scrittura
 from app.core.database import db
 from app.core.passwords import hash_password
 # (nessun uso di app.core.config)
@@ -197,7 +197,8 @@ async def delete_driver(driver_id: str, user: dict = Depends(richiedi_titolare))
     # come se il pacco fosse stato ritirato.
     await db.deliveries.update_many(
         {"driver_id": driver_id, "pharmacy_id": user["user_id"],
-         "status": {"$in": ["assigned", "picked_up", "in_transit"]}},
+         "status": {"$in": [s for s in STATI_FATTORINO_RIMOSSO
+                            if valuta_scrittura(s, "pronta", origine="fattorino_rimosso")["ok"]]}},
         {
             "$set": {"driver_id": None, "status": "pronta",
                      "updated_at": datetime.now(timezone.utc).isoformat()},
