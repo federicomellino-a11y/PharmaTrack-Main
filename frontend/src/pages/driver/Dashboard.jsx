@@ -1,3 +1,4 @@
+import { vaInviataPosizione } from '@/lib/driverLocation';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
@@ -19,8 +20,6 @@ import { useDriverDeliveriesQuery, useDriverShiftQuery } from '@/hooks/queries';
 import { flushOfflineQueue, getPendingCount } from '@/lib/offlineQueue';
 import { flushQueuedPhotos } from '@/lib/offlinePhotos';
 
-const LOCATION_DISTANCE_THRESHOLD = 0.00005;
-const LOCATION_MIN_INTERVAL = 15000;
 
 export default function DriverDashboard() {
   const { driver, logout, updateLocation } = useDriverAuth();
@@ -203,12 +202,7 @@ export default function DriverDashboard() {
     const now = Date.now();
     const previous = lastSentLocationRef.current;
 
-    const sameArea = previous
-      && Math.abs(previous.lat - lat) < LOCATION_DISTANCE_THRESHOLD
-      && Math.abs(previous.lng - lng) < LOCATION_DISTANCE_THRESHOLD;
-    const sentRecently = previous && now - previous.timestamp < LOCATION_MIN_INTERVAL;
-
-    if (sameArea && sentRecently) {
+    if (!vaInviataPosizione(previous, { lat, lng }, now)) {
       setLocationStatus('enabled');
       return;
     }
