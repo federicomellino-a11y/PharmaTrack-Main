@@ -34,6 +34,9 @@ from app.core.delivery_lifecycle import (
     can_hard_delete,
     can_restore,
     resolve_restore_target,
+    valuta_cambio_stato,
+    build_phase_updates,
+    build_force_updates,
 )
 from app.models.schemas import DeliveryCreate, DeliveryUpdate
 
@@ -352,13 +355,30 @@ async def update_delivery(delivery_id: str, update: DeliveryUpdate, user: dict =
         update_data["driver_id"] = update.driver_id
         if delivery["status"] in ["pending", "da_preparare", "pronta"]:
             update_data["status"] = "assigned"
+            update_data.update(build_phase_updates(
+                "assigned", datetime.now(timezone.utc).isoformat()))
     if update.status is not None:
         effective_driver_id = update.driver_id if update.driver_id is not None else delivery.get("driver_id")
         if update.status == "in_transit" and not effective_driver_id:
             raise HTTPException(status_code=400, detail="Assegna prima un fattorino per avviare la consegna")
         if update.status not in WORKFLOW_STATUSES:
             raise HTTPException(status_code=400, detail="Stato non valido")
+        esito = valuta_cambio_stato(
+            delivery.get("status"),
+            update.status,
+            ruolo="farmacia",
+            forzato=bool(getattr(update, "force", False)),
+            motivo=getattr(update, "force_reason", None),
+        )
+        if not esito["ok"]:
+            raise HTTPException(status_code=409, detail=esito["errore"])
+        adesso_iso = datetime.now(timezone.utc).isoformat()
         update_data["status"] = update.status
+        if update.status != delivery.get("status"):
+            update_data.update(build_phase_updates(update.status, adesso_iso))
+        if esito["forzato"]:
+            update_data.update(build_force_updates(
+                getattr(update, "force_reason", ""), adesso_iso, user["user_id"]))
         if update.status in ("cancelled", "not_delivered") and delivery.get("status") not in ("cancelled", "not_delivered"):
             update_data["previous_status"] = delivery.get("status") or "pronta"
             update_data["cancelled_at"] = datetime.now(timezone.utc).isoformat()
