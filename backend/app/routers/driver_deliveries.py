@@ -4,7 +4,11 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends, Request
 
 from app.core.clock import ROME_TZ
-from app.core.delivery_lifecycle import BILLED_STATUSES
+from app.core.delivery_lifecycle import (
+    BILLED_STATUSES,
+    valuta_cambio_stato,
+    build_phase_updates,
+)
 from app.core.database import db
 from app.core.fasce import descrivi_fascia, fascia_scaduta
 from app.core.websocket import manager
@@ -74,7 +78,13 @@ async def update_delivery_status_driver(delivery_id: str, request: Request, driv
 
     # Driver "delivered" → diventa pending_confirmation (la farmacia deve confermare l'incasso)
     effective_status = "delivered_pending_confirmation" if new_status == "delivered" else new_status
-    update_data = {"status": effective_status, "updated_at": datetime.now(timezone.utc).isoformat()}
+    # Il fattorino non forza niente: la sua sequenza e' quella e basta.
+    esito = valuta_cambio_stato(delivery.get("status"), effective_status, ruolo="fattorino")
+    if not esito["ok"]:
+        raise HTTPException(status_code=409, detail=esito["errore"])
+    adesso_iso = datetime.now(timezone.utc).isoformat()
+    update_data = {"status": effective_status, "updated_at": adesso_iso}
+    update_data.update(build_phase_updates(effective_status, adesso_iso))
     if new_status == "not_delivered":
         update_data["failure_reason"] = (body.get("failure_reason") or "Non specificato")[:200]
         update_data["previous_status"] = delivery.get("status")

@@ -134,3 +134,106 @@ def build_photo_cleanup(photos: list[dict] | None) -> dict:
         ],
         "righe": len(elenco),
     }
+
+
+# --- Fasi e transizioni ---------------------------------------------------
+#
+# Una consegna passa da sei fasi prima di incassare. Fino a ieri il passaggio da
+# una all'altra non era governato: la farmacia poteva mandare una consegna da
+# "consegnata" a "da preparare" con un PUT, e i report la contavano o non la
+# contavano piu' senza dirlo a nessuno. Qui la sequenza e' scritta una volta.
+
+# L'orario che segna ogni fase: senza, non si puo' misurare dove si perde tempo
+# (preparazione, attesa del fattorino, giro, conferma dell'incasso).
+FASE_ORARI = {
+    "pronta": "pronta_at",
+    "assigned": "assigned_at",
+    "picked_up": "picked_up_at",
+    "in_transit": "departed_at",
+    "delivered_pending_confirmation": "delivered_by_driver_at",
+    "delivered": "confirmed_at",
+}
+
+# La sequenza della farmacia. 'pending' resta in uscita: e' il doppione storico
+# di 'da_preparare' e sta gia' sparendo dal resto del codice.
+TRANSIZIONI = {
+    "da_preparare": ("pronta", "assigned", "cancelled"),
+    "pending": ("pronta", "assigned", "cancelled"),
+    "pronta": ("assigned", "picked_up", "cancelled"),
+    "assigned": ("picked_up", "pronta", "cancelled", "not_delivered"),
+    "picked_up": ("in_transit", "delivered_pending_confirmation", "not_delivered", "cancelled"),
+    "in_transit": ("delivered_pending_confirmation", "not_delivered", "cancelled"),
+    # Da "consegnata in attesa di incasso" si torna indietro solo se la farmacia
+    # contesta il pagamento: la consegna e' di nuovo in giro.
+    "delivered_pending_confirmation": ("delivered", "in_transit", "not_delivered"),
+    # Chiuse: si riaprono soltanto dal ripristino, che ha gia' le sue regole.
+    "delivered": (),
+    "not_delivered": (),
+    "cancelled": (),
+}
+
+# Il fattorino ha una sequenza piu' stretta: puo' solo far avanzare il giro.
+TRANSIZIONI_FATTORINO = {
+    "assigned": ("picked_up", "not_delivered", "cancelled"),
+    "picked_up": ("in_transit", "delivered_pending_confirmation", "not_delivered", "cancelled"),
+    "in_transit": ("delivered_pending_confirmation", "not_delivered", "cancelled"),
+}
+
+
+def stati_successivi(stato: str, ruolo: str = "farmacia") -> tuple:
+    """Gli stati in cui si puo' andare da qui, per questo ruolo."""
+    tabella = TRANSIZIONI_FATTORINO if ruolo == "fattorino" else TRANSIZIONI
+    return tabella.get(stato, ())
+
+
+def valuta_cambio_stato(stato_attuale, nuovo, ruolo: str = "farmacia",
+                        forzato: bool = False, motivo: str | None = None) -> dict:
+    """Se il cambio si puo' fare, e cosa serve per farlo.
+
+    La farmacia resta padrona dello stato: puo' forzare un passaggio non previsto,
+    ma solo dichiarandolo con un motivo, che finisce nel documento e nell'audit.
+    Il fattorino no: il suo giro ha una sequenza e basta, perche' da li' non vede
+    ne' i soldi ne' la cassa.
+    """
+    if not nuovo:
+        return {"ok": False, "forzato": False, "errore": "Stato mancante"}
+    if nuovo == stato_attuale:
+        return {"ok": True, "forzato": False, "errore": None}
+    ammessi = stati_successivi(stato_attuale, ruolo)
+    if nuovo in ammessi:
+        return {"ok": True, "forzato": False, "errore": None}
+    prossimi = ", ".join(ammessi) if ammessi else "nessuno"
+    if ruolo == "fattorino":
+        return {"ok": False, "forzato": False,
+                "errore": f"Da '{stato_attuale}' il fattorino puo' passare solo a: {prossimi}"}
+    if not forzato:
+        return {
+            "ok": False,
+            "forzato": False,
+            "errore": (f"Passaggio '{stato_attuale}' -> '{nuovo}' non previsto. "
+                       f"Da qui si va in: {prossimi}. Per una correzione volontaria "
+                       "ripeti la richiesta con force=true e un motivo."),
+        }
+    if not (motivo or "").strip():
+        return {"ok": False, "forzato": False,
+                "errore": "Per forzare il cambio di stato serve un motivo"}
+    return {"ok": True, "forzato": True, "errore": None}
+
+
+def orario_di_fase(stato: str) -> str | None:
+    return FASE_ORARI.get(stato)
+
+
+def build_phase_updates(stato: str, now_iso: str) -> dict:
+    """L'orario della fase che si sta aprendo (niente, per gli stati senza fase)."""
+    campo = FASE_ORARI.get(stato)
+    return {campo: now_iso} if campo else {}
+
+
+def build_force_updates(motivo: str, now_iso: str, actor_id: str) -> dict:
+    """I segni di una correzione voluta: chi, quando e perche'."""
+    return {
+        "status_forced_at": now_iso,
+        "status_forced_by": actor_id,
+        "status_forced_reason": (motivo or "").strip()[:200],
+    }

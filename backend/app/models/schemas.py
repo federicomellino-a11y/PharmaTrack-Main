@@ -120,6 +120,10 @@ class DeliveryUpdate(BaseModel):
     slot_to: Optional[str] = None
     priority: Optional[str] = None
     failure_reason: Optional[str] = None
+    # Correzione volontaria dello stato da parte della farmacia: senza force
+    # valgono solo i passaggi previsti.
+    force: Optional[bool] = None
+    force_reason: Optional[str] = None
 
 class MessageCreate(BaseModel):
     driver_id: str
