@@ -19,49 +19,15 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ensureArray } from '@/lib/collections';
+import {
+  buildUpdatedConversation,
+  dayLabel,
+  dedupeMessages,
+  formatConversationTime,
+  sameDay,
+} from '@/lib/chatMessages';
 import { confirmAction } from '../../components/ConfirmDialog';
 
-
-const sortMessages = (items = []) => [...items].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-const dedupeMessages = (items = []) => {
-  const seen = new Set();
-  return sortMessages(items.filter((item) => {
-    if (!item?.message_id || seen.has(item.message_id)) return false;
-    seen.add(item.message_id);
-    return true;
-  }));
-};
-
-const sameDay = (first, second) => new Date(first).toDateString() === new Date(second).toDateString();
-const dayLabel = (dateString) => {
-  const date = new Date(dateString);
-  const today = new Date();
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
-  if (date.toDateString() === today.toDateString()) return 'Oggi';
-  if (date.toDateString() === yesterday.toDateString()) return 'Ieri';
-  return date.toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' });
-};
-
-const formatConversationTime = (dateString) => {
-  if (!dateString) return '';
-  const date = new Date(dateString);
-  const today = new Date();
-  if (date.toDateString() === today.toDateString()) {
-    return date.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
-  }
-  return date.toLocaleDateString('it-IT', { day: '2-digit', month: 'short' });
-};
-
-const buildUpdatedConversation = (conversation, message, isCurrentConversation) => ({
-  ...conversation,
-  last_message: message.content,
-  last_message_at: message.created_at,
-  last_sender_type: message.sender_type,
-  unread_count: message.sender_type === 'driver' && !isCurrentConversation
-    ? (conversation.unread_count || 0) + 1
-    : 0,
-});
 
 export default function ChatPage() {
   const { driverId } = useParams();

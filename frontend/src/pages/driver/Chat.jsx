@@ -15,20 +15,10 @@ import { Badge } from '../../components/ui/badge';
 import { Send, Package, MessageSquare, LogOut, Building2, Wifi, WifiOff } from 'lucide-react';
 import { toast } from 'sonner';
 import { ensureArray } from '@/lib/collections';
+import { dedupeMessages, sameDay } from '@/lib/chatMessages';
 import { confirmAction } from '../../components/ConfirmDialog';
 
 
-const sortMessages = (items = []) => [...items].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-const dedupeMessages = (items = []) => {
-  const seen = new Set();
-  return sortMessages(items.filter((item) => {
-    if (!item?.message_id || seen.has(item.message_id)) return false;
-    seen.add(item.message_id);
-    return true;
-  }));
-};
-
-const sameDay = (first, second) => new Date(first).toDateString() === new Date(second).toDateString();
 const formatTime = (dateString) => new Date(dateString).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
 const formatDateLabel = (dateString) => {
   const date = new Date(dateString);
