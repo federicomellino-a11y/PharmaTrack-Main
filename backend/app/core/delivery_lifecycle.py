@@ -347,10 +347,6 @@ def valuta_cambio_stato(stato_attuale, nuovo, ruolo: str = "farmacia",
     return {"ok": True, "forzato": True, "errore": None}
 
 
-def orario_di_fase(stato: str) -> str | None:
-    return FASE_ORARI.get(stato)
-
-
 def build_phase_updates(stato: str, now_iso: str) -> dict:
     """L'orario della fase che si sta aprendo (niente, per gli stati senza fase)."""
     campo = FASE_ORARI.get(stato)

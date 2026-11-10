@@ -2,49 +2,29 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useDeliveriesQuery, useCustomersQuery, useDriversQuery } from '@/hooks/queries';
 import { ListSkeleton } from '../../components/Skeletons';
-import AddressAutocomplete from '../../components/AddressAutocomplete';
 import axios from 'axios';
 import { API } from '@/lib/config';
-import { FASCE, fasciaDi, testoFascia } from '@/lib/fasce';
-import { consegnaInRitardo } from '@/lib/deliveryDisplay';
+import { FASCE, fasciaDi } from '@/lib/fasce';
 import BarraConsegne from '../../components/deliveries/BarraConsegne';
 import ListaConsegne from '../../components/deliveries/ListaConsegne';
 import { costruisciCsv, scaricaCsv } from '@/lib/consegneCsv';
 import { Layout } from '../../components/Layout';
-import { Card, CardContent } from '../../components/ui/card';
-import { Button } from '../../components/ui/button';
-import { Input } from '../../components/ui/input';
-import { Label } from '../../components/ui/label';
-import { Textarea } from '../../components/ui/textarea';
-import { Badge } from '../../components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog';
-import { Tabs, TabsList, TabsTrigger } from '../../components/ui/tabs';
-import { ScrollArea } from '../../components/ui/scroll-area';
-import {
-  Search, Plus, Package, MapPin, Phone, User, Clock, Truck, CheckCircle2, XCircle,
-  Euro, CreditCard, Banknote, Calculator, Pencil, Calendar, AlertTriangle, Filter, RefreshCw, Printer, History, RotateCcw, Share2,
-  ClipboardCheck, ChevronRight, Download
-} from 'lucide-react';
+import { Dialog } from '../../components/ui/dialog';
+import { Filter } from 'lucide-react';
 import { toast } from 'sonner';
 
 // Il limite del piano arriva come 402: va spiegato, non mostrato come guasto.
 import printDeliverySlip from '@/lib/printDeliverySlip';
-import { formatDateTime } from '@/lib/format';
-import { STATUS_LABELS, STATUS_ICONS, PRIORITY_LABELS, PRIORITY_ICONS } from '@/lib/deliveryDisplay';
 const messaggioPiano = (errore, ripiego) =>
   errore?.response?.status === 402
     ? (errore.response.data?.detail || 'Limite del piano raggiunto.')
     : ripiego;
 import { useAuth } from '../../contexts/AuthContext';
 import { ensureArray } from '@/lib/collections';
-import { printDeliveryLabel } from '@/lib/printLabel';
 import useDeliveryForm, { normalizzaImporto } from '@/hooks/useDeliveryForm';
 import useAzioniConsegna from '@/hooks/useAzioniConsegna';
-import DeliveryRow from '../../components/deliveries/DeliveryRow';
 import CreaConsegnaDialog from '../../components/deliveries/CreaConsegnaDialog';
 import SegnaProntaDialog from '../../components/deliveries/SegnaProntaDialog';
-import { avanzamentoFarmacia } from '@/lib/deliveryActions';
 import { costruisciCorrezioneStato } from '@/lib/deliveryCorrection';
 import ModificaConsegnaDialog from '../../components/deliveries/ModificaConsegnaDialog';
 import AssegnaConsegnaDialog from '../../components/deliveries/AssegnaConsegnaDialog';

@@ -11,19 +11,11 @@ import { Layout } from '../../components/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
-import { Label } from '../../components/ui/label';
-import { Textarea } from '../../components/ui/textarea';
-import AddressAutocomplete from '../../components/AddressAutocomplete';
 import { Link } from 'react-router-dom';
 import { Badge } from '../../components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog';
+import { Dialog } from '../../components/ui/dialog';
 import { ScrollArea } from '../../components/ui/scroll-area';
-import {
-  Search, Plus, Pencil, Phone, MapPin, User, FileText,
-  Mail, Package, Clock, Euro, ArrowLeft,
-  CheckCircle2, XCircle, Navigation, ShieldCheck,
-  TrendingUp, Wallet, Activity, Sparkles, PlusCircle, X
-} from 'lucide-react';
+import { Search, Plus, Pencil, Phone, User, Mail, Package, Clock, Euro, ArrowLeft, CheckCircle2, XCircle, Navigation, ShieldCheck, TrendingUp } from 'lucide-react';
 import { toast } from 'sonner';
 import { ensureArray, ensureObject } from '@/lib/collections';
 import { confirmAction } from '../../components/ConfirmDialog';

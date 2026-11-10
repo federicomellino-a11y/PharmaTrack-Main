@@ -155,11 +155,5 @@ async def ensure_coords_with_source(address: Optional[str]) -> Tuple[Optional[fl
     return None, None, None
 
 
-async def ensure_coords(address: Optional[str]) -> Tuple[Optional[float], Optional[float]]:
-    """Compatibilita': solo (lat, lng)."""
-    lat, lng, _ = await ensure_coords_with_source(address)
-    return lat, lng
-
-
 # nome pubblico per i router: stessa logica di parsing ovunque
 split_address = _split

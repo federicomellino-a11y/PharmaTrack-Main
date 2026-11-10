@@ -9,12 +9,7 @@ import TestataFattorino from '../../components/driver/TestataFattorino';
 import CardTurno from '../../components/driver/CardTurno';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
-import { Avatar, AvatarFallback } from '../../components/ui/avatar';
-import {
-  Package, MapPin, Phone, Navigation, CheckCircle2, MessageSquare,
-  LogOut, RefreshCw, LocateFixed, ShieldAlert, MapPinned,
-  Play, Square, Euro, AlertCircle, Wallet, Clock
-} from 'lucide-react';
+import { Package, MapPin, Phone, Navigation, MessageSquare, LogOut, LocateFixed, ShieldAlert, MapPinned, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import { ETICHETTE_FATTORINO as statusLabels } from '@/lib/deliveryDisplay';
 import { ensureArray } from '@/lib/collections';

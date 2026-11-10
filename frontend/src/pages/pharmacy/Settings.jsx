@@ -6,7 +6,6 @@ import DatiFarmaciaCard from '../../components/settings/DatiFarmaciaCard';
 import NotificheCard from '../../components/settings/NotificheCard';
 import FunzioniProCard from '../../components/settings/FunzioniProCard';
 import StaffCard from '../../components/StaffCard';
-import AddressAutocomplete from '../../components/AddressAutocomplete';
 import { API } from '@/lib/config';
 import { ensureArray, ensureObject } from '@/lib/collections';
 import { useAuth } from '../../contexts/AuthContext';
@@ -15,28 +14,11 @@ import { useSocket } from '../../contexts/SocketContext';
 import { Layout } from '../../components/Layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
-import { Input } from '../../components/ui/input';
-import { Label } from '../../components/ui/label';
 import { Separator } from '../../components/ui/separator';
 import { Switch } from '../../components/ui/switch';
 import { Avatar, AvatarFallback, AvatarImage } from '../../components/ui/avatar';
 import { Badge } from '../../components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
-import { CreditCard,
-  Bell,
-  BellRing,
-  Building2,
-  Crown,
-  Lock,
-  MapPinned,
-  Moon,
-  Palette,
-  Save,
-  Shield,
-  Smartphone,
-  Sun,
-  User,
-} from 'lucide-react';
+import { Crown, Lock, MapPinned, Moon, Palette, Save, Shield, Smartphone, Sun, User } from 'lucide-react';
 import { toast } from 'sonner';
 import { usePWAInstall } from '@/hooks/usePWAInstall';
 import { InstallAppButton } from '@/components/InstallAppButton';

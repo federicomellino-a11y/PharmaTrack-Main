@@ -1,6 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
-import { API } from '@/lib/config';
 import { useQueryClient } from '@tanstack/react-query';
 import { useDeliveriesQuery, useDriversQuery } from '@/hooks/queries';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
@@ -13,9 +11,7 @@ import { Badge } from '../../components/ui/badge';
 import { ScrollArea } from '../../components/ui/scroll-area';
 import { useSocket } from '../../contexts/SocketContext';
 import { useAuth } from '../../contexts/AuthContext';
-import {
-  MapPin, Truck, Package, RefreshCw, AlertTriangle, LocateFixed, Building2
-} from 'lucide-react';
+import { MapPin, Truck, Package, RefreshCw, AlertTriangle, LocateFixed } from 'lucide-react';
 import { toast } from 'sonner';
 import 'leaflet/dist/leaflet.css';
 import { geocodeAddress as geocodeWithRateLimit } from '../../lib/geocoding';

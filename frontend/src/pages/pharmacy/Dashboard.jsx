@@ -12,10 +12,7 @@ import { Badge } from '../../components/ui/badge';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import {
-  Package, Users, Truck, Clock, CheckCircle2, Plus, UserPlus,
-  MapPin, TrendingUp, ArrowRight, AlertCircle, Euro, BarChart3, Wallet
-} from 'lucide-react';
+import { Package, Users, Truck, Clock, CheckCircle2, Plus, UserPlus, MapPin, TrendingUp, ArrowRight, AlertCircle, BarChart3, Wallet } from 'lucide-react';
 import { toast } from 'sonner';
 import 'leaflet/dist/leaflet.css';
 import { geocodeAddress as geocodeWithRateLimit } from '../../lib/geocoding';

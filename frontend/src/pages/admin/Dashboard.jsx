@@ -3,28 +3,7 @@ import axios from 'axios'
 import { useQueryClient } from '@tanstack/react-query'
 import { API } from '@/lib/config'
 import { chiavi, letture } from '@/lib/api'
-import {
-  ShieldCheck,
-  RefreshCw,
-  Users,
-  Truck,
-  Package,
-  Database,
-  Mail,
-  Building2,
-  Trash2,
-  LogOut,
-  Search,
-  Activity,
-  Eye,
-  Power,
-  Server,
-  Bell,
-  Clock3,
-  CheckCircle2,
-  AlertTriangle,
-  History,
-} from 'lucide-react'
+import { ShieldCheck, RefreshCw, Users, Truck, Package, Database, Mail, Building2, Trash2, LogOut, Search, Activity, Eye, Power, Server, Clock3, CheckCircle2, History } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card'
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
