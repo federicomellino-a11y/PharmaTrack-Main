@@ -4,6 +4,8 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Depends, Request
 
 from app.core.analisi_cliente import analisi_cliente
+from app.core.funzioni_pro import funzioni_sbloccate
+from app.core.piani import piano_corrente
 from app.core.delivery_lifecycle import FOLLOW_UP_STATUSES
 from app.core.database import db
 # (nessun uso di app.core.config)
@@ -141,9 +143,18 @@ async def get_customer_stats(customer_id: str, user: dict = Depends(get_current_
     else:
         media_farmacia = None
 
+    # L'analisi del singolo cliente è Pro: a prova finita il blocco non arriva
+    # (il resto della scheda deve continuare a funzionare), semplicemente non
+    # viene calcolato e il frontend mostra il lucchetto.
+    farmacia = await db.users.find_one(
+        {"user_id": user["user_id"]}, {"_id": 0, "piano": 1, "prova_scadenza": 1}
+    ) or {}
+    pro = funzioni_sbloccate(piano_corrente(farmacia))
+
     return {
         "customer": customer,
-        "analisi": analisi_cliente(deliveries, media_farmacia=media_farmacia),
+        "analisi": analisi_cliente(deliveries, media_farmacia=media_farmacia) if pro else None,
+        "pro": pro,
         "stats": {
             "total_deliveries": total_deliveries,
             "completed_deliveries": completed_deliveries,

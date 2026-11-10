@@ -7,7 +7,6 @@ import { API } from '@/lib/config';
 import { FASCE, fasciaDi } from '@/lib/fasce';
 import BarraConsegne from '../../components/deliveries/BarraConsegne';
 import ListaConsegne from '../../components/deliveries/ListaConsegne';
-import { costruisciCsv, scaricaCsv } from '@/lib/consegneCsv';
 import { consegneAperteDelCliente } from '@/lib/consegneAperte';
 import { Layout } from '../../components/Layout';
 import { Dialog } from '../../components/ui/dialog';
@@ -50,7 +49,6 @@ export default function DeliveriesPage() {
   const [activeCustomerIndex, setActiveCustomerIndex] = useState(-1);
   const customerInputRef = React.useRef(null);
   const [activeTab, setActiveTab] = useState('active');
-  const [repairing, setRepairing] = useState(false);
   const [filterDriver, setFilterDriver] = useState('all');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -294,34 +292,6 @@ export default function DeliveriesPage() {
     } catch { toast.error('Errore assegnazione'); }
   };
 
-  const repairCoordinates = async () => {
-    setRepairing(true);
-    try {
-      const { data } = await axios.post(`${API}/deliveries/repair-coordinates`, {}, { withCredentials: true });
-      if (!data?.checked) {
-        toast.info('Tutti gli indirizzi hanno già coordinate precise');
-      } else {
-        const extra = data.failed_count ? `, ${data.failed_count} non risolti` : '';
-        toast.success(`${data.fixed} indirizzi corretti${extra}`);
-      }
-      fetchData();
-    } catch {
-      toast.error('Riparazione indirizzi non riuscita');
-    } finally {
-      setRepairing(false);
-    }
-  };
-
-  const exportCsv = () => {
-    const rows = (sorted && sorted.length ? sorted : filtered) || [];
-    if (!rows.length) {
-      toast.info('Nessuna consegna da esportare');
-      return;
-    }
-    scaricaCsv(costruisciCsv(rows, safeDrivers));
-    toast.success(`${rows.length} consegne esportate`);
-  };
-
   const handleMarkPronta = async (e) => {
     e.preventDefault();
     if (!validateCashForm()) return;
@@ -463,7 +433,6 @@ export default function DeliveriesPage() {
           inAttesa={pendingCount}
           daConfermare={pendingConfirmCount}
           inAggiornamento={refreshing}
-          inRiparazione={repairing}
           cerca={searchTerm}
           fattorino={filterDriver}
           fattorini={safeDrivers}
@@ -472,8 +441,6 @@ export default function DeliveriesPage() {
           onNuova={() => { resetForm(); dialogOpenedAtRef.current = Date.now(); setDialogOpen(true); }}
           onCerca={setSearchTerm}
           onFattorino={setFilterDriver}
-          onEsporta={exportCsv}
-          onRipara={repairCoordinates}
           onScheda={setActiveTab}
         />
 

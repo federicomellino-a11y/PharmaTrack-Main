@@ -1,7 +1,7 @@
 import logging
 from fastapi import APIRouter, Depends
 
-from app.core.security import get_current_user
+from app.core.funzioni_pro import richiedi_pro
 from app.core.analytics import calcola_analytics
 from app.core.cache import cache_get, cache_set
 
@@ -11,7 +11,7 @@ router = APIRouter()
 
 
 @router.get("/analytics")
-async def get_analytics(period: str = "month", user: dict = Depends(get_current_user)):
+async def get_analytics(period: str = "month", user: dict = Depends(richiedi_pro("report_avanzati"))):
     """Aggregated KPIs for the pharmacy dashboard (cached)."""
     pharmacy_id = user["user_id"]
 

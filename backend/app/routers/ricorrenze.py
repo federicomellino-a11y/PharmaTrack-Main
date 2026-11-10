@@ -14,8 +14,8 @@ from pydantic import BaseModel, Field
 
 from app.core.database import db
 from app.core.fasce import valida_fascia
+from app.core.funzioni_pro import richiedi_pro
 from app.core.ricorrenze import GIORNI_RICHIAMO, raggruppa, ultimo_ordine_per_cliente
-from app.core.security import get_current_user
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -47,7 +47,7 @@ async def _consegne_recenti(pharmacy_id: str):
 
 
 @router.get("/ricorrenze")
-async def elenco_ricorrenze(giorni: int = GIORNI_RICHIAMO, user: dict = Depends(get_current_user)):
+async def elenco_ricorrenze(giorni: int = GIORNI_RICHIAMO, user: dict = Depends(richiedi_pro("ricorrenze"))):
     """Le tre liste del banco: da fare ora, in arrivo, pazienti spariti."""
     if giorni < 7 or giorni > 365:
         raise HTTPException(status_code=422, detail="I giorni del richiamo stanno fra 7 e 365")
@@ -62,7 +62,7 @@ async def elenco_ricorrenze(giorni: int = GIORNI_RICHIAMO, user: dict = Depends(
 
 
 @router.put("/ricorrenze/{customer_id}")
-async def imposta_ricorrenza(customer_id: str, dati: RicorrenzaIn, user: dict = Depends(get_current_user)):
+async def imposta_ricorrenza(customer_id: str, dati: RicorrenzaIn, user: dict = Depends(richiedi_pro("ricorrenze"))):
     """Imposta o modifica la ricorrenza di un paziente."""
     cliente = await db.customers.find_one(
         {"customer_id": customer_id, "pharmacy_id": user["user_id"]}, {"_id": 0, "customer_id": 1}
@@ -95,7 +95,7 @@ async def imposta_ricorrenza(customer_id: str, dati: RicorrenzaIn, user: dict = 
 
 
 @router.delete("/ricorrenze/{customer_id}")
-async def togli_ricorrenza(customer_id: str, user: dict = Depends(get_current_user)):
+async def togli_ricorrenza(customer_id: str, user: dict = Depends(richiedi_pro("ricorrenze"))):
     """Spegne la ricorrenza. Il paziente torna a essere un cliente normale."""
     esito = await db.customers.update_one(
         {"customer_id": customer_id, "pharmacy_id": user["user_id"]},

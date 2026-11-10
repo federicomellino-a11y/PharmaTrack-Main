@@ -7,9 +7,8 @@ import {
   Tooltip, ResponsiveContainer,
 } from 'recharts';
 import { Button } from '../../components/ui/button';
-import { Euro, Package, TrendingUp, Truck, CreditCard, Trophy, Download, CheckCircle2, Clock, XCircle, Users, BarChart3, Printer } from 'lucide-react';
+import { Euro, Package, TrendingUp, Truck, CreditCard, Trophy, CheckCircle2, Clock, XCircle, Users, BarChart3, Printer } from 'lucide-react';
 import { Badge } from '../../components/ui/badge';
-import { toast } from 'sonner';
 import { ensureArray } from '@/lib/collections';
 import { useAnalyticsQuery } from '@/hooks/queries';
 import { ListSkeleton } from '../../components/Skeletons';
@@ -31,52 +30,6 @@ const shortDate = (iso) => {
   if (!iso) return '';
   const [, m, d] = iso.split('-');
   return `${d}/${m}`;
-};
-
-const exportCSV = (data, period) => {
-  if (!data) { toast.error('Nessun dato da esportare'); return; }
-  const s = data.summary || {};
-  const rows = [];
-  rows.push(['PharmaTrack - Analytics']);
-  rows.push([`Periodo: ${periodLabels[period] || period}`]);
-  rows.push([`Generato il: ${new Date().toLocaleString('it-IT')}`]);
-  rows.push([]);
-  rows.push(['RIEPILOGO']);
-  rows.push(['Fatturato totale', `€${(s.total_revenue || 0).toFixed(2)}`]);
-  rows.push(['Consegne completate', s.delivered_count || 0]);
-  rows.push(['Consegne totali', s.total_deliveries || 0]);
-  rows.push(['Tasso completamento', `${s.completion_rate || 0}%`]);
-  rows.push(['Valore medio ordine', `€${(s.avg_order_value || 0).toFixed(2)}`]);
-  rows.push([]);
-  const daily = ensureArray(data.daily_revenue);
-  if (daily.length) {
-    rows.push(['FATTURATO GIORNALIERO']);
-    rows.push(['Data', 'Fatturato', 'Consegne']);
-    daily.forEach((r) => rows.push([r.date, `€${(r.revenue || 0).toFixed(2)}`, r.count]));
-    rows.push([]);
-  }
-  const top = ensureArray(data.top_customers);
-  if (top.length) {
-    rows.push(['TOP CLIENTI']);
-    rows.push(['Nome', 'Consegne', 'Fatturato']);
-    top.forEach((c) => rows.push([c.name, c.deliveries, `€${(c.revenue || 0).toFixed(2)}`]));
-    rows.push([]);
-  }
-  const drv = ensureArray(data.driver_performance);
-  if (drv.length) {
-    rows.push(['PERFORMANCE FATTORINI']);
-    rows.push(['Nome', 'Consegne', 'Fatturato gestito']);
-    drv.forEach((d) => rows.push([d.name, d.deliveries, `€${(d.revenue || 0).toFixed(2)}`]));
-  }
-  const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
-  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = `pharmatrack-analytics-${period}-${new Date().toISOString().slice(0, 10)}.csv`;
-  link.click();
-  URL.revokeObjectURL(url);
-  toast.success('CSV esportato con successo');
 };
 
 const KpiCard = ({ label, value, sub, icon: Icon, tint }) => (
@@ -153,9 +106,6 @@ export default function ReportsPage() {
             <p className="text-muted-foreground">Andamento fatturato e performance del team</p>
           </div>
           <div className="flex items-center gap-3">
-            <Button variant="outline" size="sm" onClick={() => exportCSV(data, period)} className="gap-2" data-testid="export-csv-btn">
-              <Download className="w-4 h-4" />Esporta CSV
-            </Button>
           <Button
             variant="outline"
             size="sm"
