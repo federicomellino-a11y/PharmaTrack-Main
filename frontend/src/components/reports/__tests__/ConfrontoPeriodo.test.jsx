@@ -14,9 +14,9 @@ describe('ConfrontoPeriodo', () => {
   afterEach(cleanup);
 
   it('mostra le percentuali del periodo prima', () => {
-    render(<ConfrontoPeriodo confronto={confronto} clienti={{ totali: 10, nuovi: 2, di_ritorno: 8, spesa_media: 96 }} etichettaPeriodo="Mese" />);
+    render(<ConfrontoPeriodo confronto={confronto} etichettaPeriodo="Mese" />);
     expect(document.body.textContent).toContain('+20%');
-    expect(screen.getAllByText('Fatturato').length).toBeGreaterThan(0);
+    expect(screen.getByText('Fatturato')).toBeTruthy();
     expect(screen.getByText('Confronto con il mese prima')).toBeTruthy();
     expect(document.body.textContent).toContain('era 800,00');
   });
@@ -25,17 +25,9 @@ describe('ConfrontoPeriodo', () => {
     render(
       <ConfrontoPeriodo
         confronto={{ previous: { total_revenue: 0, delivered_count: 0, avg_order_value: 0 }, delta: { revenue_pct: null, count_pct: null, avg_order_pct: null } }}
-        clienti={{ totali: 0, nuovi: 0, di_ritorno: 0, spesa_media: 0 }}
         etichettaPeriodo="Settimana"
       />,
     );
     expect(screen.getAllByText('niente da confrontare')).toHaveLength(3);
-  });
-
-  it('dice quanti pazienti sono nuovi', () => {
-    render(<ConfrontoPeriodo confronto={confronto} clienti={{ totali: 10, nuovi: 3, di_ritorno: 7, spesa_media: 96 }} etichettaPeriodo="Mese" />);
-    expect(screen.getByText('3')).toBeTruthy();
-    expect(screen.getByText('7')).toBeTruthy();
-    expect(document.body.textContent).toContain('30% del totale');
   });
 });
