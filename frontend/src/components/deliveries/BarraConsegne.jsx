@@ -1,4 +1,4 @@
-import { Download, Euro, Filter, MapPin, Plus, RefreshCw, Search } from 'lucide-react';
+import { Euro, Filter, Plus, RefreshCw, Search } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
@@ -13,7 +13,6 @@ export default function BarraConsegne({
   inAttesa = 0,
   daConfermare = 0,
   inAggiornamento = false,
-  inRiparazione = false,
   cerca = '',
   fattorino = 'all',
   fattorini = [],
@@ -22,8 +21,6 @@ export default function BarraConsegne({
   onNuova,
   onCerca,
   onFattorino,
-  onEsporta,
-  onRipara,
   onScheda,
 }) {
   return (
@@ -72,26 +69,6 @@ export default function BarraConsegne({
         ))}
       </SelectContent>
     </Select>
-    <Button
-      variant="outline"
-      size="sm"
-      className="h-10 sm:h-9 w-full sm:w-auto"
-      onClick={onEsporta}
-      data-testid="export-deliveries-csv"
-    >
-      <Download className="w-4 h-4 mr-1.5" />Esporta CSV
-    </Button>
-    <Button
-      variant="outline"
-      size="sm"
-      className="h-10 sm:h-9 w-full sm:w-auto"
-      onClick={onRipara}
-      disabled={inRiparazione}
-      title="Ricalcola le coordinate delle consegne aperte con indirizzi approssimativi"
-      data-testid="repair-coordinates"
-    >
-      <MapPin className="w-4 h-4 mr-1.5" />{inRiparazione ? 'Riparo...' : 'Ripara indirizzi'}
-    </Button>
     <Tabs value={scheda} onValueChange={onScheda} className="w-full sm:w-auto">
       <TabsList className="h-10 sm:h-9 w-full sm:w-auto">
         <TabsTrigger value="active" className="flex-1 sm:flex-none text-[11px] sm:text-xs px-2 sm:px-3">Attive {attive > 0 && <span className="ml-1 px-1.5 py-0 text-[10px] rounded-full bg-primary/15 text-primary font-bold">{attive}</span>}</TabsTrigger>

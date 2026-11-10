@@ -5,6 +5,7 @@ import PianoCard from '../../components/settings/PianoCard';
 import DatiFarmaciaCard from '../../components/settings/DatiFarmaciaCard';
 import NotificheCard from '../../components/settings/NotificheCard';
 import FunzioniProCard from '../../components/settings/FunzioniProCard';
+import EsportaCard from '../../components/settings/EsportaCard';
 import StaffCard from '../../components/StaffCard';
 import { API } from '@/lib/config';
 import { ensureArray, ensureObject } from '@/lib/collections';
@@ -211,6 +212,9 @@ export default function SettingsPage() {
         vicinoAlTetto,
         }}
       />
+
+      <EsportaCard piano={piano} />
+
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2"><User className="w-5 h-5 text-primary" />Profilo Account</CardTitle>
