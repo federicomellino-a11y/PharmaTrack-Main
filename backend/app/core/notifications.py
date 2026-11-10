@@ -194,6 +194,7 @@ async def remove_push_subscription(user_id: str, user_type: str, payload: dict) 
 EVENTI_NOTIFICHE = {
     "delivery": "Consegne",
     "shift": "Turni",
+    "message": "Messaggi",
 }
 
 
@@ -221,8 +222,56 @@ def notifiche_browser_accese(user: dict) -> bool:
     return ((user or {}).get("settings") or {}).get("notifications_enabled", True) is not False
 
 
+# Ore di silenzio: se la farmacia non compila niente, valgono queste. Il
+# silenzio comincia la sera e finisce la mattina, quindi scavalca la mezzanotte.
+SILENZIO_DA_DEFAULT = "21:30"
+SILENZIO_A_DEFAULT = "07:30"
+
+
+def _minuti_da_orario(valore) -> Optional[int]:
+    """'21:30' -> 1290. Qualunque altra cosa -> None (e il silenzio non si applica)."""
+    try:
+        ore, minuti = str(valore).strip().split(":")[:2]
+        ore, minuti = int(ore), int(minuti)
+    except (TypeError, ValueError):
+        return None
+    if not (0 <= ore <= 23 and 0 <= minuti <= 59):
+        return None
+    return ore * 60 + minuti
+
+
+def in_orario_silenzio(settings: dict, adesso: Optional[datetime] = None) -> bool:
+    """Vero se adesso la farmacia non vuole essere svegliata.
+
+    Vale per le push, cioe' per il telefono che suona: la campanella dentro
+    l'app resta, cosi' aprendo si trova comunque cosa e' successo. Un orario
+    scritto male non silenzia niente: meglio un avviso di troppo che una
+    consegna persa per un campo vuoto.
+    """
+    impostazioni = settings or {}
+    if impostazioni.get("silenzio_attivo") is not True:
+        return False
+    da = _minuti_da_orario(impostazioni.get("silenzio_da") or SILENZIO_DA_DEFAULT)
+    a = _minuti_da_orario(impostazioni.get("silenzio_a") or SILENZIO_A_DEFAULT)
+    if da is None or a is None or da == a:
+        return False
+    if adesso is None:
+        from app.core.clock import adesso as adesso_italia
+        adesso = adesso_italia()
+    elif adesso.tzinfo is None:
+        from app.core.clock import ROME_TZ
+        adesso = adesso.replace(tzinfo=ROME_TZ)
+    else:
+        from app.core.clock import ROME_TZ
+        adesso = adesso.astimezone(ROME_TZ)
+    ora = adesso.hour * 60 + adesso.minute
+    if da < a:
+        return da <= ora < a
+    return ora >= da or ora < a
+
+
 async def _impostazioni_destinatario(user_id: str, user_type: str) -> dict:
-    """Farmacia e staff condividono le preferenze del titolare; il fattorino no."""
+    """Il fattorino non ha le preferenze della farmacia: solo la farmacia le ha."""
     if user_type != "pharmacy":
         return {}
     utente = await db.users.find_one({"user_id": user_id}, {"settings": 1, "_id": 0})
@@ -233,11 +282,18 @@ async def send_web_push_notifications(user_id: str, user_type: str, notif_data: 
     if not push_notifications_enabled():
         return {"sent": 0, "disabled": True}
 
+    impostazioni = await _impostazioni_destinatario(user_id, user_type)
+
     # Chi ha spento le notifiche browser resta senza push, ma continua a vedere
     # la campanella: le due cose sono sempre state due interruttori diversi e
     # finora il secondo non veniva guardato da nessuno.
-    if not notifiche_browser_accese(await _impostazioni_destinatario(user_id, user_type)):
+    if not notifiche_browser_accese(impostazioni):
         return {"sent": 0, "disabled": True, "motivo": "notifiche spente dall'utente"}
+
+    # Non disturbare: di notte il telefono tace, l'avviso resta in app. Vale
+    # solo per la farmacia, che e' l'unica ad avere un orario di lavoro.
+    if user_type == "pharmacy" and in_orario_silenzio(impostazioni):
+        return {"sent": 0, "disabled": True, "motivo": "orario di non disturbo"}
 
     subscriptions = await db.push_subscriptions.find({"user_id": user_id, "user_type": user_type}, {"_id": 0}).to_list(50)
     if not subscriptions:

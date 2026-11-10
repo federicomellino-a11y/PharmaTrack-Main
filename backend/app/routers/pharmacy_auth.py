@@ -414,8 +414,8 @@ async def change_password(request: Request, data: ChangePasswordRequest, user: d
     Chiude anche le altre sessioni: se la password era nota a qualcun altro,
     quel qualcuno non deve restare dentro con la sessione gia' aperta.
     """
-    # L'account vero e' quello della sessione: per un operatore di staff
-    # user["user_id"] e' il titolare, e la password da cambiare e' la sua.
+    # La password da cambiare e' quella dell'account della sessione: si
+    # rilegge dal token, non da user["user_id"], che arriva dal DB.
     righe, token_corrente = await _sessioni_utente(request)
     corrente = next((r for r in righe if r.get("session_token") == token_corrente), None)
     if not corrente:

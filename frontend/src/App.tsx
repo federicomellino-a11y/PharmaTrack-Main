@@ -12,6 +12,7 @@ import { AdminAuthProvider, useAdminAuth } from './contexts/AdminAuthContext'
 import { SocketProvider } from './contexts/SocketContext'
 import ErrorBoundary from './components/ErrorBoundary'
 import ProGate from './components/ProGate'
+import FunzioneGate from './components/FunzioneGate'
 import './App.css'
 
 const LandingPage = lazyWithRetry(() => import('./pages/LandingPage'))
@@ -150,13 +151,13 @@ const AppRouter = () => (
     <Route path="/dock" element={<PharmacyProtectedPage><DockPage /></PharmacyProtectedPage>} />
     <Route path="/t/:token" element={<PublicTrackingPage />} />
     <Route path="/drivers" element={<PharmacyProtectedPage><DriversPage /></PharmacyProtectedPage>} />
-    <Route path="/chat" element={<PharmacyProtectedPage><ChatPage /></PharmacyProtectedPage>} />
-    <Route path="/chat/:driverId" element={<PharmacyProtectedPage><ChatPage /></PharmacyProtectedPage>} />
+    <Route path="/chat" element={<PharmacyProtectedPage><FunzioneGate funzione="chat"><ChatPage /></FunzioneGate></PharmacyProtectedPage>} />
+    <Route path="/chat/:driverId" element={<PharmacyProtectedPage><FunzioneGate funzione="chat"><ChatPage /></FunzioneGate></PharmacyProtectedPage>} />
     <Route path="/archive" element={<PharmacyProtectedPage><ArchivePage /></PharmacyProtectedPage>} />
     <Route path="/reports" element={<PharmacyProtectedPage><ProGate funzione="report_avanzati"><ReportsPage /></ProGate></PharmacyProtectedPage>} />
-    <Route path="/doctors" element={<PharmacyProtectedPage><DoctorsPage /></PharmacyProtectedPage>} />
-    <Route path="/useful-numbers" element={<PharmacyProtectedPage><UsefulNumbersPage /></PharmacyProtectedPage>} />
-    <Route path="/notes" element={<PharmacyProtectedPage><NotesPage /></PharmacyProtectedPage>} />
+    <Route path="/doctors" element={<PharmacyProtectedPage><FunzioneGate funzione="medici"><DoctorsPage /></FunzioneGate></PharmacyProtectedPage>} />
+    <Route path="/useful-numbers" element={<PharmacyProtectedPage><FunzioneGate funzione="numeri_utili"><UsefulNumbersPage /></FunzioneGate></PharmacyProtectedPage>} />
+    <Route path="/notes" element={<PharmacyProtectedPage><FunzioneGate funzione="block_notes"><NotesPage /></FunzioneGate></PharmacyProtectedPage>} />
     <Route path="/shifts" element={<PharmacyProtectedPage><ProGate funzione="turni_cassa"><ShiftsPage /></ProGate></PharmacyProtectedPage>} />
     <Route path="/integrations" element={<PharmacyProtectedPage><IntegrationsPage /></PharmacyProtectedPage>} />
     <Route path="/settings" element={<PharmacyProtectedPage><SettingsPage /></PharmacyProtectedPage>} />

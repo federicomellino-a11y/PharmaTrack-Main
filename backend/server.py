@@ -24,7 +24,7 @@ from app.routers import (
     health, pharmacy_auth, admin, driver_auth, customers, drivers,
     deliveries, driver_deliveries, messages, notifications, statistics,
     archive, doctors, useful_numbers, notes, reports, integrations, shifts,
-    analytics, photos, client_errors, csp_reports, admin_db, plan, staff, ricorrenze,
+    analytics, photos, client_errors, csp_reports, admin_db, plan, ricorrenze,
 )
 from app.core.security_middleware import SecurityHeadersMiddleware
 
@@ -107,7 +107,7 @@ _ROUTER_TAGS = {
     "messages": "messages", "notifications": "notifications", "statistics": "statistics",
     "archive": "archive", "doctors": "doctors", "useful_numbers": "useful-numbers",
     "notes": "notes", "reports": "reports", "integrations": "integrations", "shifts": "shifts",
-    "analytics": "analytics", "csp_reports": "csp", "admin_db": "admin-db", "staff": "staff", "plan": "plan",
+    "analytics": "analytics", "csp_reports": "csp", "admin_db": "admin-db", "plan": "plan",
     "ricorrenze": "ricorrenze",
 }
 api_router = APIRouter(prefix="/api")
@@ -116,7 +116,7 @@ for module in [
     health, pharmacy_auth, admin, driver_auth, customers, drivers,
     deliveries, driver_deliveries, messages, notifications, statistics,
     archive, doctors, useful_numbers, notes, reports, integrations, shifts,
-    analytics, photos, client_errors, csp_reports, admin_db, geocode_router, plan, staff,
+    analytics, photos, client_errors, csp_reports, admin_db, geocode_router, plan,
     ricorrenze,
 ]:
     tag = _ROUTER_TAGS.get(module.__name__.split(".")[-1])

@@ -35,14 +35,26 @@ export const MODULO_VUOTO = {
     force_reason: '',
 };
 
-export default function useDeliveryForm() {
-  const [form, setForm] = useState(MODULO_VUOTO);
-  const [fasciaScelta, setFasciaScelta] = useState('subito');
+/* La fascia iniziale arriva dalle impostazioni della farmacia
+   (settings.fascia_predefinita): chi consegna sempre il pomeriggio trova il
+   modulo gia' sul pomeriggio. Senza impostazioni resta "La prima possibile",
+   che e' quello che l'app faceva prima di avere una scelta. */
+export default function useDeliveryForm({ fasciaIniziale, dataIniziale } = {}) {
+  const valoreIniziale = fasciaIniziale?.valore || 'subito';
+  const conFascia = fasciaIniziale?.da && fasciaIniziale.da !== '__manuale__'
+    ? { ...MODULO_VUOTO, scheduled_time: fasciaIniziale.da, slot_to: fasciaIniziale.a || null }
+    : { ...MODULO_VUOTO };
+  // La data che la farmacia consegna davvero (Impostazioni > Consegne): cosi'
+  // il modulo non propone una domenica a chi non lavora la domenica.
+  const moduloIniziale = dataIniziale ? { ...conFascia, scheduled_date: dataIniziale } : conFascia;
+
+  const [form, setForm] = useState(moduloIniziale);
+  const [fasciaScelta, setFasciaScelta] = useState(valoreIniziale);
 
   const reset = useCallback(() => {
-    setForm(MODULO_VUOTO);
-    setFasciaScelta('subito');
-  }, []);
+    setForm(moduloIniziale);
+    setFasciaScelta(valoreIniziale);
+  }, [moduloIniziale, valoreIniziale]);
 
   const amountValue = normalizzaImporto(form.amount);
   const amountGivenValue = normalizzaImporto(form.amount_given);
