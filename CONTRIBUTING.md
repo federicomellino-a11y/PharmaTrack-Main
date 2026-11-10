@@ -39,9 +39,13 @@ git checkout -b fix/cosa-sto-sistemando
 
 # ... modifica ...
 
-# Frontend
+# Tutto in un comando, con il riepilogo controllo per controllo
+./verifica.sh
+# e prima di una modifica che tocca il frontend, anche:
+./verifica.sh --completo     # aggiunge gli E2E sul build nuovo
+
+# oppure i singoli pezzi
 cd frontend && npm run lint && npm run typecheck && npm test && npm run build && cd ..
-# Backend
 cd backend && python -m pytest tests/unit -q && cd ..
 
 git add -A
@@ -111,8 +115,8 @@ Merge con **squash**: la storia di `main` resta una riga per modifica.
 
 ## 4. Checklist prima di aprire la pull request
 
-- [ ] `npm run lint`, `npm run typecheck`, `npm test`, `npm run build` verdi
-- [ ] `python -m pytest tests/unit -q` verde
+- [ ] `./verifica.sh` verde (lint, tipi, test unitari, build)
+- [ ] `./verifica.sh --completo` verde se ho toccato il frontend (aggiunge gli E2E)
 - [ ] se ho toccato i pin Python: installazione in venv pulito, e dopo il merge
       controllo del deploy Render
 - [ ] nessun `console.log`, nessun `TODO`, nessun file nuovo senza chiamante

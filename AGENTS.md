@@ -27,6 +27,16 @@ passo; qui ci sono le regole e il perché.
 
 ## Comandi
 
+Il controllo che vale prima di aprire una pull request è uno:
+
+```bash
+./verifica.sh              # lint, tipi, test unitari, build (un minuto)
+./verifica.sh --completo   # aggiunge gli E2E sul build appena fatto
+```
+
+Esce 0 solo se è tutto verde, e stampa il riepilogo controllo per controllo.
+I comandi singoli, quando serve guardare un pezzo solo:
+
 ```bash
 # Frontend (da frontend/)
 npm ci                 # una volta
