@@ -5,6 +5,7 @@ import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Textarea } from '../ui/textarea';
 import { FASCE } from '@/lib/fasce';
+import { avvisoConsegnaAperta } from '@/lib/consegneAperte';
 import { formatCurrency } from '@/lib/format';
 import { Package, Plus, Search, User, XCircle } from 'lucide-react';
 
@@ -13,8 +14,11 @@ import { Package, Plus, Search, User, XCircle } from 'lucide-react';
    Estratto da Deliveries.jsx: stava nella stessa pagina della lista e degli altri
    quattro dialoghi. Riceve dallo stato della pagina solo cio' che usa.
 */
-export default function CreaConsegnaDialog({ modulo, activeCustomerIndex, applicaFascia, customerDropdownOpen, customerInputRef, customerSearchTerm, dialogCustomers, dialogOpen, frequentCustomers, handleCreate, openCreateCustomer, resetForm, selectCustomer, selectedCustomer, setActiveCustomerIndex, setCustomerDropdownOpen, setCustomerSearchTerm, setDialogOpen }) {
+export default function CreaConsegnaDialog({ consegneAperte = [], modulo, activeCustomerIndex, applicaFascia, customerDropdownOpen, customerInputRef, customerSearchTerm, dialogCustomers, dialogOpen, frequentCustomers, handleCreate, openCreateCustomer, resetForm, selectCustomer, selectedCustomer, setActiveCustomerIndex, setCustomerDropdownOpen, setCustomerSearchTerm, setDialogOpen }) {
   const { form, setForm, fasciaScelta, change_due } = modulo;
+  // Un cliente che ha gia' una consegna in corso: si dice mentre si compila,
+  // non dopo, quando il server risponde 409.
+  const avviso = avvisoConsegnaAperta(consegneAperte);
 
 
 
@@ -40,6 +44,7 @@ export default function CreaConsegnaDialog({ modulo, activeCustomerIndex, applic
                 </Button>
               </div>
               {selectedCustomer ? (
+                <>
                 <div className="flex items-center gap-3 p-3 rounded-xl bg-primary/5 border border-primary/20">
                   <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                     <User className="w-4 h-4 text-primary" />
@@ -56,6 +61,16 @@ export default function CreaConsegnaDialog({ modulo, activeCustomerIndex, applic
                     <XCircle className="w-4 h-4" />
                   </Button>
                 </div>
+                {avviso && (
+                  <p
+                    className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] leading-snug text-amber-700 dark:text-amber-400"
+                    data-testid="avviso-consegna-aperta"
+                  >
+                    <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
+                    {avviso}
+                  </p>
+                )}
+                </>
               ) : (
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground z-10 pointer-events-none" />

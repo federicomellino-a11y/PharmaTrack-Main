@@ -17,3 +17,15 @@ export const fasciaDi = (da, a) => {
 };
 
 export const testoFascia = (da, a) => (da ? (a ? `${da}–${a}` : da) : null);
+
+/* La promessa come va letta dal paziente: il giorno prima della fascia.
+
+   "15:00–18:00" da solo non risponde alla domanda che il paziente fa davvero
+   ("quando arriva?"): puo' essere oggi o dopodomani. Se la consegna non ha una
+   fascia ma il giorno e' oggi o domani, il giorno da solo vale la pena; una
+   data vecchia senza fascia no, sarebbe una promessa che nessuno ha fatto.
+*/
+export const testoPromessa = (giorno, fascia) => {
+  if (fascia) return [giorno, fascia].filter(Boolean).join(' ');
+  return ['oggi', 'domani'].includes(giorno) ? giorno : null;
+};

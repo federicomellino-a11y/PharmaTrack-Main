@@ -9,6 +9,7 @@ from app.core.security import (
 )
 from app.core.cache import cache_get, cache_set
 from app.core.delivery_lifecycle import BILLED_STATUSES, STATI_CONSEGNATI
+from app.core.reporting import minuti_consegna
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -65,6 +66,28 @@ async def get_statistics(user: dict = Depends(get_current_user)):
             "priority": level,
             "status": {"$nin": ["delivered", "cancelled", "not_delivered"]},
         })
+    # --- Il mese in corso: la frase che il titolare ripete al telefono ---
+    # "Questo mese: 312 consegne, 4.210 euro, 14 minuti di media." I dati
+    # esistevano sparsi fra report e turni; qui si leggono in un numero solo.
+    inizio_mese = now_local.replace(day=1, hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc)
+    mese = {"deliveries": 0, "revenue": 0.0, "avg_minutes": None}
+    durate = []
+    for consegna in await db.deliveries.find(
+        {
+            "pharmacy_id": pharmacy_id,
+            "status": {"$in": list(BILLED_STATUSES)},
+            "actual_delivery": {"$gte": inizio_mese.isoformat()},
+        },
+        {"_id": 0, "amount": 1, "created_at": 1, "actual_delivery": 1},
+    ).to_list(5000):
+        mese["deliveries"] += 1
+        mese["revenue"] = round(mese["revenue"] + (consegna.get("amount") or 0), 2)
+        minuti = minuti_consegna(consegna.get("created_at"), consegna.get("actual_delivery"))
+        if minuti is not None:
+            durate.append(minuti)
+    if durate:
+        mese["avg_minutes"] = int(round(sum(durate) / len(durate)))
+
     result = {
         "customers": {"total": total_customers},
         "drivers": {"total": total_drivers, "active": active_drivers},
@@ -72,6 +95,7 @@ async def get_statistics(user: dict = Depends(get_current_user)):
         "weekly": weekly_data,
         "priority": priority_breakdown,
         "today_money": incasso_oggi,
+        "month": mese,
     }
     await cache_set(cache_key, result)
     return result

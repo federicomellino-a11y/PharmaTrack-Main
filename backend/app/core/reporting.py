@@ -3,6 +3,26 @@
 Sta fuori dal router per due motivi: si puo' verificare con test unitari senza
 FastAPI ne' database, e la rotta resta leggibile.
 """
+from datetime import datetime
+
+# Oltre dodici ore non e' piu' un tempo di consegna: e' una consegna rimasta
+# aperta, o una data scritta male. La stessa soglia vale nei tempi per fattorino.
+TETTO_MINUTI = 720
+
+
+def minuti_consegna(created_at, actual_delivery, tetto: int = TETTO_MINUTI):
+    """Minuti fra apertura e consegna. None se le date non si leggono o sono assurde."""
+    if not created_at or not actual_delivery:
+        return None
+    try:
+        inizio = datetime.fromisoformat(str(created_at).replace("Z", "+00:00"))
+        fine = datetime.fromisoformat(str(actual_delivery).replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+    minuti = (fine - inizio).total_seconds() / 60.0
+    if minuti <= 0 or minuti > tetto:
+        return None
+    return minuti
 
 
 def aggregate_report_totals(deliveries: list) -> dict:

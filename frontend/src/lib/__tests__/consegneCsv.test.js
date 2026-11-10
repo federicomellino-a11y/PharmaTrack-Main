@@ -47,4 +47,21 @@ describe('costruisciCsv', () => {
   it('con un elenco vuoto resta solo l intestazione', () => {
     expect(costruisciCsv([]).split('\n')).toHaveLength(1);
   });
+
+  // Il commercialista ricostruisce la giornata dalla promessa, non dalla data
+  // di inserimento: senza queste due colonne il foglio non gli basta.
+  it('porta con se la data prevista e la fascia promessa', () => {
+    const conFascia = { ...consegna, scheduled_date: '2026-11-10', scheduled_time: '15:00', slot_to: '18:00' };
+    const righe = costruisciCsv([conFascia]).split('\n');
+    expect(righe[0]).toContain('Data prevista');
+    expect(righe[0]).toContain('Fascia');
+    expect(righe[1]).toContain('"2026-11-10"');
+    expect(righe[1]).toContain('"15:00–18:00"');
+  });
+
+  it('una consegna senza fascia lascia le colonne vuote invece di rompere le virgole', () => {
+    const righe = costruisciCsv([consegna]).split('\n');
+    const colonne = righe[1].split('","');
+    expect(colonne).toHaveLength(16);
+  });
 });

@@ -10,6 +10,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { toast } from 'sonner';
+import { avvisoConsegnaAperta, consegneAperteDelCliente } from '@/lib/consegneAperte';
 import { Search, User, Plus, Package, CheckCircle2, Zap, Banknote, CreditCard } from 'lucide-react';
 
 const PRIORITIES = [
@@ -123,11 +124,12 @@ export default function QuickAddPage() {
 
   // Lo stesso cliente due volte in un giorno e' quasi sempre un doppione: si
   // vede prima di premere, non dopo (il server lo blocca a consegna creata).
-  const consegneAperte = useMemo(() => {
-    if (!selectedCustomer) return [];
-    return ensureArrayLocal(deliveries).filter((d) => d.customer_id === selectedCustomer.customer_id
-      && !['delivered', 'cancelled', 'not_delivered'].includes(d.status));
-  }, [deliveries, selectedCustomer]);
+  // La regola sta in lib/consegneAperte.js: qui e in Consegne deve dire lo stesso.
+  const consegneAperte = useMemo(
+    () => consegneAperteDelCliente(ensureArrayLocal(deliveries), selectedCustomer?.customer_id),
+    [deliveries, selectedCustomer]
+  );
+  const avviso = avvisoConsegnaAperta(consegneAperte);
 
   const selectCustomer = (c) => {
     setSelectedCustomer(c);
@@ -263,13 +265,11 @@ export default function QuickAddPage() {
                     </p>
                   </div>
                 </div>
-                {consegneAperte.length > 0 && (
+                {avviso && (
                   <div className="mt-2 flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2" data-testid="avviso-consegna-aperta">
                     <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
                     <p className="text-[11px] leading-snug text-amber-700 dark:text-amber-400">
-                      {consegneAperte.length === 1
-                        ? "Questo cliente ha già una consegna aperta. Se è la stessa, non serve crearne un'altra."
-                        : `Questo cliente ha ${consegneAperte.length} consegne aperte. Controlla che non sia la stessa.`}
+                      {avviso}
                     </p>
                   </div>
                 )}

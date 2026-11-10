@@ -19,6 +19,7 @@ import { geocodeAddress as geocodeWithRateLimit } from '../../lib/geocoding';
 import { ensureArray, ensureObject } from '@/lib/collections';
 import { useStatisticsQuery, useDeliveriesQuery, useCustomersQuery } from '@/hooks/queries';
 import { DashboardSkeleton } from '../../components/Skeletons';
+import MeseInCorso from '../../components/dashboard/MeseInCorso';
 
 
 delete L.Icon.Default.prototype._getIconUrl;
@@ -244,6 +245,9 @@ export default function PharmacyDashboard() {
             <Plus className="w-4 h-4 mr-1.5" />Nuova
           </Button>
         </div>
+
+        {/* Il mese in un numero: la frase che il titolare ripete al telefono */}
+        <MeseInCorso mese={stats?.month} />
 
         {/* Quick actions */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
