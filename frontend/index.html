@@ -7,7 +7,25 @@
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#2d7a6b" />
-    <meta name="app-build" content="2026-10-29-1900" />
+    <!-- Anteprima dei link condivisi (WhatsApp, Telegram, LinkedIn).
+         L'immagine sta in public/opengraph.jpg, 1280x720. Se un giorno il sito
+         passa a un dominio suo, qui e in og:url va cambiato l'indirizzo. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="PharmaTrack" />
+    <meta property="og:locale" content="it_IT" />
+    <meta property="og:url" content="https://pharmatrack-zeta.vercel.app/" />
+    <meta property="og:title" content="PharmaTrack — Gestionale consegne per farmacie" />
+    <meta property="og:description" content="Consegne, fattorini, incassi e tracking in un unico posto. Dalla farmacia al cliente, con la prova di consegna." />
+    <meta property="og:image" content="https://pharmatrack-zeta.vercel.app/opengraph.jpg" />
+    <meta property="og:image:width" content="1280" />
+    <meta property="og:image:height" content="720" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="PharmaTrack — Gestionale consegne per farmacie" />
+    <meta name="twitter:description" content="Consegne, fattorini, incassi e tracking in un unico posto." />
+    <meta name="twitter:image" content="https://pharmatrack-zeta.vercel.app/opengraph.jpg" />
+    <!-- Riempito a ogni build da vite.config.ts: dice quale versione sta usando
+         il browser di chi ci segnala un problema. -->
+    <meta name="app-build" content="__APP_BUILD__" />
     <meta name="description" content="PharmaTrack — Gestionale consegne per farmacie" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />

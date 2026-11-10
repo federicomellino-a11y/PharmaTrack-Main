@@ -9,10 +9,26 @@ const port = Number(process.env.PORT || 3000);
 const appRelease =
   process.env.VERCEL_GIT_COMMIT_SHA || process.env.GITHUB_SHA || "local";
 
+// Lo stesso valore finisce nel <meta name="app-build">: chi guarda il sorgente
+// della pagina sa subito se il browser sta usando una build vecchia.
+const buildStamp = `${String(appRelease).slice(0, 7)} · ${new Date()
+  .toISOString()
+  .slice(0, 16)
+  .replace("T", " ")} UTC`;
+
 export default defineConfig({
   base: "/",
   define: { __APP_RELEASE__: JSON.stringify(String(appRelease).slice(0, 7)) },
-  plugins: [react(), tailwindcss()],
+  plugins: [
+    react(),
+    tailwindcss(),
+    {
+      name: "app-build-meta",
+      transformIndexHtml(html: string) {
+        return html.replace("__APP_BUILD__", buildStamp);
+      },
+    },
+  ],
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "src"),
