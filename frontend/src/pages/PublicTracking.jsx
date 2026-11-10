@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import axios from 'axios';
 import { API } from '@/lib/config';
 import { Button } from '../components/ui/button';
-import { CheckCircle2, Clock, Package, Truck, MapPin, XCircle, RefreshCw } from 'lucide-react';
+import { CheckCircle2, Clock, Package, Phone, Truck, MapPin, XCircle, RefreshCw } from 'lucide-react';
 
 const STEPS = [
   { id: 1, label: 'Richiesta ricevuta', icon: Clock, states: [] },

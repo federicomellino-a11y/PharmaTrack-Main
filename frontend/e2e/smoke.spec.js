@@ -153,3 +153,22 @@ test('Console admin: si carica con la sessione amministratore', async ({ page })
   await expect(page.getByText('La schermata bianca è stata intercettata')).toHaveCount(0);
   expect(erroriPagina, `errori JS: ${erroriPagina.join(' | ')}`).toHaveLength(0);
 });
+
+/**
+ * Il dettaglio di un cliente.
+ *
+ * Non era coperto: aprendolo la pagina lanciava "Element type is invalid"
+ * perche' il ramo di dettaglio citava un componente mai importato. Nessun test
+ * lo vedeva perche' nessuno cliccava una scheda.
+ */
+test('Clienti: il dettaglio di un cliente si apre senza eccezioni', async ({ page }) => {
+  const erroriPagina = [];
+  page.on('pageerror', (err) => erroriPagina.push(err.message));
+
+  await page.goto('/customers', { waitUntil: 'domcontentloaded' });
+  await page.getByText('Anna Verdi').first().click();
+
+  await expect(page.getByRole('button', { name: /Torna alla lista/i })).toBeVisible();
+  await expect(page.getByText('Storico consegne')).toBeVisible();
+  expect(erroriPagina, 'nessuna eccezione JS aprendo il dettaglio').toEqual([]);
+});
