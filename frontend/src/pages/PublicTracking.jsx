@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
 import { API } from '@/lib/config';
+import { testoPromessa } from '@/lib/fasce';
 import { Button } from '../components/ui/button';
 import { CheckCircle2, Clock, Package, Phone, Truck, MapPin, XCircle, RefreshCw } from 'lucide-react';
 
@@ -88,6 +89,7 @@ export default function PublicTrackingPage() {
 
   const currentStep = stepFromStatus(data.status);
   const cancelled = data.status === 'cancelled';
+  const promessa = testoPromessa(data.slot_day, data.slot);
 
   return (
     <div className="min-h-screen bg-background p-6 max-w-md mx-auto flex flex-col">
@@ -96,9 +98,9 @@ export default function PublicTrackingPage() {
         <p className="text-sm text-muted-foreground">Consegna per</p>
         <p className="text-2xl font-bold">{data.customer_first_name}</p>
         <p className="text-sm text-muted-foreground mt-1">{data.pharmacy_name}</p>
-        {data.slot && (
+        {promessa && (
           <p className="mt-3 text-sm" data-testid="promessa-fascia">
-            Consegna prevista <span className="font-semibold">{data.slot}</span>
+            Consegna prevista <span className="font-semibold">{promessa}</span>
             {data.slot_late && data.status !== 'delivered' && (
               <span className="block text-xs text-amber-600 mt-1">
                 Siamo oltre l'orario previsto: la farmacia sta chiudendo le consegne rimaste.

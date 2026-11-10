@@ -8,6 +8,7 @@ import { FASCE, fasciaDi } from '@/lib/fasce';
 import BarraConsegne from '../../components/deliveries/BarraConsegne';
 import ListaConsegne from '../../components/deliveries/ListaConsegne';
 import { costruisciCsv, scaricaCsv } from '@/lib/consegneCsv';
+import { consegneAperteDelCliente } from '@/lib/consegneAperte';
 import { Layout } from '../../components/Layout';
 import { Dialog } from '../../components/ui/dialog';
 import { Filter } from 'lucide-react';
@@ -344,6 +345,13 @@ export default function DeliveriesPage() {
   const safeCustomers = useMemo(() => ensureArray(customers), [customers]);
   const safeDrivers = useMemo(() => ensureArray(drivers), [drivers]);
 
+  // Lo stesso cliente non deve entrare due volte nello stesso giro: l'avviso
+  // arriva qui, mentre si compila, non dal 409 del server dopo.
+  const consegneAperteCliente = useMemo(
+    () => consegneAperteDelCliente(safeDeliveries, form.customer_id),
+    [safeDeliveries, form.customer_id]
+  );
+
   const activeBadgeCount = useMemo(() => ensureArray(deliveries).filter(d => ['da_preparare', 'pronta', 'pending', 'assigned', 'picked_up', 'in_transit'].includes(d.status)).length, [deliveries]);
   useEffect(() => {
     document.title = activeBadgeCount > 0 ? `(${activeBadgeCount}) PharmaTrack` : 'PharmaTrack';
@@ -499,6 +507,7 @@ export default function DeliveriesPage() {
         applicaFascia,
         customerDropdownOpen,
         customerInputRef,
+        consegneAperte: consegneAperteCliente,
         customerSearchTerm,
         dialogCustomers,
         dialogOpen,

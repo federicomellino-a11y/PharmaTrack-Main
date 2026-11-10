@@ -57,6 +57,31 @@ def descrivi_fascia(da: Optional[str], a: Optional[str]) -> Optional[str]:
     return f"{da}–{a}" if a else da
 
 
+GIORNI = ["lunedì", "martedì", "mercoledì", "giovedì", "venerdì", "sabato", "domenica"]
+
+
+def descrivi_giorno(giorno, adesso: datetime) -> Optional[str]:
+    """Il giorno della promessa come lo direbbe il banco: "oggi", "domani", "giovedì".
+
+    Serve al paziente che apre il link: sapere "15:00-18:00" senza il giorno non
+    risponde alla domanda vera, che e' "quando". Oltre la settimana si scrive la
+    data, perche' "fra undici giorni" non aiuta nessuno.
+    """
+    mio = _giorno(giorno)
+    if mio is None:
+        return None
+    distanza = (mio - adesso.date()).days
+    if distanza == 0:
+        return "oggi"
+    if distanza == 1:
+        return "domani"
+    if distanza == -1:
+        return "ieri"
+    if 1 < distanza < 7:
+        return GIORNI[mio.weekday()]
+    return mio.strftime("%d/%m/%Y")
+
+
 def _giorno(valore) -> Optional[date]:
     if not valore:
         return None

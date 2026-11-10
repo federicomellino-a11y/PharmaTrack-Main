@@ -13,7 +13,7 @@ from app.core.database import db
 from app.core.cloudinary_client import PhotoManager
 from app.core.websocket import manager
 # (nessun uso di app.core.config)
-from app.core.fasce import descrivi_fascia, fascia_scaduta, valida_fascia
+from app.core.fasce import descrivi_fascia, descrivi_giorno, fascia_scaduta, valida_fascia
 from app.core.piani import piano_corrente, inizio_mese, verifica_consegne
 from app.core.security import (
     get_current_user,
@@ -641,6 +641,10 @@ async def public_delivery_tracking(token: str):
         "slot": descrivi_fascia(delivery.get("scheduled_time"), delivery.get("slot_to")),
         # Il giorno promesso: la data programmata se c'e', altrimenti quello in
         # cui la consegna e' nata (una fascia senza data vale per oggi).
+        "slot_day": descrivi_giorno(
+            delivery.get("scheduled_date") or delivery.get("created_at"),
+            _adesso_roma(),
+        ),
         "slot_late": fascia_scaduta(
             delivery.get("scheduled_time"),
             delivery.get("slot_to"),

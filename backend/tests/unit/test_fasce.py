@@ -75,3 +75,36 @@ def test_promessa_di_oggi_si_guarda_l_orario():
 def test_giorno_illeggibile_non_fa_esplodere():
     adesso = datetime(2026, 11, 8, 19, 0)
     assert fascia_scaduta("15:00", "18:00", adesso, "non-una-data") is True
+
+
+# --- Il giorno della promessa: quello che il paziente legge nel link ---
+from app.core.fasce import descrivi_giorno
+
+
+def test_giorno_di_oggi_e_domani_si_dicono_cosi():
+    adesso = datetime(2026, 11, 10, 9, 0)
+    assert descrivi_giorno("2026-11-10", adesso) == "oggi"
+    assert descrivi_giorno("2026-11-11", adesso) == "domani"
+    assert descrivi_giorno("2026-11-09", adesso) == "ieri"
+
+
+def test_entro_la_settimana_si_usa_il_nome_del_giorno():
+    # Il 10/11/2026 e' un martedi': il 12 e' giovedi.
+    adesso = datetime(2026, 11, 10, 9, 0)
+    assert descrivi_giorno("2026-11-12", adesso) == "giovedì"
+
+
+def test_oltre_la_settimana_si_scrive_la_data():
+    adesso = datetime(2026, 11, 10, 9, 0)
+    assert descrivi_giorno("2026-11-25", adesso) == "25/11/2026"
+
+
+def test_giorno_assente_o_illeggibile_non_inventa_niente():
+    adesso = datetime(2026, 11, 10, 9, 0)
+    assert descrivi_giorno(None, adesso) is None
+    assert descrivi_giorno("non-una-data", adesso) is None
+
+
+def test_accetta_anche_un_timestamp_completo():
+    adesso = datetime(2026, 11, 10, 9, 0)
+    assert descrivi_giorno("2026-11-10T07:30:00+00:00", adesso) == "oggi"

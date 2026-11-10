@@ -15,13 +15,14 @@ import { Link } from 'react-router-dom';
 import { Badge } from '../../components/ui/badge';
 import { Dialog } from '../../components/ui/dialog';
 import { ScrollArea } from '../../components/ui/scroll-area';
-import { Search, Plus, Pencil, Phone, User, Mail, Package, Clock, Euro, ArrowLeft, CheckCircle2, XCircle, Navigation, ShieldCheck, TrendingUp } from 'lucide-react';
+import { Search, Plus, Pencil, Phone, User, Mail, Package, Clock, Euro, ArrowLeft, CheckCircle2, XCircle, Navigation, ShieldCheck, TrendingUp, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import { ensureArray, ensureObject } from '@/lib/collections';
 import { confirmAction } from '../../components/ConfirmDialog';
 
 
 import { formatCurrency, formatDate, formatDateTimeFull } from '@/lib/format';
+import { scaricaCsvClienti } from '@/lib/clientiCsv';
 import CustomerMetricCard from '../../components/customers/CustomerMetricCard';
 import {
   buildInitialCustomerStats,
@@ -166,6 +167,13 @@ export default function CustomersPage() {
       .filter(Boolean)
       .some((value) => value.toLowerCase().includes(normalizedTerm));
   }), [customers, searchTerm]);
+
+  // Quello che si vede e' quello che si scarica: si esporta la lista filtrata,
+  // come per le consegne, e il messaggio dice quante righe sono uscite.
+  const esportaClienti = () => {
+    scaricaCsvClienti(filteredCustomers);
+    toast.success(`${filteredCustomers.length} clienti esportati`);
+  };
 
   // Dialog condiviso: serve sia nella lista sia nel profilo cliente
   const customerDialog = (
@@ -419,10 +427,21 @@ export default function CustomersPage() {
             <h1 className="text-2xl font-bold text-foreground">Anagrafica clienti</h1>
             <p className="text-muted-foreground">{ensureArray(customers).length} profili salvati con recapiti e storico ordini</p>
           </div>
-          <Button onClick={openNewDialog} className="btn-primary" data-testid="add-customer-btn">
-            <Plus className="mr-2 h-4 w-4" />
-            Nuovo cliente
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={esportaClienti}
+              disabled={!filteredCustomers.length}
+              data-testid="export-customers-btn"
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Esporta CSV
+            </Button>
+            <Button onClick={openNewDialog} className="btn-primary" data-testid="add-customer-btn">
+              <Plus className="mr-2 h-4 w-4" />
+              Nuovo cliente
+            </Button>
+          </div>
         </div>
 
         <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-center">

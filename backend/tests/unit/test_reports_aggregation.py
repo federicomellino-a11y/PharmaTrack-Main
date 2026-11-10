@@ -82,3 +82,30 @@ def test_lista_vuota_restituisce_struttura_valida():
     assert dati["total_deliveries"] == 0
     assert dati["daily_revenue"] == []
     assert dati["payment_split"]["cash"] == {"revenue": 0.0, "count": 0}
+
+
+# --- Minuti di consegna: la base del "tempo medio" del mese ---
+from app.core.reporting import minuti_consegna
+
+
+def test_minuti_fra_apertura_e_consegna():
+    assert minuti_consegna("2026-11-10T09:00:00+00:00", "2026-11-10T09:20:00+00:00") == 20
+
+
+def test_tollera_la_z_finale_di_mongo():
+    assert minuti_consegna("2026-11-10T09:00:00Z", "2026-11-10T09:30:00Z") == 30
+
+
+def test_date_mancanti_o_illeggibili_non_contano():
+    assert minuti_consegna(None, "2026-11-10T09:20:00+00:00") is None
+    assert minuti_consegna("2026-11-10T09:00:00+00:00", None) is None
+    assert minuti_consegna("ieri", "2026-11-10T09:20:00+00:00") is None
+
+
+def test_una_consegna_rimasta_aperta_troppo_non_falsa_la_media():
+    # Oltre dodici ore non e' un tempo di consegna: fuori dalla media.
+    assert minuti_consegna("2026-11-09T09:00:00+00:00", "2026-11-10T09:00:00+00:00") is None
+
+
+def test_una_data_al_contrario_non_produce_minuti_negativi():
+    assert minuti_consegna("2026-11-10T10:00:00+00:00", "2026-11-10T09:00:00+00:00") is None

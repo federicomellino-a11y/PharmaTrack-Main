@@ -1,14 +1,19 @@
 import { PRIORITY_LABELS, STATUS_LABELS } from './deliveryDisplay';
+import { testoFascia } from './fasce';
 
 /**
  * Il foglio delle consegne, senza toccare il browser: cosi' si puo' provare
  * quello che finisce davvero dentro il file.
+ *
+ * "Data prevista" e "Fascia" ci sono perche' il commercialista ricostruisce la
+ * giornata dalla promessa, non dalla data di inserimento: una consegna creata
+ * lunedi' e promessa per martedi' va nel foglio di martedi'.
  */
 export function costruisciCsv(consegne, drivers = []) {
   const esc = (valore) => '"' + String(valore ?? '').replace(/"/g, '""') + '"';
-  const intestazione = ['Data', 'Cliente', 'Telefono', 'Indirizzo', 'Stato', 'Fattorino',
-    'Pagamento', 'Importo', 'Pagato con', 'Resto', 'Riferimento vendita', 'Motivo mancata',
-    'Priorita', 'Note'];
+  const intestazione = ['Data', 'Cliente', 'Telefono', 'Indirizzo', 'Data prevista', 'Fascia',
+    'Stato', 'Fattorino', 'Pagamento', 'Importo', 'Pagato con', 'Resto', 'Riferimento vendita',
+    'Motivo mancata', 'Priorita', 'Note'];
   const righe = [intestazione.join(',')];
   (consegne || []).forEach((d) => {
     const fattorino = (drivers || []).find((dr) => dr.driver_id === d.driver_id);
@@ -17,6 +22,8 @@ export function costruisciCsv(consegne, drivers = []) {
       d.customer_name,
       d.customer_phone,
       d.customer_address,
+      d.scheduled_date || '',
+      testoFascia(d.scheduled_time, d.slot_to) || '',
       STATUS_LABELS[d.status] || d.status,
       fattorino?.name || '',
       d.payment_method === 'cash' ? 'Contanti' : 'POS',
