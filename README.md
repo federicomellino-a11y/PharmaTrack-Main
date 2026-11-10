@@ -157,9 +157,10 @@ Endpoint REST anche disponibile: `POST /api/integrations/winfarm/import` (dettag
 │   │   ├── lib/            # api.js (chiavi + letture), config, utility
 │   │   └── __tests__/      # vitest accanto ai file che prova
 │   ├── public/
-│   │   ├── pharmatrack_winfarm.ahk  # script AutoHotkey
 │   │   ├── sw.js                     # service worker PWA
-│   │   └── manifest.webmanifest
+│   │   ├── manifest.webmanifest
+│   │   ├── logo.png / logo.webp
+│   │   └── favicon.svg, icons/, opengraph.jpg
 │   ├── vite.config.ts
 │   ├── tsconfig.json
 │   └── .env.example
