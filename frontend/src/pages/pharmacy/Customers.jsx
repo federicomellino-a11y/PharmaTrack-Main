@@ -200,7 +200,6 @@ export default function CustomersPage() {
   const stats = customerStats?.stats;
   const customer = customerStats?.customer || selectedCustomer;
   const recentDeliveries = ensureArray(customerStats?.recent_deliveries);
-  const preferredPayment = stats?.preferred_payment_method ? paymentLabels[stats.preferred_payment_method] : 'Non disponibile';
   const averageDays = stats?.average_days_between_orders ? `${stats.average_days_between_orders} giorni` : 'Non disponibile';
   const customerAge = calculateAge(customer?.birth_date);
   const addressLink = customer?.address
@@ -370,12 +369,6 @@ export default function CustomersPage() {
               accent="text-violet-500"
             />
           </div>
-
-      <SchedaCliente
-        stats={stats}
-        customer={customer}
-        preferredPayment={preferredPayment}
-      />
 
           <Card>
             <CardHeader>
