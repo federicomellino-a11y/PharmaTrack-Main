@@ -10,7 +10,9 @@ import re
 from typing import Any, Dict, List, Optional
 
 import httpx
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
+
+from app.core.limiter import limiter
 
 # Il motore Google e il parsing degli indirizzi vivono in app.core.geocode:
 # una sola implementazione condivisa con il salvataggio dei clienti.
@@ -119,8 +121,23 @@ def _photon_item(feature: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     }
 
 
+# Queste due rotte sono pubbliche di proposito: servono anche mentre ci si
+# registra, prima di avere una sessione. Ma non sono gratuite, perche' dietro
+# ci sono Nominatim, Photon e (se la chiave c'e') Google Geocoding, che si paga
+# a richiesta: senza un tetto per IP chiunque puo' prosciugare la quota.
+# I due limiti sono larghi per l'uso vero (l'autocompletamento si chiama mentre
+# si scrive) e stretti per uno script.
+GEOCODE_SEARCH_LIMIT = "60/minute"
+GEOCODE_RESOLVE_LIMIT = "30/minute"
+
+
 @router.get("/geocode/search")
-async def geocode_search(q: str = Query(..., min_length=3), limit: int = 6) -> List[Dict[str, Any]]:
+@limiter.limit(GEOCODE_SEARCH_LIMIT)
+async def geocode_search(
+    request: Request,
+    q: str = Query(..., min_length=3),
+    limit: int = 6,
+) -> List[Dict[str, Any]]:
     """Suggerimenti indirizzo unendo OpenStreetMap e Photon (più civici trovati)."""
     street, civic, city = _split(q)
     out: List[Dict[str, Any]] = []
@@ -185,7 +202,11 @@ async def geocode_search(q: str = Query(..., min_length=3), limit: int = 6) -> L
 
 
 @router.get("/geocode/resolve")
-async def geocode_resolve(address: str = Query(..., min_length=3)) -> Dict[str, Any]:
+@limiter.limit(GEOCODE_RESOLVE_LIMIT)
+async def geocode_resolve(
+    request: Request,
+    address: str = Query(..., min_length=3),
+) -> Dict[str, Any]:
     """Coordinate per un indirizzo: civico esatto, poi via, poi comune."""
     street, civic, city = _split(address)
     attempts: List[tuple] = []
