@@ -97,7 +97,40 @@ export function mockApiResponse(pathname) {
   if (path.startsWith('/shifts')) return path === '/shifts/current' ? { shift } : [shift];
   if (path.startsWith('/archive')) return { deliveries: [delivery], pages: 1, total: 1 };
   if (path.startsWith('/analytics') || path.startsWith('/reports')) {
-    return { totals: { delivered: 3, revenue: 120 }, series: [], by_day: [], by_status: [] };
+    // Stessa forma che manda app/core/analytics.py: se il contratto cambia,
+    // lo smoke test della pagina Report se ne accorge.
+    return {
+      period: 'month',
+      days: 30,
+      summary: {
+        total_revenue: 960, delivered_count: 48, total_deliveries: 50,
+        cancelled: 2, completion_rate: 96, avg_order_value: 20,
+      },
+      payment_split: { cash: { revenue: 600, count: 30 }, pos: { revenue: 360, count: 18 } },
+      daily_revenue: [
+        { date: '2026-11-08', revenue: 320, count: 16 },
+        { date: '2026-11-09', revenue: 640, count: 32 },
+      ],
+      top_customers: [{ customer_id: 'c1', name: 'Anna Verdi', deliveries: 6, revenue: 120 }],
+      driver_performance: [{ driver_id: 'd1', name: 'Luca Bianchi', deliveries: 48, revenue: 960 }],
+      delivery_times: {
+        avg_minutes: 42, median_minutes: 38, sampled: 48,
+        by_driver: [{ name: 'Luca Bianchi', avg_minutes: 42, count: 48 }],
+      },
+      failures: { total: 1, by_reason: [{ reason: 'Assente', count: 1 }] },
+      by_hour: [{ hour: 9, count: 12 }, { hour: 10, count: 20 }],
+      by_weekday: [{ day: 'lun', count: 20 }, { day: 'mar', count: 12 }],
+      busiest: { hour: 10, weekday: 'lun' },
+      open_without_driver: 2,
+      overdue_slots: 1,
+      lapsed_customers: [],
+      confronto: {
+        previous: { total_revenue: 800, delivered_count: 40, avg_order_value: 20 },
+        current: { total_revenue: 960, delivered_count: 48, avg_order_value: 20 },
+        delta: { revenue_pct: 20, count_pct: 20, avg_order_pct: 0 },
+      },
+      clienti: { totali: 10, nuovi: 3, di_ritorno: 7, spesa_media: 96 },
+    };
   }
   if (path.startsWith('/messages') || path.startsWith('/driver/messages')) return [];
   if (path.startsWith('/notifications')) return [];
