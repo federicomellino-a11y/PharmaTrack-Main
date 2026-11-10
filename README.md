@@ -5,6 +5,10 @@ Coordina fattorini, traccia ogni ordine, gestisci cassa e turni, integrazione co
 
 🌐 Demo live: [pharmatrack-zeta.vercel.app](https://pharmatrack-zeta.vercel.app)
 
+> **Stai per modificare il codice?** Leggi prima
+> [`AGENTS.md`](AGENTS.md) (regole e perché) e [`CONTRIBUTING.md`](CONTRIBUTING.md)
+> (giro di lavoro e ricette). `main` è la produzione: un merge pubblica subito.
+
 ---
 
 ## ✨ Funzionalità
@@ -99,8 +103,8 @@ uvicorn server:app --reload --port 8001
 # Frontend (in altro terminale)
 cd frontend
 cp .env.example .env
-yarn install
-yarn dev  # http://localhost:3000
+npm ci
+npm run dev  # http://localhost:3000
 ```
 
 ### Seed dati di test
@@ -108,10 +112,10 @@ yarn dev  # http://localhost:3000
 cd backend && python scripts/seed_data.py
 ```
 
-Genera:
-- Pharmacy: `test@farmaciaprova.it` / `Test1234!`
-- Driver: `luca@fattorino.it` / `Driver123!`
-- Admin: `Admin@superadmin.it` / `Admin1234!` (sovrascritto da ADMIN_* in .env se diverso)
+Genera una farmacia, un fattorino e un amministratore di prova e stampa a video
+le credenziali che ha creato (le password stanno in `scripts/seed_data.py`, non
+in questo file: il repository è pubblico). La password admin è quella impostata
+in `ADMIN_PASSWORD`, se presente.
 
 ---
 
@@ -134,10 +138,10 @@ Endpoint REST anche disponibile: `POST /api/integrations/winfarm/import` (dettag
 ```
 .
 ├── backend/                # FastAPI + MongoDB
-│   ├── server.py           # entry FastAPI (~320 righe), logica in app/
+│   ├── server.py           # entry FastAPI (~380 righe): monta i router, logica in app/
 │   ├── app/                # il codice: routers/ (rotte), core/ (logica), models/ (schemi)
 │   ├── scripts/            # seed_data.py (dati di test), audit_db.py (controllo dati)
-│   ├── requirements.txt    # 19 dipendenze dirette pinnate
+│   ├── requirements.txt    # 20 dipendenze dirette, pin esatti
 │   ├── runtime.txt         # Python 3.11.9
 │   ├── .env.example
 │   └── tests/              # pytest (unit + contratto)
@@ -162,12 +166,14 @@ Endpoint REST anche disponibile: `POST /api/integrations/winfarm/import` (dettag
 │   │   ├── logo.png / logo.webp
 │   │   └── favicon.svg, icons/, opengraph.jpg
 │   ├── vite.config.ts
+│   ├── vercel.json         # config deploy (rewrites SPA, header CSP)
 │   ├── tsconfig.json
 │   └── .env.example
 │
 ├── docs/                   # note tecniche (backup, privacy, CSP) e archivio storico
-├── .github/workflows/      # CI, test di integrazione notturni, backup database, allarmi
-├── vercel.json             # config deploy frontend
+├── .github/                # CI, test notturni, backup database, allarmi, modello di PR
+├── AGENTS.md               # regole per chi mette mano al codice (persone e programmi)
+├── CONTRIBUTING.md         # giro di lavoro, ricette, checklist
 ├── render.yaml             # config deploy backend (Blueprint)
 └── README.md               # questo file
 ```
@@ -183,7 +189,8 @@ Endpoint REST anche disponibile: `POST /api/integrations/winfarm/import` (dettag
 | Una pagina o una schermata | `frontend/src/pages/` |
 | Come si legge un dato dal server | chiave e lettura in `frontend/src/lib/api.js`, hook in `hooks/queries.js` |
 | Un test backend veloce senza database | `backend/tests/unit/` |
-| Un test che gira contro l'API vera | `backend/tests/` (suite notturna) |
+| Un test che gira contro l'API vera | `backend/tests/` (suite notturna, mai `DELETE`) |
+| Le regole del repository | `AGENTS.md`, controllate da `tests/unit/test_regole_repository.py` |
 
 Regola che vale per tutto il frontend: le pagine non chiamano mai `axios` per leggere. Se serve un dato nuovo, si aggiunge la coppia chiave/lettura in `lib/api.js` e l'hook; il test `migrazione-api.test.js` blocca le scorciatoie.
 
