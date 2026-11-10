@@ -338,10 +338,7 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
-      <FunzioniProCard
-        {...{
-        }}
-      />
+      <FunzioniProCard piano={piano} />
 
         <Card className="border-destructive/30">
           <CardHeader>

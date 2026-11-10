@@ -11,6 +11,7 @@ import { DriverAuthProvider, useDriverAuth } from './contexts/DriverAuthContext'
 import { AdminAuthProvider, useAdminAuth } from './contexts/AdminAuthContext'
 import { SocketProvider } from './contexts/SocketContext'
 import ErrorBoundary from './components/ErrorBoundary'
+import ProGate from './components/ProGate'
 import './App.css'
 
 const LandingPage = lazyWithRetry(() => import('./pages/LandingPage'))
@@ -144,7 +145,7 @@ const AppRouter = () => (
     <Route path="/verify-email" element={<PharmacyPublicPage><VerifyEmailPage /></PharmacyPublicPage>} />
     <Route path="/dashboard" element={<PharmacyProtectedPage><PharmacyDashboard /></PharmacyProtectedPage>} />
     <Route path="/customers" element={<PharmacyProtectedPage><CustomersPage /></PharmacyProtectedPage>} />
-    <Route path="/richiami" element={<PharmacyProtectedPage><RecallsPage /></PharmacyProtectedPage>} />
+    <Route path="/richiami" element={<PharmacyProtectedPage><ProGate funzione="ricorrenze"><RecallsPage /></ProGate></PharmacyProtectedPage>} />
     <Route path="/deliveries" element={<PharmacyProtectedPage><DeliveriesPage /></PharmacyProtectedPage>} />
     <Route path="/tracking" element={<PharmacyProtectedPage><TrackingPage /></PharmacyProtectedPage>} />
     <Route path="/quick" element={<PharmacyProtectedPage><QuickAddPage /></PharmacyProtectedPage>} />
@@ -154,7 +155,7 @@ const AppRouter = () => (
     <Route path="/chat" element={<PharmacyProtectedPage><ChatPage /></PharmacyProtectedPage>} />
     <Route path="/chat/:driverId" element={<PharmacyProtectedPage><ChatPage /></PharmacyProtectedPage>} />
     <Route path="/archive" element={<PharmacyProtectedPage><ArchivePage /></PharmacyProtectedPage>} />
-    <Route path="/reports" element={<PharmacyProtectedPage><ReportsPage /></PharmacyProtectedPage>} />
+    <Route path="/reports" element={<PharmacyProtectedPage><ProGate funzione="report_avanzati"><ReportsPage /></ProGate></PharmacyProtectedPage>} />
     <Route path="/doctors" element={<PharmacyProtectedPage><DoctorsPage /></PharmacyProtectedPage>} />
     <Route path="/useful-numbers" element={<PharmacyProtectedPage><UsefulNumbersPage /></PharmacyProtectedPage>} />
     <Route path="/notes" element={<PharmacyProtectedPage><NotesPage /></PharmacyProtectedPage>} />

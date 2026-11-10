@@ -7,6 +7,7 @@ import { useCustomersQuery } from '@/hooks/queries';
 import { ListSkeleton } from '../../components/Skeletons';
 import ClienteDialog from '../../components/customers/ClienteDialog';
 import AnalisiCliente from '../../components/customers/AnalisiCliente';
+import ProGate from '../../components/ProGate';
 import CartaCliente from '../../components/customers/CartaCliente';
 import { Layout } from '../../components/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
@@ -371,7 +372,9 @@ export default function CustomersPage() {
             />
           </div>
 
-          <AnalisiCliente analisi={customerStats?.analisi} />
+          <ProGate funzione="analisi_cliente" compatto>
+            <AnalisiCliente analisi={customerStats?.analisi} />
+          </ProGate>
 
           <Card>
             <CardHeader>

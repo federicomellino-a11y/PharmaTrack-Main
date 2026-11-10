@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends
 
 from app.core.database import db
+from app.core.funzioni_pro import elenco_funzioni, funzioni_sbloccate
 from app.core.piani import PIANI, piano_corrente, inizio_mese, verifica_consegne, verifica_fattorini
 from app.core.security import get_current_user
 
@@ -37,6 +38,10 @@ async def get_plan(user: dict = Depends(get_current_user)):
             "consegne": verifica_consegne(piano, consegne_mese),
             "fattorini": verifica_fattorini(piano, fattorini),
         },
+        # Le funzioni Pro: "pro" è la risposta breve che usa il frontend per i
+        # lucchetti, "funzioni" è cosa scrivere nella scheda Impostazioni.
+        "pro": funzioni_sbloccate(piano),
+        "funzioni": elenco_funzioni(piano),
         "catalogo": [
             {
                 "piano": chiave,
