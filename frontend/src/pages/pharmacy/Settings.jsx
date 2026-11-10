@@ -9,7 +9,10 @@ import FunzioniProCard from '../../components/settings/FunzioniProCard';
 import EsportaCard from '../../components/settings/EsportaCard';
 import AspettoCard from '../../components/settings/AspettoCard';
 import AccountCard from '../../components/settings/AccountCard';
-import StaffCard from '../../components/StaffCard';
+import OrariConsegnaCard from '../../components/settings/OrariConsegnaCard';
+import FunzioniCard from '../../components/settings/FunzioniCard';
+import { FASCE_PREDEFINITE, FASCIA_PRIMA, normalizzaFasce } from '../../lib/fasce';
+import { funzioniDellaFarmacia } from '../../lib/funzioniFarmacia';
 import { API } from '@/lib/config';
 import { ensureArray, ensureObject } from '@/lib/collections';
 import { useAuth } from '../../contexts/AuthContext';
@@ -44,9 +47,18 @@ const buildFormData = (user) => ({
 
 // giorni_pazienti_fermi resta una stringa finche' si edita, cosi' il campo non
 // si svuota a meta' battitura: diventa numero solo al salvataggio.
+const buildFasce = (salvate) => {
+  const elenco = Array.isArray(salvate.fasce) && salvate.fasce.length ? salvate.fasce : FASCE_PREDEFINITE;
+  // Copia: la forma di modifica non deve scrivere dentro le impostazioni salvate.
+  return elenco
+    .filter((fascia) => fascia && fascia.da && fascia.a)
+    .map((fascia) => ({ etichetta: fascia.etichetta || '', da: fascia.da, a: fascia.a }));
+};
+
 const buildSettingsData = (user) => {
   const salvate = ensureObject(user?.settings);
   const eventi = ensureObject(salvate.notifiche_eventi);
+  const fasce = buildFasce(salvate);
   return {
     notifications_enabled: salvate.notifications_enabled ?? true,
     sound_enabled: salvate.sound_enabled ?? true,
@@ -54,7 +66,14 @@ const buildSettingsData = (user) => {
     notifiche_eventi: {
       delivery: eventi.delivery !== false,
       shift: eventi.shift !== false,
+      message: eventi.message !== false,
     },
+    silenzio_attivo: salvate.silenzio_attivo === true,
+    silenzio_da: salvate.silenzio_da || '21:30',
+    silenzio_a: salvate.silenzio_a || '07:30',
+    fasce: fasce.length ? fasce : buildFasce({}),
+    fascia_predefinita: salvate.fascia_predefinita || FASCIA_PRIMA.valore,
+    funzioni: funzioniDellaFarmacia({ settings: salvate }),
   };
 };
 
@@ -113,6 +132,16 @@ export default function SettingsPage() {
 
   const handleSubmit = async (event) => {
     event?.preventDefault?.();
+
+    // Le fasce si controllano qui e non nel server: il banco deve leggere
+    // l'errore mentre e' ancora nella scheda che sta compilando.
+    const controlloFasce = normalizzaFasce(settings.fasce);
+    if (!controlloFasce.ok) {
+      setScheda('consegne');
+      toast.error(controlloFasce.errore);
+      return;
+    }
+
     setSaving(true);
 
     const mergedSettings = {
@@ -120,6 +149,7 @@ export default function SettingsPage() {
       ...ensureObject(settings),
       giorni_pazienti_fermi: sogliaValida(settings.giorni_pazienti_fermi),
       default_driver_id: formData.default_driver_id || '',
+      fasce: controlloFasce.fasce,
     };
 
     const payload = {
@@ -221,7 +251,6 @@ export default function SettingsPage() {
   const vicinoAlTetto =
     (limiti.max_consegne_mese && (uso.consegne_mese || 0) >= limiti.max_consegne_mese * 0.9) ||
     (limiti.max_fattorini && (uso.fattorini || 0) >= limiti.max_fattorini);
-  const isStaff = user?.role === 'staff';
 
   return (
     <Layout title="Impostazioni">
@@ -229,10 +258,10 @@ export default function SettingsPage() {
         <Tabs value={scheda} onValueChange={setScheda}>
           <TabsList className="w-full justify-start overflow-x-auto" data-testid="settings-tabs">
             <TabsTrigger value="farmacia">Farmacia</TabsTrigger>
+            <TabsTrigger value="consegne">Consegne</TabsTrigger>
             <TabsTrigger value="notifiche">Notifiche</TabsTrigger>
             <TabsTrigger value="aspetto">Aspetto</TabsTrigger>
             <TabsTrigger value="account">Account</TabsTrigger>
-            {!isStaff && <TabsTrigger value="team">Team</TabsTrigger>}
             <TabsTrigger value="piano">Piano</TabsTrigger>
             <TabsTrigger value="integrazioni">Integrazioni</TabsTrigger>
             <TabsTrigger value="esporta">Esporta</TabsTrigger>
@@ -251,8 +280,22 @@ export default function SettingsPage() {
                 settings,
               }}
             />
+            <FunzioniCard settings={settings} setSettings={setSettings} />
             <p className="text-xs text-muted-foreground">
               Indirizzo e telefono compaiono al fattorino e sulle stampe: se cambiano, si cambiano qui.
+            </p>
+          </TabsContent>
+
+          <TabsContent value="consegne" className="space-y-6 mt-4">
+            <OrariConsegnaCard
+              onSalva={handleSubmit}
+              saving={saving}
+              setSettings={setSettings}
+              settings={settings}
+            />
+            <p className="text-xs text-muted-foreground">
+              Il pulsante &quot;Salva orari&quot; salva anche il resto della farmacia: e&apos; una sola scheda da
+              tenere in ordine, non due che si sovrascrivono.
             </p>
           </TabsContent>
 
@@ -289,15 +332,6 @@ export default function SettingsPage() {
           <TabsContent value="account" className="space-y-6 mt-4">
             <AccountCard onSaveName={handleSaveName} salvandoNome={salvandoNome} user={user} />
           </TabsContent>
-
-          {!isStaff && (
-            <TabsContent value="team" className="space-y-6 mt-4">
-              <StaffCard />
-              <p className="text-xs text-muted-foreground">
-                Chi entra come staff vede consegne e clienti ma non le impostazioni della farmacia.
-              </p>
-            </TabsContent>
-          )}
 
           <TabsContent value="piano" className="space-y-6 mt-4">
             <PianoCard

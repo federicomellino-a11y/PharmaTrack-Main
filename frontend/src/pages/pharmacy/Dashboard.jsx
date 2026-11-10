@@ -31,6 +31,7 @@ L.Icon.Default.mergeOptions({
 
 import { STATUS_LABELS as statusLabels } from '@/lib/deliveryDisplay';
 import { formatCurrency } from '@/lib/format';
+import { funzioneAttiva } from '@/lib/funzioniFarmacia';
 const customerIcon = new L.DivIcon({
   className: '',
   html: `<div style="background:hsl(172,66%,33%);width:12px;height:12px;border-radius:50%;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.3);"></div>`,
@@ -189,6 +190,8 @@ export default function PharmacyDashboard() {
   const tileUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
   const tileAttribution = '&copy; OpenStreetMap contributors';
 
+  const cassaInHome = funzioneAttiva(user, 'cassa_home');
+
   const kpis = [
     { to: '/deliveries', label: 'Consegne oggi', value: stats?.deliveries?.today || 0, sub: `${stats?.deliveries?.today_completed || 0} completate`, icon: Package, color: 'text-primary', bg: 'bg-primary/10' },
     { to: '/deliveries', label: 'In corso', value: stats?.deliveries?.active || 0, sub: `${stats?.deliveries?.pending || 0} in attesa`, icon: Clock, color: 'text-amber-600', bg: 'bg-amber-500/10', alert: (stats?.deliveries?.pending || 0) > 3 },
@@ -247,7 +250,7 @@ export default function PharmacyDashboard() {
         </div>
 
         {/* Il mese in un numero: la frase che il titolare ripete al telefono */}
-        <MeseInCorso mese={stats?.month} />
+        {cassaInHome && <MeseInCorso mese={stats?.month} />}
 
         {/* Quick actions */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -292,33 +295,36 @@ export default function PharmacyDashboard() {
           ))}
         </div>
 
-        {/* Cassa di oggi: il numero che serve alla sera, senza ricostruirlo */}
-        <Card className="card-exclusive" data-testid="cassa-oggi">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between gap-3 mb-3">
-              <div className="flex items-center gap-2">
-                <Wallet className="w-4 h-4 text-primary" />
-                <p className="text-sm font-semibold">Cassa di oggi</p>
+        {/* Cassa di oggi: il numero che serve alla sera, senza ricostruirlo.
+            Si spegne da Impostazioni quando la home resta davanti ai clienti. */}
+        {cassaInHome && (
+          <Card className="card-exclusive" data-testid="cassa-oggi">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between gap-3 mb-3">
+                <div className="flex items-center gap-2">
+                  <Wallet className="w-4 h-4 text-primary" />
+                  <p className="text-sm font-semibold">Cassa di oggi</p>
+                </div>
+                <Link to="/shifts" className="text-xs text-primary hover:underline">Turni &amp; Cassa</Link>
               </div>
-              <Link to="/shifts" className="text-xs text-primary hover:underline">Turni &amp; Cassa</Link>
-            </div>
-            <div className="grid grid-cols-3 gap-3">
-              <div>
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Totale</p>
-                <p className="text-2xl font-black tabular-nums">€ {(stats?.today_money?.total || 0).toFixed(2).replace('.', ',')}</p>
-                <p className="text-xs text-muted-foreground">{stats?.today_money?.count || 0} consegne incassate</p>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Totale</p>
+                  <p className="text-2xl font-black tabular-nums">€ {(stats?.today_money?.total || 0).toFixed(2).replace('.', ',')}</p>
+                  <p className="text-xs text-muted-foreground">{stats?.today_money?.count || 0} consegne incassate</p>
+                </div>
+                <div>
+                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Contanti</p>
+                  <p className="text-lg font-bold tabular-nums">€ {(stats?.today_money?.cash || 0).toFixed(2).replace('.', ',')}</p>
+                </div>
+                <div>
+                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">POS</p>
+                  <p className="text-lg font-bold tabular-nums">€ {(stats?.today_money?.pos || 0).toFixed(2).replace('.', ',')}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Contanti</p>
-                <p className="text-lg font-bold tabular-nums">€ {(stats?.today_money?.cash || 0).toFixed(2).replace('.', ',')}</p>
-              </div>
-              <div>
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">POS</p>
-                <p className="text-lg font-bold tabular-nums">€ {(stats?.today_money?.pos || 0).toFixed(2).replace('.', ',')}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Map + Chart */}
         <div className="grid lg:grid-cols-2 gap-4">

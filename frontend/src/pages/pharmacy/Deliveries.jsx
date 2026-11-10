@@ -4,7 +4,7 @@ import { useDeliveriesQuery, useCustomersQuery, useDriversQuery } from '@/hooks/
 import { ListSkeleton } from '../../components/Skeletons';
 import axios from 'axios';
 import { API } from '@/lib/config';
-import { FASCE, fasciaDi } from '@/lib/fasce';
+import { fasciaDi, fasceDellaFarmacia } from '@/lib/fasce';
 import BarraConsegne from '../../components/deliveries/BarraConsegne';
 import ListaConsegne from '../../components/deliveries/ListaConsegne';
 import { consegneAperteDelCliente } from '@/lib/consegneAperte';
@@ -56,8 +56,16 @@ export default function DeliveriesPage() {
   const [prontaDialogOpen, setProntaDialogOpen] = useState(false);
   const [selectedDelivery, setSelectedDelivery] = useState(null);
   // La fascia scelta è uno stato suo: derivarla dai valori non permetteva
+  // Le fasce sono quelle della farmacia (Impostazioni > Consegne), non piu' una
+  // lista uguale per tutti.
+  const fasce = useMemo(() => fasceDellaFarmacia(user), [user]);
+  const fasciaIniziale = useMemo(() => {
+    const scelta = user?.settings?.fascia_predefinita;
+    return fasce.find((fascia) => fascia.valore === scelta) || fasce[0];
+  }, [fasce, user]);
+
   // Stato del modulo consegna: vive in hooks/useDeliveryForm.js
-  const modulo = useDeliveryForm();
+  const modulo = useDeliveryForm({ fasciaIniziale });
   const { form, setForm, fasciaScelta, setFasciaScelta, change_due, amountValue, amountGivenValue } = modulo;
 
   // Stato per import Winfarm: dati pre-compilati dalla querystring
@@ -187,7 +195,7 @@ export default function DeliveriesPage() {
       slot_to: winfarmPrefill.scheduled_time ? (prev.slot_to ?? null) : prev.slot_to,
     }));
     if (winfarmPrefill.scheduled_time) {
-      setFasciaScelta((fasciaDi(winfarmPrefill.scheduled_time, null) || { valore: 'subito' }).valore);
+      setFasciaScelta((fasciaDi(winfarmPrefill.scheduled_time, null, fasce) || { valore: 'subito' }).valore);
     }
     if (!matched && winfarmPrefill.customer_name) {
       // mostra termine di ricerca così il farmacista vede la lista filtrata
@@ -255,7 +263,7 @@ export default function DeliveriesPage() {
 
   const applicaFascia = (valore) => {
     setFasciaScelta(valore);
-    const scelta = FASCE.find((f) => f.valore === valore);
+    const scelta = fasce.find((f) => f.valore === valore);
     if (!scelta || valore === 'preciso') {
       // "Orario preciso": si tengono i valori attuali e si mostrano i campi.
       setForm((precedente) => ({ ...precedente, scheduled_time: precedente.scheduled_time || '', slot_to: precedente.slot_to || null }));
@@ -470,6 +478,7 @@ export default function DeliveriesPage() {
       <CreaConsegnaDialog
         modulo={modulo}
         {...{
+        fasce,
         activeCustomerIndex,
         applicaFascia,
         customerDropdownOpen,

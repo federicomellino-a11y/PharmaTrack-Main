@@ -14,6 +14,7 @@ import { ScrollArea } from './ui/scroll-area';
 import { Badge } from './ui/badge';
 import CommandPalette from './CommandPalette';
 import { ensureArray } from '@/lib/collections';
+import { funzioniDellaFarmacia } from '@/lib/funzioniFarmacia';
 import { useConversationsQuery } from '@/hooks/queries';
 import {
   LayoutDashboard, Users, Package, Truck, MessageSquare, Archive, Settings,
@@ -26,21 +27,26 @@ const navItems = [
   { path: '/deliveries',    icon: Package,         label: 'Consegne',      mobile: true },
   { path: '/customers',     icon: Users,           label: 'Clienti',       mobile: true },
   { path: '/drivers',        icon: Truck,           label: 'Fattorini' },
-  { path: '/chat',          icon: MessageSquare,   label: 'Chat',          mobile: true, badge: true },
+  { path: '/chat',          icon: MessageSquare,   label: 'Chat',          mobile: true, badge: true, funzione: 'chat' },
   { divider: true },
   { path: '/shifts',        icon: Wallet,          label: 'Turni & Cassa' },
   { path: '/tracking',      icon: Map,             label: 'Tracking Live' },
   { path: '/reports',       icon: BarChart3,       label: 'Report' },
-  { path: '/doctors',       icon: Stethoscope,     label: 'Medici' },
-  { path: '/useful-numbers',icon: Phone,           label: 'Numeri Utili' },
-  { path: '/notes',         icon: StickyNote,      label: 'Block Notes' },
+  { path: '/doctors',       icon: Stethoscope,     label: 'Medici',        funzione: 'medici' },
+  { path: '/useful-numbers',icon: Phone,           label: 'Numeri Utili',  funzione: 'numeri_utili' },
+  { path: '/notes',         icon: StickyNote,      label: 'Block Notes',   funzione: 'block_notes' },
   { divider: true },
   { path: '/integrations',  icon: Plug,            label: 'Integrazioni' },
   { path: '/archive',       icon: Archive,         label: 'Archivio' },
   { path: '/settings',      icon: Settings,        label: 'Impostazioni' },
 ];
 
-const mobileNavItems = navItems.filter(i => i.mobile);
+// Una funzione spenta dalla farmacia non compare nel menu, ne' sul computer
+// ne' sul telefono: il filtro e' lo stesso per entrambi.
+const navVisibili = (user) => {
+  const accese = funzioniDellaFarmacia(user);
+  return navItems.filter((item) => item.divider || !item.funzione || accese[item.funzione] !== false);
+};
 const isArchivedDeliveryNotification = (notification) => (
   notification?.type === 'delivery' && ['delivered', 'cancelled'].includes(notification?.data?.status)
 );
@@ -52,6 +58,9 @@ export const Layout = ({ children, title }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const voci = navVisibili(user);
+  const mobileNavItems = voci.filter(i => i.mobile);
 
   const safeNotifications = ensureArray(notifications);
   const unreadCount = safeNotifications.filter((notification) => !notification.is_read && !isArchivedDeliveryNotification(notification)).length;
@@ -163,7 +172,7 @@ export const Layout = ({ children, title }) => {
         {/* Nav */}
         <ScrollArea className="flex-1 py-2">
           <nav className="px-3 space-y-0.5">
-            {navItems.map((item, i) => {
+            {voci.map((item, i) => {
               if (item.divider) return <div key={i} className="my-2 h-px bg-border/60 mx-2" />;
               const active = isActive(item.path);
               return (

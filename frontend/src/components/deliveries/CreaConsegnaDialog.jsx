@@ -4,7 +4,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Textarea } from '../ui/textarea';
-import { FASCE } from '@/lib/fasce';
+import { FASCE, testoFasciaBreve } from '@/lib/fasce';
 import { avvisoConsegnaAperta } from '@/lib/consegneAperte';
 import { formatCurrency } from '@/lib/format';
 import { Package, Plus, Search, User, XCircle } from 'lucide-react';
@@ -14,7 +14,7 @@ import { Package, Plus, Search, User, XCircle } from 'lucide-react';
    Estratto da Deliveries.jsx: stava nella stessa pagina della lista e degli altri
    quattro dialoghi. Riceve dallo stato della pagina solo cio' che usa.
 */
-export default function CreaConsegnaDialog({ consegneAperte = [], modulo, activeCustomerIndex, applicaFascia, customerDropdownOpen, customerInputRef, customerSearchTerm, dialogCustomers, dialogOpen, frequentCustomers, handleCreate, openCreateCustomer, resetForm, selectCustomer, selectedCustomer, setActiveCustomerIndex, setCustomerDropdownOpen, setCustomerSearchTerm, setDialogOpen }) {
+export default function CreaConsegnaDialog({ consegneAperte = [], fasce = FASCE, modulo, activeCustomerIndex, applicaFascia, customerDropdownOpen, customerInputRef, customerSearchTerm, dialogCustomers, dialogOpen, frequentCustomers, handleCreate, openCreateCustomer, resetForm, selectCustomer, selectedCustomer, setActiveCustomerIndex, setCustomerDropdownOpen, setCustomerSearchTerm, setDialogOpen }) {
   const { form, setForm, fasciaScelta, change_due } = modulo;
   // Un cliente che ha gia' una consegna in corso: si dice mentre si compila,
   // non dopo, quando il server risponde 409.
@@ -166,7 +166,7 @@ export default function CreaConsegnaDialog({ consegneAperte = [], modulo, active
                   onChange={e => applicaFascia(e.target.value)}
                   data-testid="scelta-fascia"
                 >
-                  {FASCE.map(f => <option key={f.valore} value={f.valore}>{f.etichetta}</option>)}
+                  {fasce.map(f => <option key={f.valore} value={f.valore}>{testoFasciaBreve(f)}</option>)}
                 </select>
               </div>
             </div>
