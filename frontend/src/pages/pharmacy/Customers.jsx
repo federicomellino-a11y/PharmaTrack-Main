@@ -6,6 +6,7 @@ import { API } from '@/lib/config';
 import { useCustomersQuery } from '@/hooks/queries';
 import { ListSkeleton } from '../../components/Skeletons';
 import ClienteDialog from '../../components/customers/ClienteDialog';
+import AnalisiCliente from '../../components/customers/AnalisiCliente';
 import CartaCliente from '../../components/customers/CartaCliente';
 import { Layout } from '../../components/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
@@ -369,6 +370,8 @@ export default function CustomersPage() {
               accent="text-violet-500"
             />
           </div>
+
+          <AnalisiCliente analisi={customerStats?.analisi} />
 
           <Card>
             <CardHeader>

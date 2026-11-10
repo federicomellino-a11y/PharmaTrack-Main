@@ -24,6 +24,7 @@ const DockPage = lazyWithRetry(() => import('./pages/DockPage'))
 const PublicTrackingPage = lazyWithRetry(() => import('./pages/PublicTracking'))
 const PharmacyDashboard = lazyWithRetry(() => import('./pages/pharmacy/Dashboard'))
 const CustomersPage = lazyWithRetry(() => import('./pages/pharmacy/Customers'))
+const RecallsPage = lazyWithRetry(() => import('./pages/pharmacy/Recalls'))
 const DeliveriesPage = lazyWithRetry(() => import('./pages/pharmacy/Deliveries'))
 const DriversPage = lazyWithRetry(() => import('./pages/pharmacy/Drivers'))
 const ChatPage = lazyWithRetry(() => import('./pages/pharmacy/Chat'))
@@ -143,6 +144,7 @@ const AppRouter = () => (
     <Route path="/verify-email" element={<PharmacyPublicPage><VerifyEmailPage /></PharmacyPublicPage>} />
     <Route path="/dashboard" element={<PharmacyProtectedPage><PharmacyDashboard /></PharmacyProtectedPage>} />
     <Route path="/customers" element={<PharmacyProtectedPage><CustomersPage /></PharmacyProtectedPage>} />
+    <Route path="/richiami" element={<PharmacyProtectedPage><RecallsPage /></PharmacyProtectedPage>} />
     <Route path="/deliveries" element={<PharmacyProtectedPage><DeliveriesPage /></PharmacyProtectedPage>} />
     <Route path="/tracking" element={<PharmacyProtectedPage><TrackingPage /></PharmacyProtectedPage>} />
     <Route path="/quick" element={<PharmacyProtectedPage><QuickAddPage /></PharmacyProtectedPage>} />

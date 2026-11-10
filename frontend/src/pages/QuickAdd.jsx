@@ -67,6 +67,14 @@ export default function QuickAddPage() {
     if (activeDeliveriesCache) setDeliveries(ensureArrayLocal(activeDeliveriesCache));
   }, [activeDeliveriesCache]);
 
+  // Arrivo dai Richiami: il paziente e' gia' deciso, non si cerca nulla.
+  const customerIdDaLink = searchParams.get('customer_id');
+  useEffect(() => {
+    if (!customerIdDaLink || selectedCustomer) return;
+    const trovato = customers.find((c) => c.customer_id === customerIdDaLink);
+    if (trovato) setSelectedCustomer(trovato);
+  }, [customerIdDaLink, customers, selectedCustomer]);
+
   useEffect(() => { document.title = 'PharmaTrack · Quick'; }, []);
   useEffect(() => {
     const esc = (e) => { if (e.key === 'Escape' && !created) { try { window.close(); } catch { /* noop */ } } };
