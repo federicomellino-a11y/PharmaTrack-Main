@@ -25,7 +25,7 @@ import {
 } from 'lucide-react';
 
 import { formatCurrency, formatDateTime } from '@/lib/format';
-import { fasciaDi, testoFascia } from '@/lib/fasce';
+import { testoFascia } from '@/lib/fasce';
 import { printDeliveryLabel } from '@/lib/printLabel';
 import {
   PRIORITY_ICONS,

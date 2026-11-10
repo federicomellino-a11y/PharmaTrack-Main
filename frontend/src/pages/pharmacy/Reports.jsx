@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { API } from '@/lib/config';
 import { Layout } from '../../components/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '../../components/ui/tabs';
@@ -8,10 +7,7 @@ import {
   Tooltip, ResponsiveContainer,
 } from 'recharts';
 import { Button } from '../../components/ui/button';
-import {
-  Euro, Package, TrendingUp, Truck, CreditCard, Banknote, Trophy, Download, CheckCircle2,
-  Clock, XCircle, Users, BarChart3, Printer,
-} from 'lucide-react';
+import { Euro, Package, TrendingUp, Truck, CreditCard, Trophy, Download, CheckCircle2, Clock, XCircle, Users, BarChart3, Printer } from 'lucide-react';
 import { Badge } from '../../components/ui/badge';
 import { toast } from 'sonner';
 import { ensureArray } from '@/lib/collections';

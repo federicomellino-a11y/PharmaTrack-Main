@@ -14,11 +14,7 @@ import L from 'leaflet';
 import { Card, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
-import { 
-  ArrowLeft, MapPin, Phone, Package, Navigation, 
-  Clock, CheckCircle2, Truck, Play, MessageSquare, LogOut,
-  Euro, Banknote, CreditCard, Calculator, Camera, Loader2, AlertTriangle
-} from 'lucide-react';
+import { ArrowLeft, MapPin, Phone, Package, Navigation, CheckCircle2, Play, MessageSquare, LogOut, Banknote, CreditCard, Calculator, Camera, Loader2, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { confirmAction } from '../../components/ConfirmDialog';
 import 'leaflet/dist/leaflet.css';

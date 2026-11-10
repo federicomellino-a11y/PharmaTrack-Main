@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useDeliveriesQuery, useDriversQuery } from '@/hooks/queries';
 import axios from 'axios';
 import { API } from '@/lib/config';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
-import { Truck, Plus, RefreshCw, Search, ClipboardCheck, Package, Euro, XCircle, CheckCircle2, Zap } from 'lucide-react';
+import { Truck, Plus, RefreshCw, Search, Euro, CheckCircle2, Zap } from 'lucide-react';
 import { toast } from 'sonner';
 
 

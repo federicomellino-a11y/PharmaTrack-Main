@@ -15,18 +15,10 @@ import { Badge } from '../../components/ui/badge';
 import { useSocket } from '../../contexts/SocketContext';
 import TestataChat from '../../components/chat/TestataChat';
 import ListaConversazioni from '../../components/chat/ListaConversazioni';
-import {
-  MessageSquare, Send, Truck, ArrowLeft, Phone, WifiOff, Check, CheckCheck
-} from 'lucide-react';
+import { MessageSquare, Send, Truck, ArrowLeft, Phone, WifiOff, CheckCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { ensureArray } from '@/lib/collections';
-import {
-  buildUpdatedConversation,
-  dayLabel,
-  dedupeMessages,
-  formatConversationTime,
-  sameDay,
-} from '@/lib/chatMessages';
+import { buildUpdatedConversation, dayLabel, dedupeMessages, sameDay } from '@/lib/chatMessages';
 import { confirmAction } from '../../components/ConfirmDialog';
 
 

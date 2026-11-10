@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { Download, Share2, MoreVertical, MonitorDown, Smartphone } from 'lucide-react';
+import { Download, Share2, MoreVertical, Smartphone } from 'lucide-react';
 import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
 import { usePWAInstall } from '@/hooks/usePWAInstall';

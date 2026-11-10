@@ -3,12 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { API } from '@/lib/config';
 import { Button } from '../components/ui/button';
-import {
-  MapPin, MessageSquare, BarChart3, Users, Package, Shield,
-  Zap, ArrowRight, CheckCircle2, Truck, Clock, Download,
-  ChevronRight, Globe, Lock, HeartPulse, Route, Star,
-  TrendingUp, Bell, Smartphone, Sparkles,
-} from 'lucide-react';
+import { MapPin, MessageSquare, BarChart3, Users, Package, Shield, ArrowRight, CheckCircle2, Truck, Download, HeartPulse, Route, TrendingUp, Bell, Smartphone, Sparkles } from 'lucide-react';
 import { usePWAInstall } from '@/hooks/usePWAInstall';
 import { toast } from 'sonner';
 
