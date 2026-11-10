@@ -21,7 +21,7 @@ import { Separator } from '../ui/separator';
    Estratto da Settings.jsx: la pagina teneva dieci schede in fila e nessuna
    si poteva leggere da sola. Riceve dallo stato della pagina solo cio' che usa.
 */
-export default function DatiFarmaciaCard({ activeDrivers, formData, handleSubmit, saving, setFormData, settings }) {
+export default function DatiFarmaciaCard({ activeDrivers, formData, handleSubmit, saving, setFormData, setSettings, settings }) {
   return (
         <Card>
           <CardHeader>
@@ -84,6 +84,24 @@ export default function DatiFarmaciaCard({ activeDrivers, formData, handleSubmit
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground mt-1">Questo fattorino sarà suggerito automaticamente per le nuove consegne</p>
+              </div>
+
+              <Separator />
+
+              <div>
+                <Label htmlFor="soglia-pazienti">Pazienti fermi: quanti giorni prima di segnalarli</Label>
+                <Input
+                  id="soglia-pazienti"
+                  type="number"
+                  min={7}
+                  max={365}
+                  value={settings.giorni_pazienti_fermi}
+                  onChange={(e) => setSettings((prev) => ({ ...prev, giorni_pazienti_fermi: e.target.value }))}
+                  data-testid="soglia-pazienti"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Compare in Report &gt; Pazienti e ritorni: chi non ordina da piu' di questi giorni finisce nell'elenco dei fermi.
+                </p>
               </div>
 
               <Button type="submit" disabled={saving}>

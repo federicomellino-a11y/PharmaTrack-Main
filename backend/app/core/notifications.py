@@ -188,9 +188,56 @@ async def remove_push_subscription(user_id: str, user_type: str, payload: dict) 
     return {"status": "unsubscribed", "deleted": result.deleted_count}
 
 
+# Le famiglie di avvisi che la farmacia puo' accendere e spegnere da sola.
+# Il tipo interno resta quello scritto nelle chiamate (delivery, shift): qui
+# c'e' solo la traduzione in una scelta comprensibile a chi non legge il codice.
+EVENTI_NOTIFICHE = {
+    "delivery": "Consegne",
+    "shift": "Turni",
+}
+
+
+def preferenze_eventi(user: dict) -> dict:
+    """Cosa la farmacia vuole ricevere. Assente significa acceso."""
+    preferenze = ((user or {}).get("settings") or {}).get("notifiche_eventi") or {}
+    # Solo un False scritto davvero spegne: un valore storto nel JSON non deve
+    # silenziare gli avvisi di una farmacia.
+    return {chiave: preferenze.get(chiave, True) is not False for chiave in EVENTI_NOTIFICHE}
+
+
+def evento_consentito(user: dict, notif_type: str) -> bool:
+    """Un evento spento non produce ne' notifica in app ne' push.
+
+    Spenta la campanella, il registro degli avvisi resta: le notifiche gia'
+    ricevute non si toccano, semplicemente non se ne aggiungono di nuove per
+    quella famiglia. I tipi non elencati in EVENTI_NOTIFICHE passano sempre.
+    """
+    if notif_type not in EVENTI_NOTIFICHE:
+        return True
+    return preferenze_eventi(user)[notif_type]
+
+
+def notifiche_browser_accese(user: dict) -> bool:
+    return ((user or {}).get("settings") or {}).get("notifications_enabled", True) is not False
+
+
+async def _impostazioni_destinatario(user_id: str, user_type: str) -> dict:
+    """Farmacia e staff condividono le preferenze del titolare; il fattorino no."""
+    if user_type != "pharmacy":
+        return {}
+    utente = await db.users.find_one({"user_id": user_id}, {"settings": 1, "_id": 0})
+    return utente or {}
+
+
 async def send_web_push_notifications(user_id: str, user_type: str, notif_data: dict) -> dict:
     if not push_notifications_enabled():
         return {"sent": 0, "disabled": True}
+
+    # Chi ha spento le notifiche browser resta senza push, ma continua a vedere
+    # la campanella: le due cose sono sempre state due interruttori diversi e
+    # finora il secondo non veniva guardato da nessuno.
+    if not notifiche_browser_accese(await _impostazioni_destinatario(user_id, user_type)):
+        return {"sent": 0, "disabled": True, "motivo": "notifiche spente dall'utente"}
 
     subscriptions = await db.push_subscriptions.find({"user_id": user_id, "user_type": user_type}, {"_id": 0}).to_list(50)
     if not subscriptions:
@@ -316,6 +363,8 @@ async def send_transactional_email(to_address: str, subject: str, text_body: str
 
 
 async def create_notification_internal(user_id, user_type, title, message, notif_type, data=None):
+    if not evento_consentito(await _impostazioni_destinatario(user_id, user_type), notif_type):
+        return None
     notification_data = {**(data or {})}
     notification_data.setdefault("url", build_notification_target_url(user_type, notif_type, notification_data))
     notif_data = {
