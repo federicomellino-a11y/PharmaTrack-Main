@@ -14,6 +14,34 @@ from app.core.delivery_lifecycle import BILLED_STATUSES
 from app.core.fasce import fascia_scaduta
 
 
+def variazione(nuovo: float, vecchio: float):
+    """Quanto è cambiato, in percentuale. Senza termine di paragone: None.
+
+    Zero non è una variazione del -100%: è un periodo in cui non c'era niente,
+    e inventare una percentuale su quel vuoto fa dire bugie ai grafici.
+    """
+    if not vecchio:
+        return None
+    return round((nuovo - vecchio) / vecchio * 100, 1)
+
+
+async def _somma_periodo(pharmacy_id: str, da: str, a: str) -> dict:
+    """Fatturato e consegne fatturate di una finestra di tempo."""
+    righe = await db.deliveries.aggregate([
+        {"$match": {"pharmacy_id": pharmacy_id, "status": {"$in": BILLED_STATUSES},
+                    "created_at": {"$gte": da, "$lt": a}}},
+        {"$group": {"_id": None, "revenue": {"$sum": {"$ifNull": ["$amount", 0]}}, "count": {"$sum": 1}}},
+    ]).to_list(1)
+    riga = righe[0] if righe else {}
+    fatturato = round(float(riga.get("revenue") or 0), 2)
+    quante = int(riga.get("count") or 0)
+    return {
+        "total_revenue": fatturato,
+        "delivered_count": quante,
+        "avg_order_value": round(fatturato / quante, 2) if quante else 0.0,
+    }
+
+
 async def calcola_analytics(pharmacy_id: str, period: str) -> dict:
     """Tutti i KPI del periodo per una farmacia."""
     days = {"week": 7, "month": 30, "quarter": 90, "year": 365}.get(period, 30)
@@ -209,6 +237,46 @@ async def calcola_analytics(pharmacy_id: str, period: str) -> dict:
         )
     )
 
+    # --- Confronto col periodo prima ---
+    # Un fatturato da solo non dice se la farmacia sta crescendo: serve il
+    # termine di paragone della stessa lunghezza, subito precedente.
+    prima_inizio = start - timedelta(days=days)
+    precedente = await _somma_periodo(pharmacy_id, prima_inizio.isoformat(), start.isoformat())
+    attuale = {
+        "total_revenue": round(total_revenue, 2),
+        "delivered_count": delivered_count,
+        "avg_order_value": avg_order,
+    }
+    confronto = {
+        "previous": precedente,
+        "current": attuale,
+        "delta": {
+            "revenue_pct": variazione(attuale["total_revenue"], precedente["total_revenue"]),
+            "count_pct": variazione(attuale["delivered_count"], precedente["delivered_count"]),
+            "avg_order_pct": variazione(attuale["avg_order_value"], precedente["avg_order_value"]),
+        },
+    }
+
+    # --- Chi è nuovo e chi è di ritorno ---
+    # "Nuovo" vuol dire: prima consegna fatturata di sempre dentro il periodo.
+    prime = await db.deliveries.aggregate([
+        {"$match": {"pharmacy_id": pharmacy_id, "status": {"$in": BILLED_STATUSES}}},
+        {"$group": {"_id": "$customer_id", "prima": {"$min": "$created_at"}}},
+    ]).to_list(20000)
+    prima_volta = {r["_id"]: str(r.get("prima") or "") for r in prime if r.get("_id")}
+    nel_periodo = {
+        c.get("customer_id") for c in dettagli
+        if c.get("customer_id") and c.get("status") in BILLED_STATUSES
+    }
+    soglia = start.isoformat()
+    nuovi = sum(1 for cid in nel_periodo if (prima_volta.get(cid) or "") >= soglia)
+    clienti = {
+        "totali": len(nel_periodo),
+        "nuovi": nuovi,
+        "di_ritorno": len(nel_periodo) - nuovi,
+        "spesa_media": round(total_revenue / len(nel_periodo), 2) if nel_periodo else 0.0,
+    }
+
     ora_di_punta = max(per_ora, key=lambda ora: per_ora[ora]) if any(per_ora.values()) else None
     giorno_di_punta = max(per_giorno, key=lambda giorno: per_giorno[giorno]) if any(per_giorno.values()) else None
 
@@ -243,6 +311,8 @@ async def calcola_analytics(pharmacy_id: str, period: str) -> dict:
         "open_without_driver": senza_fattorino,
         "overdue_slots": in_ritardo,
         "lapsed_customers": da_richiamare[:10],
+        "confronto": confronto,
+        "clienti": clienti,
     }
 
     return result

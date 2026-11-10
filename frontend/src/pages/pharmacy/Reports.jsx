@@ -7,11 +7,13 @@ import {
   Tooltip, ResponsiveContainer,
 } from 'recharts';
 import { Button } from '../../components/ui/button';
-import { Euro, Package, TrendingUp, Truck, CreditCard, Trophy, CheckCircle2, Clock, XCircle, Users, BarChart3, Printer } from 'lucide-react';
+import { Euro, Package, TrendingUp, Truck, CreditCard, Trophy, CheckCircle2, Clock, XCircle, BarChart3, Printer } from 'lucide-react';
 import { Badge } from '../../components/ui/badge';
 import { ensureArray } from '@/lib/collections';
 import { useAnalyticsQuery } from '@/hooks/queries';
 import { ListSkeleton } from '../../components/Skeletons';
+import ConfrontoPeriodo from '../../components/reports/ConfrontoPeriodo';
+import PazientiRicorrenti from '../../components/reports/PazientiRicorrenti';
 
 import { formatCurrency } from '@/lib/format';
 const periodLabels = { week: 'Settimana', month: 'Mese', quarter: 'Trimestre', year: 'Anno' };
@@ -89,7 +91,6 @@ export default function ReportsPage() {
   const tempi = data.delivery_times || {};
   const motivi = ensureArray(data.failures?.by_reason);
   const perOra = ensureArray(data.by_hour);
-  const daRichiamare = ensureArray(data.lapsed_customers);
   const massimoOra = Math.max(1, ...perOra.map((v) => v.count || 0));
   const perGiorno = ensureArray(data.by_weekday);
   const massimoGiorno = Math.max(1, ...perGiorno.map((v) => v.count || 0));
@@ -134,6 +135,12 @@ export default function ReportsPage() {
           <KpiCard label="Media ordine" value={formatCurrency(s.avg_order_value)} sub="Per consegna" icon={TrendingUp} tint="hsl(45,93%,47%)" />
           <KpiCard label="Completamento" value={`${s.completion_rate || 0}%`} sub={`${s.cancelled || 0} annullate`} icon={CheckCircle2} tint="hsl(142,71%,45%)" />
         </div>
+
+        <ConfrontoPeriodo
+          confronto={data.confronto}
+          clienti={data.clienti}
+          etichettaPeriodo={periodLabels[period]}
+        />
 
         {/* Revenue trend */}
         <Card className="card-exclusive">
@@ -374,38 +381,9 @@ export default function ReportsPage() {
             </CardContent>
           </Card>
 
-          {/* Clienti da richiamare */}
-          <Card className="card-exclusive lg:col-span-2">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="w-5 h-5 text-emerald-500" />
-                Pazienti da richiamare
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {daRichiamare.length === 0 ? (
-                <EmptyState title="Nessuno da richiamare" hint="Chi ordinava spesso ha ordinato di recente." />
-              ) : (
-                <div className="divide-y divide-border/60" data-testid="lapsed-customers">
-                  {daRichiamare.map((cliente) => (
-                    <div key={cliente.customer_id} className="flex items-center justify-between gap-3 py-2">
-                      <div className="min-w-0">
-                        <p className="font-medium truncate">{cliente.name || 'Cliente'}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {cliente.deliveries} consegne · ultima il {cliente.last_delivery}
-                        </p>
-                      </div>
-                      <Badge variant="secondary" className="tabular-nums shrink-0">{cliente.days_since} giorni</Badge>
-                    </div>
-                  ))}
-                  <p className="pt-2 text-[11px] text-muted-foreground">
-                    Chi ordinava almeno due volte e non ordina da 45 giorni. L'importo cambia ogni volta, la persona no.
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
         </div>
+
+        <PazientiRicorrenti />
       </div>
     </Layout>
   );
