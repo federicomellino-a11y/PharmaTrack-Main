@@ -26,6 +26,25 @@ export const FUNZIONI_PRO = [
     descrizione: 'Fatturato, consegne per fattorino, top clienti e fasce orarie con export',
     dove: 'Pagina Report',
   },
+  {
+    chiave: 'tracking_live',
+    nome: 'Tracking Live',
+    descrizione: 'Mappa dei fattorini in giro, posizione e stato di ogni consegna in tempo reale',
+    dove: 'Pagina Tracking Live',
+  },
+  {
+    chiave: 'turni_cassa',
+    nome: 'Turni e cassa',
+    descrizione: 'Turni dei fattorini, incasso atteso contro ricevuto, quadratura di fine giornata',
+    dove: 'Pagina Turni & Cassa',
+  },
+  {
+    chiave: 'multisede',
+    nome: 'Più sedi',
+    descrizione: 'Una farmacia con più sedi e un solo titolare che le guarda tutte',
+    dove: 'Da costruire',
+    in_arrivo: true,
+  },
 ];
 
 export const funzioneSbloccata = (piano, chiave) => {

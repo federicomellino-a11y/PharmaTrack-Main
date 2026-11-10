@@ -60,6 +60,24 @@ def test_chiave_sconosciuta_non_chiude_niente():
     assert verifica_funzione(piano, "funzione_che_non_esiste") is None
 
 
+def test_tracking_e_turni_sono_pro_come_gli_altri():
+    """Chiesti da Federico l'11/11: tracking e turni-cassa salgono nel Professional."""
+    piano = _piano(nuovo_profilo_piano(ADESSO), GIORNI_PROVA + 1)
+    assert verifica_funzione(piano, "tracking_live")
+    assert verifica_funzione(piano, "turni_cassa")
+    aperto = _piano(nuovo_profilo_piano(ADESSO))
+    assert verifica_funzione(aperto, "tracking_live") is None
+    assert verifica_funzione(aperto, "turni_cassa") is None
+
+
+def test_multisede_non_ha_lucchetto_perche_non_esiste():
+    """Si promette, non si blocca: una funzione che non c'è non va chiusa."""
+    piano = _piano(nuovo_profilo_piano(ADESSO), GIORNI_PROVA + 1)
+    assert verifica_funzione(piano, "multisede") is None
+    voce = [f for f in elenco_funzioni(piano) if f["chiave"] == "multisede"][0]
+    assert voce["in_arrivo"] is True
+
+
 def test_elenco_funzioni_racconta_cosa_e_aperto():
     chiuso = elenco_funzioni(_piano(nuovo_profilo_piano(ADESSO), GIORNI_PROVA + 1))
     assert {voce["chiave"] for voce in chiuso} == set(FUNZIONI)

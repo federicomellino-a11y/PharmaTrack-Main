@@ -6,6 +6,7 @@ import { CardTitle } from '../ui/card';
 import { Crown } from 'lucide-react';
 import { Lock } from 'lucide-react';
 import { Check } from 'lucide-react';
+import { Clock } from 'lucide-react';
 import { FUNZIONI_PRO } from '@/lib/funzioniPro';
 
 /* FunzioniProCard: cosa è compreso nel piano Professional.
@@ -17,7 +18,9 @@ import { FUNZIONI_PRO } from '@/lib/funzioniPro';
 */
 export default function FunzioniProCard({ piano }) {
   const elenco = piano?.funzioni?.length ? piano.funzioni : FUNZIONI_PRO;
-  const nessunaChiusa = elenco.every((funzione) => funzione.sbloccata);
+  // Multisede non esiste ancora: sta nell'elenco come cosa da fare, non come
+  // lucchetto. Se contasse fra le chiuse, la scheda direbbe una bugia al contrario.
+  const nessunaChiusa = elenco.filter((funzione) => !funzione.in_arrivo).every((funzione) => funzione.sbloccata);
 
   return (
     <Card className="border-purple-500/30 bg-gradient-to-br from-purple-500/5 to-primary/5" data-testid="funzioni-pro">
@@ -34,12 +37,17 @@ export default function FunzioniProCard({ piano }) {
           {elenco.map((funzione) => (
             <div key={funzione.chiave} className="flex items-center gap-3 p-3 rounded-lg bg-background/50">
               <div className="w-8 h-8 rounded bg-purple-500/20 flex items-center justify-center">
-                {funzione.sbloccata
-                  ? <Check className="w-4 h-4 text-emerald-500" />
-                  : <Lock className="w-4 h-4 text-purple-400" />}
+                {funzione.in_arrivo
+                  ? <Clock className="w-4 h-4 text-muted-foreground" />
+                  : funzione.sbloccata
+                    ? <Check className="w-4 h-4 text-emerald-500" />
+                    : <Lock className="w-4 h-4 text-purple-400" />}
               </div>
               <div className="min-w-0">
-                <p className="font-medium text-sm">{funzione.nome}</p>
+                <p className="font-medium text-sm">
+                  {funzione.nome}
+                  {funzione.in_arrivo && <span className="ml-2 text-[11px] font-normal text-muted-foreground">in arrivo</span>}
+                </p>
                 <p className="text-xs text-muted-foreground">{funzione.descrizione}</p>
                 {funzione.dove && <p className="text-[11px] text-muted-foreground/80 mt-0.5">Dove: {funzione.dove}</p>}
               </div>
@@ -48,7 +56,7 @@ export default function FunzioniProCard({ piano }) {
         </div>
         <p className="text-xs text-center text-muted-foreground mt-4">
           {nessunaChiusa
-            ? 'Quello che non è qui (consegne, clienti, tracking, chat, turni) resta nel piano base.'
+            ? 'Quello che non è qui (consegne, clienti, anagrafica, chat, archivio) resta nel piano base.'
             : 'Passando a un piano a pagamento si riaprono; i dati già salvati restano.'}
         </p>
       </CardContent>

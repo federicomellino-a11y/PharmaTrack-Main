@@ -38,6 +38,28 @@ FUNZIONI = {
         "descrizione": "Fatturato, consegne per fattorino, top clienti e fasce orarie con export",
         "dove": "Pagina Report",
     },
+    # Tracking Live non ha un endpoint suo: legge le stesse consegne e gli
+    # stessi fattorini del piano base. La serratura è quindi sulla pagina, ed è
+    # giusto dirlo invece di far finta di aver bloccato un database.
+    "tracking_live": {
+        "nome": "Tracking Live",
+        "descrizione": "Mappa dei fattorini in giro, posizione e stato di ogni consegna in tempo reale",
+        "dove": "Pagina Tracking Live",
+        "blocco": "interfaccia",
+    },
+    "turni_cassa": {
+        "nome": "Turni e cassa",
+        "descrizione": "Turni dei fattorini, incasso atteso contro ricevuto, quadratura di fine giornata",
+        "dove": "Pagina Turni & Cassa",
+    },
+    # Multisede non esiste ancora come codice: sta nel Professional come cosa
+    # da fare, non come lucchetto. Meglio dirlo in chiaro che prometterlo muto.
+    "multisede": {
+        "nome": "Più sedi",
+        "descrizione": "Una farmacia con più sedi e un solo titolare che le guarda tutte",
+        "dove": "Da costruire",
+        "in_arrivo": True,
+    },
 }
 
 # I piani che comprendono le funzioni Pro. Un eventuale piano base futuro non
@@ -59,6 +81,9 @@ def verifica_funzione(piano: dict, chiave: str) -> Optional[str]:
     if chiave not in FUNZIONI:
         # Chiave sconosciuta: meglio lasciar passare che chiudere per errore.
         return None
+    if FUNZIONI[chiave].get("in_arrivo"):
+        # Una funzione che non esiste non si può chiudere: si promette, non si blocca.
+        return None
     if funzioni_sbloccate(piano):
         return None
     return (
@@ -78,6 +103,7 @@ def elenco_funzioni(piano: dict) -> list:
             "descrizione": valori["descrizione"],
             "dove": valori["dove"],
             "sbloccata": aperto,
+            "in_arrivo": bool(valori.get("in_arrivo")),
         }
         for chiave, valori in FUNZIONI.items()
     ]

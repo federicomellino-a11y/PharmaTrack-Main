@@ -147,7 +147,7 @@ const AppRouter = () => (
     <Route path="/customers" element={<PharmacyProtectedPage><CustomersPage /></PharmacyProtectedPage>} />
     <Route path="/richiami" element={<PharmacyProtectedPage><ProGate funzione="ricorrenze"><RecallsPage /></ProGate></PharmacyProtectedPage>} />
     <Route path="/deliveries" element={<PharmacyProtectedPage><DeliveriesPage /></PharmacyProtectedPage>} />
-    <Route path="/tracking" element={<PharmacyProtectedPage><TrackingPage /></PharmacyProtectedPage>} />
+    <Route path="/tracking" element={<PharmacyProtectedPage><ProGate funzione="tracking_live"><TrackingPage /></ProGate></PharmacyProtectedPage>} />
     <Route path="/quick" element={<PharmacyProtectedPage><QuickAddPage /></PharmacyProtectedPage>} />
     <Route path="/dock" element={<PharmacyProtectedPage><DockPage /></PharmacyProtectedPage>} />
     <Route path="/t/:token" element={<PublicTrackingPage />} />
@@ -159,7 +159,7 @@ const AppRouter = () => (
     <Route path="/doctors" element={<PharmacyProtectedPage><DoctorsPage /></PharmacyProtectedPage>} />
     <Route path="/useful-numbers" element={<PharmacyProtectedPage><UsefulNumbersPage /></PharmacyProtectedPage>} />
     <Route path="/notes" element={<PharmacyProtectedPage><NotesPage /></PharmacyProtectedPage>} />
-    <Route path="/shifts" element={<PharmacyProtectedPage><ShiftsPage /></PharmacyProtectedPage>} />
+    <Route path="/shifts" element={<PharmacyProtectedPage><ProGate funzione="turni_cassa"><ShiftsPage /></ProGate></PharmacyProtectedPage>} />
     <Route path="/integrations" element={<PharmacyProtectedPage><IntegrationsPage /></PharmacyProtectedPage>} />
     <Route path="/settings" element={<PharmacyProtectedPage><SettingsPage /></PharmacyProtectedPage>} />
     <Route path="/driver/login" element={<DriverPublicPage><DriverLogin /></DriverPublicPage>} />

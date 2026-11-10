@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, Depends, Request
 
 from app.core.cache import invalida_riepiloghi
 from app.core.database import db
+from app.core.funzioni_pro import richiedi_pro
 from app.core.websocket import manager
 from app.core.security import (
     get_current_user, get_current_driver,
@@ -159,7 +160,7 @@ async def driver_list_shifts(driver: dict = Depends(get_current_driver), limit: 
 
 @router.get("/shifts")
 async def pharmacy_list_shifts(
-    user: dict = Depends(get_current_user),
+    user: dict = Depends(richiedi_pro("turni_cassa")),
     driver_id: Optional[str] = None,
     status_filter: Optional[str] = None,
     limit: int = 50,
@@ -174,7 +175,7 @@ async def pharmacy_list_shifts(
 
 
 @router.get("/shifts/{shift_id}")
-async def pharmacy_get_shift(shift_id: str, user: dict = Depends(get_current_user)):
+async def pharmacy_get_shift(shift_id: str, user: dict = Depends(richiedi_pro("turni_cassa"))):
     shift = await db.driver_shifts.find_one(
         {"shift_id": shift_id, "pharmacy_id": user["user_id"]}, {"_id": 0}
     )
@@ -184,7 +185,7 @@ async def pharmacy_get_shift(shift_id: str, user: dict = Depends(get_current_use
 
 
 @router.post("/shifts/{shift_id}/settle")
-async def pharmacy_settle_shift(shift_id: str, request: Request, user: dict = Depends(get_current_user)):
+async def pharmacy_settle_shift(shift_id: str, request: Request, user: dict = Depends(richiedi_pro("turni_cassa"))):
     shift = await db.driver_shifts.find_one(
         {"shift_id": shift_id, "pharmacy_id": user["user_id"]}, {"_id": 0}
     )
