@@ -13,6 +13,7 @@ import OrariConsegnaCard from '../../components/settings/OrariConsegnaCard';
 import FunzioniCard from '../../components/settings/FunzioniCard';
 import { FASCE_PREDEFINITE, FASCIA_PRIMA, normalizzaFasce } from '../../lib/fasce';
 import { funzioniDellaFarmacia } from '../../lib/funzioniFarmacia';
+import { giorniConsegnati, taglioOrdini } from '../../lib/giorniConsegna';
 import { API } from '@/lib/config';
 import { ensureArray, ensureObject } from '@/lib/collections';
 import { useAuth } from '../../contexts/AuthContext';
@@ -22,7 +23,7 @@ import { Layout } from '../../components/Layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import { Button } from '../../components/ui/button';
-import { Plug } from 'lucide-react';
+import { Compass, Plug, Save } from 'lucide-react';
 import { toast } from 'sonner';
 import { usePWAInstall } from '@/hooks/usePWAInstall';
 
@@ -73,6 +74,9 @@ const buildSettingsData = (user) => {
     silenzio_a: salvate.silenzio_a || '07:30',
     fasce: fasce.length ? fasce : buildFasce({}),
     fascia_predefinita: salvate.fascia_predefinita || FASCIA_PRIMA.valore,
+    giorni_consegna: giorniConsegnati(salvate),
+    taglio_ordini: taglioOrdini(salvate),
+    pagina_iniziale: salvate.pagina_iniziale === 'deliveries' ? 'deliveries' : 'dashboard',
     funzioni: funzioniDellaFarmacia({ settings: salvate }),
   };
 };
@@ -150,6 +154,8 @@ export default function SettingsPage() {
       giorni_pazienti_fermi: sogliaValida(settings.giorni_pazienti_fermi),
       default_driver_id: formData.default_driver_id || '',
       fasce: controlloFasce.fasce,
+      giorni_consegna: giorniConsegnati(settings),
+      taglio_ordini: taglioOrdini(settings),
     };
 
     const payload = {
@@ -320,6 +326,37 @@ export default function SettingsPage() {
           </TabsContent>
 
           <TabsContent value="aspetto" className="space-y-6 mt-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Compass className="w-5 h-5 text-primary" />Dove riparte l&apos;app
+                </CardTitle>
+                <CardDescription>La prima pagina che trovi aprendo PharmaTrack dopo l&apos;accesso</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {[
+                    { valore: 'dashboard', etichetta: 'La home', descrizione: 'Consegne di oggi, cassa e mappa' },
+                    { valore: 'deliveries', etichetta: 'Le consegne', descrizione: 'Direttamente la lista da lavorare' },
+                  ].map(({ valore, etichetta, descrizione }) => (
+                    <Button
+                      key={valore}
+                      type="button"
+                      variant={settings.pagina_iniziale === valore ? 'default' : 'outline'}
+                      className="h-auto flex-col items-start gap-0.5 py-3"
+                      onClick={() => setSettings((prev) => ({ ...prev, pagina_iniziale: valore }))}
+                      data-testid={`pagina-iniziale-${valore}`}
+                    >
+                      <span className="font-semibold">{etichetta}</span>
+                      <span className="text-xs font-normal opacity-80">{descrizione}</span>
+                    </Button>
+                  ))}
+                </div>
+                <Button type="button" onClick={handleSubmit} disabled={saving} data-testid="salva-avvio">
+                  <Save className="w-4 h-4 mr-2" />{saving ? 'Salvataggio...' : 'Salva la pagina di avvio'}
+                </Button>
+              </CardContent>
+            </Card>
             <AspettoCard
               isInstallable={isInstallable}
               isInstalled={isInstalled}

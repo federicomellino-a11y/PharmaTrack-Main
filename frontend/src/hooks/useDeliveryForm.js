@@ -39,11 +39,14 @@ export const MODULO_VUOTO = {
    (settings.fascia_predefinita): chi consegna sempre il pomeriggio trova il
    modulo gia' sul pomeriggio. Senza impostazioni resta "La prima possibile",
    che e' quello che l'app faceva prima di avere una scelta. */
-export default function useDeliveryForm({ fasciaIniziale } = {}) {
+export default function useDeliveryForm({ fasciaIniziale, dataIniziale } = {}) {
   const valoreIniziale = fasciaIniziale?.valore || 'subito';
-  const moduloIniziale = fasciaIniziale?.da && fasciaIniziale.da !== '__manuale__'
+  const conFascia = fasciaIniziale?.da && fasciaIniziale.da !== '__manuale__'
     ? { ...MODULO_VUOTO, scheduled_time: fasciaIniziale.da, slot_to: fasciaIniziale.a || null }
-    : MODULO_VUOTO;
+    : { ...MODULO_VUOTO };
+  // La data che la farmacia consegna davvero (Impostazioni > Consegne): cosi'
+  // il modulo non propone una domenica a chi non lavora la domenica.
+  const moduloIniziale = dataIniziale ? { ...conFascia, scheduled_date: dataIniziale } : conFascia;
 
   const [form, setForm] = useState(moduloIniziale);
   const [fasciaScelta, setFasciaScelta] = useState(valoreIniziale);

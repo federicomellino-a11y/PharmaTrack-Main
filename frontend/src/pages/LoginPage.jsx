@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { paginaDiAvvio } from '@/lib/paginaAvvio';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -74,7 +75,7 @@ export default function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState({});
 
-  useEffect(() => { if (user) navigate('/dashboard'); }, [user, navigate]);
+  useEffect(() => { if (user) navigate(paginaDiAvvio(user)); }, [user, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -85,8 +86,10 @@ export default function LoginPage() {
 
     setSubmitting(true);
     try {
-      await login(email, password);
-      navigate('/dashboard');
+      const entrato = await login(email, password);
+      // La pagina di avvio si legge dall'utente appena entrato: lo stato di
+      // React qui e' ancora quello di prima del login.
+      navigate(paginaDiAvvio(entrato));
     } catch (err) {
       const msg = err.response?.data?.detail;
       if (msg === 'Credenziali non valide') setErrors({ password: 'Email o password errati' });
@@ -98,8 +101,8 @@ export default function LoginPage() {
 
   const handleGoogleCredential = useCallback(async (credential) => {
     try {
-      await loginWithGoogle(credential);
-      navigate('/dashboard');
+      const entrato = await loginWithGoogle(credential);
+      navigate(paginaDiAvvio(entrato));
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Accesso con Google fallito');
     }

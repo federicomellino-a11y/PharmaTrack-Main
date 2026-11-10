@@ -5,6 +5,7 @@ import { ListSkeleton } from '../../components/Skeletons';
 import axios from 'axios';
 import { API } from '@/lib/config';
 import { fasciaDi, fasceDellaFarmacia } from '@/lib/fasce';
+import { dataConsegnaPredefinita } from '@/lib/giorniConsegna';
 import BarraConsegne from '../../components/deliveries/BarraConsegne';
 import ListaConsegne from '../../components/deliveries/ListaConsegne';
 import { consegneAperteDelCliente } from '@/lib/consegneAperte';
@@ -64,8 +65,10 @@ export default function DeliveriesPage() {
     return fasce.find((fascia) => fascia.valore === scelta) || fasce[0];
   }, [fasce, user]);
 
+  const dataIniziale = useMemo(() => dataConsegnaPredefinita(user?.settings || {}), [user]);
+
   // Stato del modulo consegna: vive in hooks/useDeliveryForm.js
-  const modulo = useDeliveryForm({ fasciaIniziale });
+  const modulo = useDeliveryForm({ fasciaIniziale, dataIniziale });
   const { form, setForm, fasciaScelta, setFasciaScelta, change_due, amountValue, amountGivenValue } = modulo;
 
   // Stato per import Winfarm: dati pre-compilati dalla querystring

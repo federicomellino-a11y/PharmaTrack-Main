@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Separator } from '../ui/separator';
 import { Clock, Plus, Save, Trash2 } from 'lucide-react';
 import { FASCIA_PRIMA, MASSIMO_FASCE, normalizzaFasce, testoFasciaBreve } from '@/lib/fasce';
+import { GIORNI_SETTIMANA, giorniConsegnati, taglioOrdini } from '@/lib/giorniConsegna';
 
 /* OrariConsegnaCard: le fasce che la farmacia promette al paziente.
 
@@ -21,6 +22,7 @@ import { FASCIA_PRIMA, MASSIMO_FASCE, normalizzaFasce, testoFasciaBreve } from '
 */
 export default function OrariConsegnaCard({ onSalva, saving, setSettings, settings }) {
   const fasce = Array.isArray(settings.fasce) ? settings.fasce : [];
+  const giorni = giorniConsegnati(settings);
 
   const cambia = (indice, campo, valore) => setSettings((prev) => ({
     ...prev,
@@ -150,6 +152,55 @@ export default function OrariConsegnaCard({ onSalva, saving, setSettings, settin
         <p className="text-xs text-muted-foreground">
           Le consegne gia&apos; prese tengono l&apos;orario promesso: cambiare una fascia vale dalle prossime.
         </p>
+
+        <Separator />
+
+        <div>
+          <Label>Giorni in cui consegni</Label>
+          <div className="mt-2 flex flex-wrap gap-2" data-testid="giorni-consegna">
+            {GIORNI_SETTIMANA.map(({ numero, breve, nome }) => {
+              const acceso = giorni.includes(numero);
+              return (
+                <Button
+                  key={numero}
+                  type="button"
+                  size="sm"
+                  variant={acceso ? 'default' : 'outline'}
+                  className="w-14"
+                  aria-pressed={acceso}
+                  aria-label={nome}
+                  onClick={() => setSettings((prev) => {
+                    const scelti = giorniConsegnati({ giorni_consegna: prev.giorni_consegna });
+                    const nuovi = acceso ? scelti.filter((g) => g !== numero) : [...scelti, numero];
+                    // L'ultimo giorno acceso non si spegne: il fattorino gira
+                    // almeno un giorno, altrimenti nessuna data sarebbe giusta.
+                    return nuovi.length ? { ...prev, giorni_consegna: nuovi } : prev;
+                  })}
+                >
+                  {breve}
+                </Button>
+              );
+            })}
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Il modulo &quot;Nuova consegna&quot; propone gia&apos; il primo giorno buono: se oggi non consegni, parte da domani.
+          </p>
+        </div>
+
+        <div>
+          <Label htmlFor="taglio-ordini">Ordini presi entro le</Label>
+          <Input
+            id="taglio-ordini"
+            type="time"
+            value={taglioOrdini(settings)}
+            onChange={(e) => setSettings((prev) => ({ ...prev, taglio_ordini: e.target.value }))}
+            data-testid="taglio-ordini"
+          />
+          <p className="mt-1 text-xs text-muted-foreground">
+            Dopo quest&apos;ora un ordine si propone per il giorno dopo: e&apos; il momento in cui il fattorino
+            esce, non un&apos;imposizione.
+          </p>
+        </div>
 
         <Button type="button" onClick={onSalva} disabled={saving || !validate.ok} data-testid="salva-orari">
           <Save className="w-4 h-4 mr-2" />{saving ? 'Salvataggio...' : 'Salva orari'}
