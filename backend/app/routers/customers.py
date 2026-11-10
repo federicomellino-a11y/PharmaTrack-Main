@@ -3,6 +3,7 @@ import logging
 from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Depends, Request
 
+from app.core.analisi_cliente import analisi_cliente
 from app.core.delivery_lifecycle import FOLLOW_UP_STATUSES
 from app.core.database import db
 # (nessun uso di app.core.config)
@@ -129,8 +130,20 @@ async def get_customer_stats(customer_id: str, user: dict = Depends(get_current_
     last_order_at = deliveries[0].get("created_at") if deliveries else None
     verified_address = customer.get("customer_lat") is not None and customer.get("customer_lng") is not None
 
+    # Media della farmacia: serve al confronto ("questo paziente spende il doppio"),
+    # ed e' un dato aggregato, non la somma di tutte le consegne.
+    aggregato = await db.deliveries.aggregate([
+        {"$match": {"pharmacy_id": user["user_id"], "status": "delivered"}},
+        {"$group": {"_id": None, "totale": {"$sum": "$amount"}, "quante": {"$sum": 1}}},
+    ]).to_list(1)
+    if aggregato and aggregato[0].get("quante"):
+        media_farmacia = round((aggregato[0].get("totale") or 0) / aggregato[0]["quante"], 2)
+    else:
+        media_farmacia = None
+
     return {
         "customer": customer,
+        "analisi": analisi_cliente(deliveries, media_farmacia=media_farmacia),
         "stats": {
             "total_deliveries": total_deliveries,
             "completed_deliveries": completed_deliveries,

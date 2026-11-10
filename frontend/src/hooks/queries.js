@@ -23,6 +23,9 @@ export const useAnalyticsQuery = (period = 'month', options = {}) =>
 export const usePlanQuery = (options = {}) =>
   useQuery({ queryKey: chiavi.plan, queryFn: letture.plan, ...options });
 
+export const useRicorrenzeQuery = (options = {}) =>
+  useQuery({ queryKey: chiavi.ricorrenze, queryFn: letture.ricorrenze, ...options });
+
 export const useNotesQuery = (options = {}) =>
   useQuery({ queryKey: chiavi.notes, queryFn: letture.notes, ...options });
 

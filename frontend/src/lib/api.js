@@ -41,6 +41,7 @@ export const chiavi = {
   staff: ['staff'],
   notifiche: (tipo) => ['notifiche', tipo],
   pushConfig: (tipo) => ['push-config', tipo],
+  ricorrenze: ['ricorrenze'],
   statsCliente: (customerId) => ['customer-stats', customerId],
   statsFattorino: (driverId) => ['driver-stats', driverId],
 };
@@ -52,6 +53,7 @@ export const letture = {
   statistics: () => get('/statistics'),
   analytics: (period) => () => get(`/analytics?period=${period}`),
   plan: () => get('/plan'),
+  ricorrenze: () => get('/ricorrenze'),
   notes: () => getLista('/notes'),
   doctors: () => getLista('/doctors'),
   numeriUtili: () => getLista('/useful-numbers'),
