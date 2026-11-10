@@ -157,3 +157,25 @@ def test_totali_allineati_alle_liste():
         "richiami": len(esito["richiami"]),
     }
     assert esito["oggi"] == OGGI.isoformat()
+
+
+# --- La soglia dei pazienti fermi e' una preferenza della farmacia -----------
+
+def test_la_soglia_arriva_dalle_impostazioni():
+    from app.routers.ricorrenze import _soglia_della_farmacia
+
+    assert _soglia_della_farmacia({"settings": {"giorni_pazienti_fermi": 90}}) == 90
+
+
+def test_senza_preferenza_restano_i_45_di_sempre():
+    from app.routers.ricorrenze import _soglia_della_farmacia
+
+    assert _soglia_della_farmacia({}) == 45
+    assert _soglia_della_farmacia({"settings": {}}) == 45
+
+
+def test_una_soglia_fuori_scala_non_puo_silenziare_la_lista():
+    from app.routers.ricorrenze import _soglia_della_farmacia
+
+    for storta in (3, 0, -10, 999, "molti", None):
+        assert _soglia_della_farmacia({"settings": {"giorni_pazienti_fermi": storta}}) == 45

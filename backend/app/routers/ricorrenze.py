@@ -46,9 +46,25 @@ async def _consegne_recenti(pharmacy_id: str):
     ).to_list(20000)
 
 
+def _soglia_della_farmacia(user: dict) -> int:
+    """Quanti giorni di silenzio fanno scattare l'avviso. Default: i 45 di sempre."""
+    impostata = (user.get("settings") or {}).get("giorni_pazienti_fermi")
+    try:
+        valore = int(impostata)
+    except (TypeError, ValueError):
+        return GIORNI_RICHIAMO
+    return valore if 7 <= valore <= 365 else GIORNI_RICHIAMO
+
+
 @router.get("/ricorrenze")
-async def elenco_ricorrenze(giorni: int = GIORNI_RICHIAMO, user: dict = Depends(richiedi_pro("ricorrenze"))):
-    """Le tre liste del banco: da fare ora, in arrivo, pazienti spariti."""
+async def elenco_ricorrenze(giorni: Optional[int] = None, user: dict = Depends(richiedi_pro("ricorrenze"))):
+    """Le tre liste del banco: da fare ora, in arrivo, pazienti spariti.
+
+    La soglia dei "pazienti fermi" e' una preferenza della farmacia
+    (Impostazioni > Farmacia): se la chiamata non la chiede, vale quella.
+    """
+    if giorni is None:
+        giorni = _soglia_della_farmacia(user)
     if giorni < 7 or giorni > 365:
         raise HTTPException(status_code=422, detail="I giorni del richiamo stanno fra 7 e 365")
     clienti = await db.customers.find(

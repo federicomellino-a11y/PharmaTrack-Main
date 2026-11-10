@@ -1,3 +1,4 @@
+import hashlib
 import os
 import uuid
 import logging
@@ -14,7 +15,7 @@ from app.core.security import (
 from app.core.notifications import (
     send_transactional_email,
 )
-from app.models.schemas import ForgotPasswordRequest, GoogleAuthRequest, PharmacyLogin, PharmacyRegister, ResetPasswordRequest, VerifyEmailRequest
+from app.models.schemas import ChangePasswordRequest, ForgotPasswordRequest, GoogleAuthRequest, PharmacyLogin, PharmacyRegister, ResetPasswordRequest, VerifyEmailRequest
 
 from app.core.limiter import limiter
 
@@ -124,16 +125,7 @@ async def login(request: Request, data: PharmacyLogin, response: Response):
     if user.get("is_active", True) is False:
         raise HTTPException(status_code=403, detail="Account disattivato")
     
-    session_token = f"sess_{uuid.uuid4().hex}"
-    expires_at = datetime.now(timezone.utc) + timedelta(days=7)
-    
-    await db.user_sessions.delete_many({"user_id": user["user_id"]})
-    await db.user_sessions.insert_one({
-        "user_id": user["user_id"],
-        "session_token": session_token,
-        "expires_at": expires_at,
-        "created_at": datetime.now(timezone.utc).isoformat()
-    })
+    session_token = await _apri_sessione(request, user["user_id"])
     
     response.set_cookie(key="session_token", value=session_token, httponly=True,
                         secure=True, samesite="none", path="/", max_age=7*24*60*60)
@@ -295,18 +287,156 @@ async def google_auth(data: GoogleAuthRequest, response: Response):
     elif user.get("is_active", True) is False:
         raise HTTPException(status_code=403, detail="Account disattivato")
 
-    session_token = f"sess_{uuid.uuid4().hex}"
-    expires_at = datetime.now(timezone.utc) + timedelta(days=7)
-    await db.user_sessions.delete_many({"user_id": user["user_id"]})
-    await db.user_sessions.insert_one({
-        "user_id": user["user_id"],
-        "session_token": session_token,
-        "expires_at": expires_at,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    })
+    session_token = await _apri_sessione(request, user["user_id"])
     response.set_cookie(key="session_token", value=session_token, httponly=True,
                         secure=True, samesite="none", path="/", max_age=7*24*60*60)
     return {k: v for k, v in user.items() if k not in ["_id", "password_hash"]}
+
+
+# ---------- Sessioni ----------
+
+def _etichetta_dispositivo(user_agent: str) -> str:
+    """Un nome che si riconosce in elenco: "iPhone · Safari", "PC · Chrome"."""
+    ua = (user_agent or "").lower()
+    if not ua:
+        return "Dispositivo sconosciuto"
+    if "iphone" in ua:
+        dispositivo = "iPhone"
+    elif "ipad" in ua:
+        dispositivo = "iPad"
+    elif "android" in ua:
+        dispositivo = "Android"
+    elif "macintosh" in ua or "mac os" in ua:
+        dispositivo = "Mac"
+    elif "windows" in ua:
+        dispositivo = "PC Windows"
+    elif "linux" in ua:
+        dispositivo = "PC Linux"
+    else:
+        dispositivo = "Dispositivo"
+
+    if "edg/" in ua:
+        browser = "Edge"
+    elif "opr/" in ua or "opera" in ua:
+        browser = "Opera"
+    elif "chrome" in ua or "crios" in ua:
+        browser = "Chrome"
+    elif "firefox" in ua or "fxios" in ua:
+        browser = "Firefox"
+    elif "safari" in ua:
+        browser = "Safari"
+    else:
+        browser = "browser"
+    return f"{dispositivo} · {browser}"
+
+
+async def _apri_sessione(request: Request, user_id: str) -> str:
+    """Apre una sessione senza chiudere quelle degli altri dispositivi.
+
+    Prima ogni login cancellava tutte le sessioni dell'utente: entrare dal
+    telefono buttava fuori il PC del banco. Adesso le sessioni convivono, e la
+    farmacia puo' vederle e chiuderle da Impostazioni.
+    """
+    session_token = f"sess_{uuid.uuid4().hex}"
+    await db.user_sessions.insert_one({
+        "user_id": user_id,
+        "session_token": session_token,
+        "user_agent": (request.headers.get("user-agent") or "")[:300],
+        "expires_at": datetime.now(timezone.utc) + timedelta(days=7),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+    # Pulizia opportunistica: le sessioni scadute di questo utente non servono.
+    await db.user_sessions.delete_many({
+        "user_id": user_id,
+        "expires_at": {"$lt": datetime.now(timezone.utc)},
+    })
+    return session_token
+
+
+def _id_sessione(session_token: str) -> str:
+    """Identificativo pubblico di una sessione: non e' il token e non lo rivela."""
+    return hashlib.sha256(str(session_token).encode()).hexdigest()[:12]
+
+
+async def _sessioni_utente(request: Request) -> tuple:
+    token_corrente = request.cookies.get("session_token")
+    if not token_corrente:
+        intestazione = request.headers.get("Authorization") or ""
+        if intestazione.startswith("Bearer "):
+            token_corrente = intestazione.split(" ", 1)[1]
+    corrente = await db.user_sessions.find_one({"session_token": token_corrente}, {"_id": 0})
+    if not corrente:
+        raise HTTPException(status_code=401, detail="Invalid session")
+    righe = await db.user_sessions.find(
+        {"user_id": corrente["user_id"]}, {"_id": 0}
+    ).sort("created_at", -1).to_list(50)
+    return righe, token_corrente
+
+
+@router.get("/auth/sessions")
+async def elenco_sessioni(request: Request, user: dict = Depends(get_current_user)):
+    righe, token_corrente = await _sessioni_utente(request)
+    return [
+        {
+            "id": _id_sessione(riga.get("session_token")),
+            "dispositivo": _etichetta_dispositivo(riga.get("user_agent")),
+            "created_at": riga.get("created_at"),
+            "corrente": riga.get("session_token") == token_corrente,
+        }
+        for riga in righe
+    ]
+
+
+@router.post("/auth/sessions/revoke")
+async def revoca_sessioni(request: Request, user: dict = Depends(get_current_user)):
+    """Chiude le altre sessioni, o una sola se arriva il suo id."""
+    body = await request.json() if request.headers.get("content-length") not in (None, "0") else {}
+    righe, token_corrente = await _sessioni_utente(request)
+    richiesto = (body or {}).get("session_id")
+    if richiesto:
+        token = next((r["session_token"] for r in righe if _id_sessione(r.get("session_token")) == richiesto), None)
+        if not token:
+            raise HTTPException(status_code=404, detail="Sessione non trovata")
+        if token == token_corrente:
+            raise HTTPException(status_code=422, detail="Questa e' la sessione che stai usando: per uscire, esci.")
+        await db.user_sessions.delete_one({"session_token": token})
+        return {"chiuse": 1, "restano": len(righe) - 1}
+    altre = [r["session_token"] for r in righe if r.get("session_token") != token_corrente]
+    if altre:
+        await db.user_sessions.delete_many({"session_token": {"$in": altre}})
+    return {"chiuse": len(altre), "restano": 1}
+
+
+@router.post("/auth/change-password")
+async def change_password(request: Request, data: ChangePasswordRequest, user: dict = Depends(get_current_user)):
+    """Cambio password da dentro l'app, senza passare dalla mail.
+
+    Chiude anche le altre sessioni: se la password era nota a qualcun altro,
+    quel qualcuno non deve restare dentro con la sessione gia' aperta.
+    """
+    # L'account vero e' quello della sessione: per un operatore di staff
+    # user["user_id"] e' il titolare, e la password da cambiare e' la sua.
+    righe, token_corrente = await _sessioni_utente(request)
+    corrente = next((r for r in righe if r.get("session_token") == token_corrente), None)
+    if not corrente:
+        raise HTTPException(status_code=401, detail="Invalid session")
+    proprietario = corrente["user_id"]
+    utente = await db.users.find_one({"user_id": proprietario}, {"_id": 0, "password_hash": 1})
+    if not utente or not verify_password(data.current_password, utente.get("password_hash", "")):
+        raise HTTPException(status_code=400, detail="La password attuale non e' corretta")
+    if len(data.new_password) < 8:
+        raise HTTPException(status_code=422, detail="La password deve contenere almeno 8 caratteri")
+    if data.current_password == data.new_password:
+        raise HTTPException(status_code=422, detail="La nuova password e' identica a quella attuale")
+    await db.users.update_one(
+        {"user_id": proprietario},
+        {"$set": {"password_hash": hash_password(data.new_password)}},
+    )
+    await db.user_sessions.delete_many({
+        "user_id": proprietario,
+        "session_token": {"$ne": token_corrente},
+    })
+    return {"message": "Password aggiornata"}
 
 
 @router.put("/auth/profile")

@@ -26,6 +26,9 @@ export const usePlanQuery = (options = {}) =>
 export const useRicorrenzeQuery = (options = {}) =>
   useQuery({ queryKey: chiavi.ricorrenze, queryFn: letture.ricorrenze, ...options });
 
+export const useSessioniQuery = (options = {}) =>
+  useQuery({ queryKey: chiavi.sessioni, queryFn: letture.sessioni, ...options });
+
 export const useNotesQuery = (options = {}) =>
   useQuery({ queryKey: chiavi.notes, queryFn: letture.notes, ...options });
 

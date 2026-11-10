@@ -1,3 +1,4 @@
+import React from 'react';
 import { Badge } from '../ui/badge';
 import { Bell } from 'lucide-react';
 import { BellRing } from 'lucide-react';
@@ -14,6 +15,11 @@ import { Switch } from '../ui/switch';
    Estratto da Settings.jsx: la pagina teneva dieci schede in fila e nessuna
    si poteva leggere da sola. Riceve dallo stato della pagina solo cio' che usa.
 */
+const EVENTI = [
+  { chiave: 'delivery', etichetta: 'Consegne', descrizione: 'Consegna assegnata, ritirata, consegnata, annullata, vendita importata.' },
+  { chiave: 'shift', etichetta: 'Turni', descrizione: 'Turno aperto, chiuso e chiusura di cassa.' },
+];
+
 export default function NotificheCard({ handleDisableRealPush, handleEnableRealPush, handleRequestPermission, notificationPermissionInfo, pushConfigured, pushLoading, pushSubscribed, pushSupported, setSettings, settings }) {
   return (
         <Card>
@@ -36,6 +42,29 @@ export default function NotificheCard({ handleDisableRealPush, handleEnableRealP
                 <p className="text-xs text-muted-foreground">Riproduci un suono quando arriva un nuovo evento</p>
               </div>
               <Switch checked={settings.sound_enabled} onCheckedChange={(checked) => setSettings((prev) => ({ ...prev, sound_enabled: checked }))} />
+            </div>
+
+            <div className="rounded-lg border border-border p-4 space-y-3" data-testid="eventi-notifiche">
+              <div>
+                <p className="font-medium">Cosa vuoi sapere</p>
+                <p className="text-xs text-muted-foreground">Spegnere una famiglia di avvisi non tocca quelli gia' ricevuti.</p>
+              </div>
+              {EVENTI.map(({ chiave, etichetta, descrizione }) => (
+                <div key={chiave} className="flex items-center justify-between gap-3 border-t border-border/60 pt-3">
+                  <div>
+                    <p className="font-medium">{etichetta}</p>
+                    <p className="text-xs text-muted-foreground">{descrizione}</p>
+                  </div>
+                  <Switch
+                    checked={settings.notifiche_eventi[chiave]}
+                    onCheckedChange={(checked) => setSettings((prev) => ({
+                      ...prev,
+                      notifiche_eventi: { ...prev.notifiche_eventi, [chiave]: checked },
+                    }))}
+                    data-testid={`evento-${chiave}`}
+                  />
+                </div>
+              ))}
             </div>
 
             <div className="rounded-lg border border-border p-4 space-y-3">
