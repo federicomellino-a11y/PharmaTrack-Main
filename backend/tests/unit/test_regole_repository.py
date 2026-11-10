@@ -11,6 +11,7 @@ rete, girano in un decimo di secondo.
 """
 from __future__ import annotations
 
+import os
 import re
 from pathlib import Path
 
@@ -205,6 +206,17 @@ def test_nessun_segreto_nel_codice(firma, descrizione):
             if firma.search(_leggi(percorso)):
                 trovati.append(str(percorso.relative_to(RADICE)))
     assert trovati == [], f"possibile {descrizione} versionata in: {trovati}"
+
+
+def test_c_e_un_solo_comando_di_verifica():
+    """`./verifica.sh` e' il controllo che chiunque deve poter lanciare.
+
+    Se sparisce o perde il permesso di esecuzione, chi arriva non ha piu' un
+    modo unico di verificare e ricomincia a lanciare i comandi a memoria.
+    """
+    script = RADICE / "verifica.sh"
+    assert script.is_file(), "manca verifica.sh nella radice"
+    assert os.access(script, os.X_OK), "verifica.sh non e' eseguibile (chmod +x)"
 
 
 def test_i_documenti_di_ingresso_esistono():

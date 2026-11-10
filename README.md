@@ -107,6 +107,14 @@ npm ci
 npm run dev  # http://localhost:3000
 ```
 
+Prima di aprire una pull request basta un comando, che esegue gli stessi
+controlli della CI (lint, tipi, test unitari, build; con `--completo` anche gli
+E2E) e stampa il riepilogo:
+
+```bash
+./verifica.sh
+```
+
 ### Seed dati di test
 ```bash
 cd backend && python scripts/seed_data.py

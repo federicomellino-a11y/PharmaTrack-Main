@@ -14,9 +14,8 @@
 
 ## Verifiche fatte
 
-- [ ] `npm run lint` + `npm run typecheck` + `npm test` + `npm run build`
-- [ ] `npm run test:e2e` sul build nuovo (se ho toccato il frontend)
-- [ ] `python -m pytest tests/unit -q`
+- [ ] `./verifica.sh` verde
+- [ ] `./verifica.sh --completo` verde (se ho toccato il frontend: aggiunge gli E2E)
 - [ ] se ho toccato i pin Python: venv pulito e deploy Render verificato dopo il merge
 
 ## Controlli che valgono sempre
