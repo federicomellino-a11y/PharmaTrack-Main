@@ -6,15 +6,14 @@ import { MemoryRouter } from 'react-router-dom';
 
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: vi.fn() }) }));
 vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
-vi.mock('../../components/Layout', () => ({ Layout: ({ children }) => <div>{children}</div> }));
 vi.mock('@/hooks/queries', () => ({ useRicorrenzeQuery: vi.fn() }));
 
-import RecallsPage from '../pharmacy/Recalls';
+import PazientiRicorrenti from '../PazientiRicorrenti';
 import { useRicorrenzeQuery } from '@/hooks/queries';
 
 const vuoto = { oggi: '2026-11-10', giorni_richiamo: 45, da_fare: [], in_arrivo: [], richiami: [] };
 
-describe('RecallsPage', () => {
+describe('Pazienti e ritorni (dentro la pagina Report)', () => {
   beforeEach(() => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
   });
@@ -27,7 +26,7 @@ describe('RecallsPage', () => {
 
   it('senza liste dice che non c e niente da fare', () => {
     useRicorrenzeQuery.mockReturnValue({ data: vuoto, isLoading: false });
-    render(<MemoryRouter><RecallsPage /></MemoryRouter>);
+    render(<MemoryRouter><PazientiRicorrenti /></MemoryRouter>);
     expect(document.body.textContent).toContain('Nessuna ricorrenza da preparare');
   });
 
@@ -44,14 +43,14 @@ describe('RecallsPage', () => {
       },
       isLoading: false,
     });
-    render(<MemoryRouter><RecallsPage /></MemoryRouter>);
+    render(<MemoryRouter><PazientiRicorrenti /></MemoryRouter>);
     expect(screen.getByTestId('ricorrenze-da-fare')).toBeTruthy();
     expect(screen.getByText('Anna Verdi')).toBeTruthy();
     expect(screen.getByText('10 gg fa')).toBeTruthy();
     expect(screen.getByText('Prepara').closest('a').getAttribute('href')).toBe('/quick?customer_id=c1');
   });
 
-  it('il paziente sparito finisce nella lista dei richiami', () => {
+  it('il paziente sparito è segnalato con i giorni di silenzio', () => {
     useRicorrenzeQuery.mockReturnValue({
       data: {
         ...vuoto,
@@ -63,8 +62,8 @@ describe('RecallsPage', () => {
       },
       isLoading: false,
     });
-    render(<MemoryRouter><RecallsPage /></MemoryRouter>);
-    expect(screen.getByTestId('richiami')).toBeTruthy();
+    render(<MemoryRouter><PazientiRicorrenti /></MemoryRouter>);
+    expect(screen.getByTestId('pazienti-fermi')).toBeTruthy();
     expect(screen.getByText('Bruno Neri')).toBeTruthy();
     expect(screen.getByText('101 gg')).toBeTruthy();
     // niente telefono: il pulsante di chiamata non compare
@@ -83,14 +82,14 @@ describe('RecallsPage', () => {
       },
       isLoading: false,
     });
-    render(<MemoryRouter><RecallsPage /></MemoryRouter>);
+    render(<MemoryRouter><PazientiRicorrenti /></MemoryRouter>);
     expect(screen.getByTestId('ricorrenze-in-arrivo')).toBeTruthy();
     expect(screen.getByText('fra 5 gg')).toBeTruthy();
   });
 
   it('se la lettura fallisce lo dice invece di restare vuota', () => {
     useRicorrenzeQuery.mockReturnValue({ data: undefined, isLoading: false, error: new Error('x') });
-    render(<MemoryRouter><RecallsPage /></MemoryRouter>);
-    expect(document.body.textContent).toContain('Non riesco a leggere le ricorrenze');
+    render(<MemoryRouter><PazientiRicorrenti /></MemoryRouter>);
+    expect(document.body.textContent).toContain('Non riesco a leggere i dati dei pazienti');
   });
 });

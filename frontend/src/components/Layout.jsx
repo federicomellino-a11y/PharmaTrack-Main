@@ -19,14 +19,12 @@ import {
   LayoutDashboard, Users, Package, Truck, MessageSquare, Archive, Settings,
   Bell, LogOut, Menu, X, ChevronRight, BarChart3, Stethoscope,
   Phone, StickyNote, Sun, Moon, Plus, Home, Check, Trash2, RefreshCw, Map, Wallet, Plug, Search,
-  Repeat,
 } from 'lucide-react';
 
 const navItems = [
   { path: '/dashboard',     icon: LayoutDashboard, label: 'Home',          mobile: true },
   { path: '/deliveries',    icon: Package,         label: 'Consegne',      mobile: true },
   { path: '/customers',     icon: Users,           label: 'Clienti',       mobile: true },
-  { path: '/richiami',      icon: Repeat,          label: 'Richiami' },
   { path: '/drivers',        icon: Truck,           label: 'Fattorini' },
   { path: '/chat',          icon: MessageSquare,   label: 'Chat',          mobile: true, badge: true },
   { divider: true },
