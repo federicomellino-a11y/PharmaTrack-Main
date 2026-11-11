@@ -106,6 +106,23 @@ def controlla_workflow():
             )
 
 
+def controlla_deploy():
+    """Se l'ultima verifica in produzione e' rossa, il sito puo' essere rotto
+    anche con la pipeline verde: e' il caso che nessuno guarda."""
+    run, errore = ultimo_run("verifica-produzione.yml")
+    if errore:
+        print(f"verifica-produzione: {errore} (non e' un guasto)")
+        return
+    if run.get("status") != "completed":
+        return
+    if run.get("conclusion") == "failure":
+        creato = datetime.fromisoformat(run["created_at"].replace("Z", "+00:00"))
+        problemi.append(
+            f"l'ultima verifica della produzione e' rossa ({creato.strftime('%d/%m %H:%M')} UTC): "
+            f"health, chunk o login demo non tornano — {run.get('html_url', '')}"
+        )
+
+
 def manda_mail(oggetto, testo):
     """L'allarme parte dal backend: i runner GitHub non sono in allowlist Brevo."""
     if not (ADMIN_EMAIL and ADMIN_PASSWORD):
@@ -139,6 +156,7 @@ def manda_mail(oggetto, testo):
 def main():
     controlla_api()
     controlla_workflow()
+    controlla_deploy()
 
     if not problemi:
         print("tutto a posto: API sana, backup e test notturni al loro posto")

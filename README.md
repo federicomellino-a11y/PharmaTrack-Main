@@ -11,6 +11,10 @@ Coordina fattorini, traccia ogni ordine, gestisci cassa e turni, integrazione co
 > [`CONTRIBUTING.md`](CONTRIBUTING.md) (giro di lavoro e ricette).
 > Cosa è protetto e cosa no: [`docs/SICUREZZA.md`](docs/SICUREZZA.md).
 > `main` è la produzione: un merge pubblica subito.
+>
+> **Primo giorno qui?** [`docs/PRIMO-GIORNO.md`](docs/PRIMO-GIORNO.md): quali
+> accessi chiedere, come avere l'app in locale in cinque minuti, tre lavori
+> buoni per cominciare.
 
 ---
 
