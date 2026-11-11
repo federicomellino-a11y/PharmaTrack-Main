@@ -159,6 +159,28 @@ Tutti e quattro girano in `tests/unit`, quindi costano secondi.
 | 4.2 | Verifica Render senza `RENDER_API_KEY` | è già possibile: Render registra il deploy come GitHub Deployment sul commit, quindi `GET /deployments?ref=main` + `/statuses` dicono se il backend è su. Va scritto in `CONTRIBUTING.md` e usato dalla skill di salute, così non serve un token che non c'è |
 | 4.3 | Allarmi | `allarmi.yml` esiste e manda email a `ALERT_EMAIL`: verificare che copra anche "deploy fallito", non solo "API giù" |
 
+**Stato al 11 novembre, scritto e provato contro la produzione vera:**
+
+- **4.1 fatto**: `.github/workflows/verifica-produzione.yml` con
+  `.github/scripts/verifica_produzione.py`, gira a ogni push su `main` (e a mano).
+  Guarda `/api/health`, scarica la home e **ogni** asset che cita controllando il
+  tipo (`application/javascript`, `text/css`), apre il login demo dei due ruoli e
+  legge lo stato del deploy Render. Se il primo giro è rosso aspetta 90 secondi e
+  riprova, perché il deploy parte insieme al controllo. Provato in due modi
+  contro la produzione: sul sito vero esce 0 e stampa cinque righe `ok`;
+  puntandolo a una pagina inesistente esce 1 e nomina i cinque asset che tornano
+  `text/html` invece di javascript, cioè esattamente il guasto "deploy verde,
+  sito bianco".
+- **4.2 fatto**: `render_check` della skill di salute ora legge i **GitHub
+  Deployments**, quindi funziona senza `RENDER_API_KEY`. Due trappole trovate e
+  chiuse: Render mette lo sha in `sha` e `main` in `ref`, il nome del servizio sta
+  in `environment` (cercarlo nel `ref` non trova mai niente: la prima versione
+  rispondeva sempre "nessun deploy"), e il ripiego su `CLOUDINARY_API_KEY` come
+  chiave Render era sbagliato, tolto. Ricetta anche in `CONTRIBUTING.md` §5.
+- **4.3 fatto**: `allarmi.py` controllava già i run dei workflow; aggiunto il
+  controllo su `verifica-produzione.yml`, così un sito rotto o un deploy fallito
+  arriva per email invece di aspettare che qualcuno apra le Actions.
+
 ---
 
 ## Blocco 5 — chi arriva domani
