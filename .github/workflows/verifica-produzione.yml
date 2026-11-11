@@ -1,0 +1,44 @@
+name: Verifica produzione
+
+# Dopo ogni merge su main guarda la produzione come la guarda un browser:
+# health, chunk del sito, login demo, stato del deploy Render. Il caso "deploy
+# verde ma sito bianco" e' gia' successo due volte: cosi' lo vede GitHub un
+# minuto dopo, non il farmacista al banco.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  deployments: read   # per leggere lo stato del deploy Render via GitHub
+
+concurrency:
+  group: verifica-produzione
+  cancel-in-progress: true
+
+jobs:
+  verifica:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      # Nessuna dipendenza da installare: lo script usa solo la libreria standard.
+      - name: Controlla la produzione
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          # Il deploy parte insieme a questo job: se il primo giro e' rosso
+          # quasi sempre e' perche' stiamo guardando la versione precedente,
+          # quindi si aspetta e si riprova una volta. Un rosso al secondo giro
+          # e' un guasto vero.
+          if python .github/scripts/verifica_produzione.py; then
+            exit 0
+          fi
+          echo "::warning::primo giro rosso: aspetto 90 secondi che i deploy finiscano e riprovo"
+          sleep 90
+          python .github/scripts/verifica_produzione.py

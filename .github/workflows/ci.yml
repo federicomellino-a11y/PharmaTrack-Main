@@ -85,9 +85,40 @@ jobs:
       - name: Installa le dipendenze
         working-directory: frontend
         run: npm ci
+      # Il browser scaricato una volta resta nel runner per i job successivi:
+      # senza cache ogni giro riscarica 100 MB e ricasca nella stessa finestra
+      # di rete cattiva.
+      - name: Cache dei browser Playwright
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
       - name: Installa Chromium per Playwright
         working-directory: frontend
-        run: npx playwright install --with-deps chromium
+        # L'11/11 il runner non risolveva security.ubuntu.com: `--with-deps`
+        # e' morto con exit 100 per tre volte di fila senza eseguire un solo
+        # test, e il merge si e' fermato per un guasto di rete.
+        # Qui si scarica prima il solo browser headless, che non passa da apt:
+        # se parte, i test girano come sempre. Le librerie di sistema si
+        # installano solo se il browser davvero non si avvia.
+        run: |
+          prova() {
+            for tentativo in 1 2 3; do
+              if "$@"; then echo "ok al tentativo $tentativo: $*"; return 0; fi
+              echo "::warning::tentativo $tentativo fallito: $*"
+              sleep 15
+            done
+            return 1
+          }
+          if prova npx playwright install --only-shell chromium \
+             && prova npx playwright screenshot --browser=chromium about:blank /tmp/avvio.png; then
+            echo "browser headless pronto senza apt"
+            exit 0
+          fi
+          echo "::warning::il browser non parte da solo: provo con le librerie di sistema"
+          prova npx playwright install --with-deps chromium && exit 0
+          echo "::error::installazione dei browser fallita anche con --with-deps"
+          exit 1
       - name: Build di produzione
         working-directory: frontend
         run: npm run build
