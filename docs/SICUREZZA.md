@@ -48,7 +48,7 @@ console admin, bundle senza chiavi server (`AIza`, `sk-`, `mongodb+srv`, `ghp_`)
 | `CLOUDINARY_*` | Render | foto delle consegne | senza, le foto vanno su disco e si perdono al riavvio |
 | `GOOGLE_CLIENT_ID` | Render / Vercel | accesso con Google | Google Cloud → Credentials |
 | `VITE_*` | Vercel → Environment | finiscono **nel bundle pubblico**: solo URL e chiavi da browser | si cambiano e si ridistribuisce |
-| `PT_TEST_EMAIL` / `PT_TEST_PASSWORD` | GitHub → Secrets | test di integrazione notturni | si ricrea l'account di prova |
+| `PT_TEST_EMAIL` / `PT_TEST_PASSWORD` | GitHub → Secrets | farmacia di prova dei test notturni (`federicomellino+pharmatrack-qa@`), **non** l'account demo | si ricrea la farmacia e si aggiornano i due secret |
 | `MONGO_URL_BACKUP` | GitHub → Secrets | dump notturno con utente *sola lettura* | si ricrea l'utente in Atlas |
 | `MONGO_URL_ADMIN` | GitHub → Secrets | operazioni straordinarie sul database | — (potere distruttivo: serve l'ok di Federico) |
 | `BACKUP_PASSPHRASE` | GitHub → Secrets + gestore password | cifratura dei dump | **senza, i backup sono rumore** |
@@ -64,12 +64,19 @@ rimosso il 4/11 dopo settimane, con la password admin dentro).
 
 Nell'ordine in cui fanno male.
 
-1. **Credenziali demo dentro il bundle pubblico.** `LandingPage` contiene
-   `test@farmaciaprova.it` / `Test1234!` e `luca@fattorino.it` / `Driver123!`
-   compilate nel JavaScript che chiunque scarica. Il tenant demo è isolato, ma è
-   **lo stesso account usato dai test di integrazione notturni**: chi entra con
-   quei pulsanti può falsificare o cancellare i dati su cui girano i test.
-   Piano di chiusura in [`PIANO-FINALE.md`](PIANO-FINALE.md), blocco 1.
+1. **La demo è aperta per scelta, non per errore.** ~~Credenziali dentro il
+   bundle pubblico~~: chiuso l'11/11. Il bundle conteneva
+   `test@farmaciaprova.it` / `Test1234!` e `luca@fattorino.it` / `Driver123!`;
+   ora la sessione demo la apre il server (`POST /api/auth/demo`) e nel
+   JavaScript pubblico non c'è più nessuna credenziale né le variabili
+   `VITE_DEMO_*`. La difesa è automatica: `scripts/controlla-segreti.sh --dist`
+   controlla il bundle appena costruito e fa fallire la CI se le stringhe
+   ricompaiono. Resta aperto, e va bene così, il fatto che chiunque possa
+   cliccare "Demo farmacia": quel tenant può essere sporcato. Non è più un
+   rischio per le misure, perché dall'11/11 i test di integrazione notturni
+   girano su un account dedicato (farmacia `federicomellino+pharmatrack-qa@`,
+   secret `PT_TEST_EMAIL` / `PT_TEST_PASSWORD`), non sul tenant demo. Manca solo
+   il reset periodico della demo: [`PIANO-FINALE.md`](PIANO-FINALE.md), punto 1.4.
 2. **Nessun secret scanning della piattaforma.** GitHub Advanced Security non è
    disponibile su un repo privato personale: la copertura è il nostro script in
    CI, che è volutamente approssimativo (cerca forme note, non entropia).

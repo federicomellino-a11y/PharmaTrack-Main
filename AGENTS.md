@@ -138,8 +138,13 @@ run_skill("pharmatrack_health", "--full")
 ## Cosa non si tocca senza Federico
 
 - **Gli account demo** (`test@farmaciaprova.it` e il fattorino) e i due pulsanti
-  demo in `LandingPage.jsx`: la suite di integrazione notturna usa quelle
-  credenziali.
+  demo in `LandingPage.jsx`: sono la vetrina del prodotto. La sessione la apre
+  il server (`POST /api/auth/demo`), mai il browser: non reintrodurre credenziali
+  nel frontend, la CI le blocca comunque sul bundle.
+- **La farmacia di prova dei test notturni** (`federicomellino+pharmatrack-qa@`,
+  secret `PT_TEST_EMAIL` / `PT_TEST_PASSWORD`): è un tenant vero, con una
+  consegna di prova. Non cancellarla e non cambiarle la password a mano: la
+  suite delle 03:00 diventerebbe rossa senza un guasto vero.
 - **`ADMIN_PASSWORD` e le env var** dei servizi Render e Vercel.
 - **Il repository è pubblico**: tutto ciò che si committa è leggibile da fuori.
   Non mettere dati di clienti reali, né indirizzi, né nomi.
