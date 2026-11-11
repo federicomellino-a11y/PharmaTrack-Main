@@ -1,0 +1,42 @@
+name: Sveglia backend
+
+# Il piano free di Render addormenta l'istanza dopo 15 minuti di silenzio: la
+# prima richiesta dopo la pausa paga il risveglio (misurato: 30-90 secondi) e
+# chi apre il gestionale crede che sia lento o rotto. Questo workflow tiene
+# l'API sveglia nelle ore in cui la farmacia lavora, senza toccare il codice
+# dell'app e senza servizi a pagamento.
+#
+# Perche' qui e non su Base44: i workflow schedulati di Base44 che chiamavano
+# la funzione keepRenderAwake vengono annullati prima del primo passo (dal
+# 8 novembre 2026), quindi il ping non partiva piu' e l'istanza dormiva.
+#
+# Copertura: cron ogni 10 minuti e ogni esecuzione pinge per 15 minuti, cosi'
+# un ritardo o un'esecuzione saltata da GitHub non lascia mai un buco piu'
+# lungo della soglia di sonno. Ore 06:00-20:50 UTC = 07:00-21:50 italiane.
+# Consumo: circa 15 ore al giorno su 750 ore mensili del piano free.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/10 6-20 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  sveglia:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Ping salute ogni cinque minuti
+        run: |
+          for giro in 1 2 3 4; do
+            ora=$(date -u '+%H:%M:%S')
+            codice=$(curl -s -o /tmp/salute.json -w '%{http_code}' \
+              --max-time 90 \
+              -H 'User-Agent: pharmatrack-sveglia' \
+              https://pharmatrack-api.onrender.com/api/health || true)
+            echo "$ora UTC -> HTTP $codice $(head -c 160 /tmp/salute.json 2>/dev/null || true)"
+            if [ "$giro" -lt 4 ]; then
+              sleep 300
+            fi
+          done

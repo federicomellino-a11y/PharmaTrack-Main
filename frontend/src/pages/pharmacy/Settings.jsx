@@ -87,19 +87,11 @@ const sogliaValida = (valore) => {
   return numero;
 };
 
-const permissionLabels = {
-  granted: { label: 'Consentito', className: 'bg-emerald-500/15 text-emerald-600 border-emerald-500/30' },
-  default: { label: 'Da autorizzare', className: 'bg-amber-500/15 text-amber-600 border-amber-500/30' },
-  denied: { label: 'Bloccato dal browser', className: 'bg-destructive/10 text-destructive border-destructive/30' },
-  unsupported: { label: 'Non supportato', className: 'bg-muted text-muted-foreground border-border' },
-};
-
 export default function SettingsPage() {
   const { user, updateProfile, logout } = useAuth();
   const { setTheme, theme } = useTheme();
   const {
     notificationPermission,
-    requestBrowserNotificationPermission,
     pushSupported,
     pushConfigured,
     pushSubscribed,
@@ -132,7 +124,10 @@ export default function SettingsPage() {
     [drivers],
   );
 
-  const notificationPermissionInfo = permissionLabels[notificationPermission] || permissionLabels.unsupported;
+  // Il telefono avvisa davvero solo se il dispositivo e' registrato: lo stato
+  // dell'interruttore e' questo, non la preferenza salvata da sola.
+  const notificheDisponibili = pushSupported && pushConfigured;
+  const notificheAttive = notificheDisponibili && pushSubscribed && settings.notifications_enabled !== false;
 
   const handleSubmit = async (event) => {
     event?.preventDefault?.();
@@ -207,47 +202,58 @@ export default function SettingsPage() {
     }
   };
 
-  const handleRequestPermission = async () => {
-    const permission = await requestBrowserNotificationPermission();
-    if (permission === 'granted') {
-      toast.success('Permesso notifiche attivato');
-      return;
+  // Una preferenza di notifica si salva quando la si tocca: l'utente non deve
+  // ricordarsi di premere "Salva" per un interruttore. Si salvano solo le
+  // chiavi delle notifiche, cosi' le altre schede in modifica non vengono toccate.
+  const salvaNotifiche = async (parziale) => {
+    const base = ensureObject(user?.settings);
+    const prossime = {
+      ...base,
+      ...parziale,
+      sound_enabled: parziale.sound_enabled ?? settings.sound_enabled,
+      notifiche_eventi: parziale.notifiche_eventi ?? settings.notifiche_eventi,
+      silenzio_attivo: parziale.silenzio_attivo ?? settings.silenzio_attivo,
+      silenzio_da: parziale.silenzio_da ?? settings.silenzio_da,
+      silenzio_a: parziale.silenzio_a ?? settings.silenzio_a,
+    };
+    try {
+      await updateProfile({ settings: prossime });
+      return true;
+    } catch {
+      toast.error('Non sono riuscito a salvare la preferenza');
+      return false;
     }
-    if (permission === 'denied') {
-      toast.error('Permesso notifiche bloccato: abilitalo dalle impostazioni del browser');
-      return;
-    }
-    toast.message('Richiesta permesso notifiche annullata');
   };
 
-  const handleEnableRealPush = async () => {
-    const result = await enablePushNotifications();
-    if (result?.ok) {
-      toast.success('Push reali attivate sul dispositivo');
+  /* L'interruttore fa tutto quello che serve: chiede il permesso, registra il
+     dispositivo e spegne davvero. Se il browser blocca le notifiche si dice
+     dove sbloccarle, senza gergo. */
+  const handleCambiaNotifiche = async (acceso) => {
+    if (!acceso) {
+      await disablePushNotifications();
+      setSettings((prev) => ({ ...prev, notifications_enabled: false }));
+      await salvaNotifiche({ notifications_enabled: false });
+      toast.success('Notifiche spente');
       return;
     }
-    if (result?.reason === 'push_not_configured') {
-      toast.error('Push server non configurate sul backend');
-      return;
-    }
-    if (result?.reason === 'permission_denied') {
-      toast.error('Permesso notifiche negato dal browser');
-      return;
-    }
-    if (result?.reason === 'unsupported') {
-      toast.error('Questo browser non supporta le push web');
-      return;
-    }
-    toast.error(typeof result?.reason === 'string' ? result.reason : 'Attivazione push non riuscita');
-  };
 
-  const handleDisableRealPush = async () => {
-    const result = await disablePushNotifications();
-    if (result?.ok) {
-      toast.success('Push reali disattivate su questo dispositivo');
+    const esito = await enablePushNotifications();
+    if (esito?.ok) {
+      setSettings((prev) => ({ ...prev, notifications_enabled: true }));
+      await salvaNotifiche({ notifications_enabled: true });
+      toast.success('Notifiche attive');
       return;
     }
-    toast.error(typeof result?.reason === 'string' ? result.reason : 'Disattivazione push non riuscita');
+
+    if (esito?.reason === 'permission_denied') {
+      toast.error("Il browser ha bloccato le notifiche: sbloccale dal lucchetto accanto all'indirizzo");
+      return;
+    }
+    if (esito?.reason === 'unsupported') {
+      toast.error('Questo dispositivo non permette le notifiche');
+      return;
+    }
+    toast.error('Non sono riuscito ad attivare le notifiche, riprova');
   };
 
   const { data: piano } = usePlanQuery();
@@ -308,20 +314,17 @@ export default function SettingsPage() {
           <TabsContent value="notifiche" className="space-y-6 mt-4">
             <NotificheCard
               {...{
-                handleDisableRealPush,
-                handleEnableRealPush,
-                handleRequestPermission,
-                notificationPermissionInfo,
-                pushConfigured,
-                pushLoading,
-                pushSubscribed,
-                pushSupported,
+                attive: notificheAttive,
+                disponibili: notificheDisponibili,
+                inCorso: pushLoading,
+                onCambiaNotifiche: handleCambiaNotifiche,
+                permesso: notificationPermission,
                 setSettings,
                 settings,
               }}
             />
             <Button type="button" onClick={handleSubmit} disabled={saving} className="w-full">
-              {saving ? 'Salvataggio...' : 'Salva le preferenze di notifica'}
+              {saving ? 'Salvataggio...' : 'Salva le altre preferenze di notifica'}
             </Button>
           </TabsContent>
 

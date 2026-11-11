@@ -6,8 +6,12 @@ import { installGlobalErrorHandlers } from "@/lib/errorReporter";
 import { hardReload } from "@/lib/hardReload";
 import { toast } from 'sonner';
 import { installaGestioneTelefono } from '@/lib/phoneLink';
+import { svegliaBackend } from '@/lib/svegliaBackend';
 
 installGlobalErrorHandlers();
+// Il backend dorme quando nessuno lo usa: svegliarlo mentre la pagina si apre
+// toglie il minuto di attesa al primo "Accedi" o "Demo" della giornata.
+svegliaBackend();
 
 // Se un tab aperto prima di un deploy chiede un chunk non piu esistente, Vite
 // emette vite:preloadError: ricarichiamo una volta sola invece di mostrare
