@@ -7,6 +7,10 @@ come si è sicuri di non aver rotto niente.
 `main` **è** la produzione. Un merge su `main` pubblica su Vercel e Render in
 pochi minuti, davanti alle farmacie che usano il gestionale.
 
+Se è il tuo primo giorno, prima di questa pagina c'è
+[`docs/PRIMO-GIORNO.md`](docs/PRIMO-GIORNO.md): accessi da chiedere, avvio in
+locale, tre lavori per cominciare.
+
 ---
 
 ## 1. Preparare la macchina (una volta)
@@ -141,6 +145,28 @@ Deve essere tutto verde: deploy Vercel READY, release nel bundle uguale al
 commit, deploy Render live, Sentry senza issue sulla release corrente, endpoint
 a 200, CI verde. Se qualcosa è rosso, si ripara o si fa `git revert` del commit
 (il revert deploya a sua volta), non si lascia lì.
+
+### Se il backend è aggiornato, senza chiave di Render
+
+Non serve più `RENDER_API_KEY` (dal 10/11 non c'è). Render registra ogni deploy
+come **GitHub Deployment** sul commit di `main`, quindi lo stato si legge con il
+token di GitHub che hai già:
+
+```bash
+curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
+  "https://api.github.com/repos/federicomellino-a11y/PharmaTrack-Main/deployments?per_page=5" \
+  | python3 -c 'import json,sys; [print(d["id"], d["ref"]) for d in json.load(sys.stdin)]'
+# prendi l'id dove ref è "main - pharmatrack-api", poi:
+curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
+  "https://api.github.com/repos/federicomellino-a11y/PharmaTrack-Main/deployments/<id>/statuses"
+# state: success = backend in produzione
+```
+
+Il workflow **Verifica produzione** lo fa già da solo a ogni merge su `main`:
+guarda `/api/health`, i chunk del sito, il login demo dei due ruoli e lo stato
+del deploy Render, e diventa rosso se qualcosa non torna (con un secondo
+tentativo 90 secondi dopo, perché il deploy parte insieme). Nota: `/api/health`
+**non** riporta la release, quindi da solo non conferma un deploy.
 
 ---
 

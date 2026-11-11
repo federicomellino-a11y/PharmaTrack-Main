@@ -5,9 +5,9 @@ PharmaTrack senza rischiare di rompere qualcosa**, con uno schema chiaro e tutto
 pronto. Questo file è il programma: cosa si fa, in che ordine, come si verifica
 che sia fatto, e cosa serve da lui.
 
-Stato al 12 novembre 2026. **Blocco 0 in produzione**, **blocco 1 quasi chiuso**
-(1.1, 1.2 e 1.3 fatti e verificati; resta 1.4). Gli altri sono pronti per essere
-eseguiti uno per giro.
+Stato al 12 novembre 2026. **Blocchi 0, 1 (tranne 1.4), 2, 3, 4 e 5 in
+produzione.** Restano 1.4 (reset periodico della demo: serve il via di Federico)
+e il blocco 6 (tre decisioni che spettano a lui).
 
 ---
 
@@ -147,7 +147,13 @@ Tutti e quattro girano in `tests/unit`, quindi costano secondi.
   (solo patch, con i major e i minor ignorati: il bump che il 1/11 ha steso il
   backend). Aggiunto il gruppo anche per `github-actions`, che era l'unico a
   poter aprire fino a due PR separate al mese.
-- **3.4 resta aperto**: `docs/archivio` e `docs/outreach`.
+- **3.4 fatto (11/11)**: `docs/archivio` resta (manifest Emergent piu' il PRD
+  del 2026, che ora sono descritti nel suo `README.md`: prima il PRD non era
+  spiegato da nessuna parte). `docs/outreach/` non era documentazione del
+  prodotto ma due bozze di email commerciali del 29 ottobre: spostate in
+  `docs/archivio/outreach/`, cosi' `docs/` contiene solo la documentazione
+  tecnica e le bozze restano recuperabili. `memory/` non e' tornato: git non lo
+  traccia e nessun file lo cita.
 
 ---
 
@@ -159,6 +165,28 @@ Tutti e quattro girano in `tests/unit`, quindi costano secondi.
 | 4.2 | Verifica Render senza `RENDER_API_KEY` | è già possibile: Render registra il deploy come GitHub Deployment sul commit, quindi `GET /deployments?ref=main` + `/statuses` dicono se il backend è su. Va scritto in `CONTRIBUTING.md` e usato dalla skill di salute, così non serve un token che non c'è |
 | 4.3 | Allarmi | `allarmi.yml` esiste e manda email a `ALERT_EMAIL`: verificare che copra anche "deploy fallito", non solo "API giù" |
 
+**Stato al 11 novembre, scritto e provato contro la produzione vera:**
+
+- **4.1 fatto**: `.github/workflows/verifica-produzione.yml` con
+  `.github/scripts/verifica_produzione.py`, gira a ogni push su `main` (e a mano).
+  Guarda `/api/health`, scarica la home e **ogni** asset che cita controllando il
+  tipo (`application/javascript`, `text/css`), apre il login demo dei due ruoli e
+  legge lo stato del deploy Render. Se il primo giro è rosso aspetta 90 secondi e
+  riprova, perché il deploy parte insieme al controllo. Provato in due modi
+  contro la produzione: sul sito vero esce 0 e stampa cinque righe `ok`;
+  puntandolo a una pagina inesistente esce 1 e nomina i cinque asset che tornano
+  `text/html` invece di javascript, cioè esattamente il guasto "deploy verde,
+  sito bianco".
+- **4.2 fatto**: `render_check` della skill di salute ora legge i **GitHub
+  Deployments**, quindi funziona senza `RENDER_API_KEY`. Due trappole trovate e
+  chiuse: Render mette lo sha in `sha` e `main` in `ref`, il nome del servizio sta
+  in `environment` (cercarlo nel `ref` non trova mai niente: la prima versione
+  rispondeva sempre "nessun deploy"), e il ripiego su `CLOUDINARY_API_KEY` come
+  chiave Render era sbagliato, tolto. Ricetta anche in `CONTRIBUTING.md` §5.
+- **4.3 fatto**: `allarmi.py` controllava già i run dei workflow; aggiunto il
+  controllo su `verifica-produzione.yml`, così un sito rotto o un deploy fallito
+  arriva per email invece di aspettare che qualcuno apra le Actions.
+
 ---
 
 ## Blocco 5 — chi arriva domani
@@ -168,6 +196,29 @@ Tutti e quattro girano in `tests/unit`, quindi costano secondi.
 | 5.1 | `docs/PRIMO-GIORNO.md` | quali accessi servono (GitHub, Vercel, Render, Atlas, Sentry, Brevo) e chi li dà; come si avvia in locale in 5 minuti; i tre lavori buoni per iniziare; le cinque cose da non toccare senza Federico |
 | 5.2 | PR template aggiornato | al posto di "ho testato": le caselle vere (`./verifica.sh --completo` verde, deploy verificato se tocca `backend/`, nessun segreto, docs aggiornate se cambia uno schema) |
 | 5.3 | `AGENTS.md` e `README` allineati | link a ARCHITETTURA e SICUREZZA in testa, così la prima pagina porta allo schema |
+
+**Stato al 12 novembre:**
+
+- **5.1 fatto**: `docs/PRIMO-GIORNO.md`. Gli accessi sono in tabella con chi li
+  concede e cosa **non** puoi fare senza (GitHub, Vercel, Render, Atlas, Sentry,
+  Brevo, Cloudinary), piu' la regola che i segreti di produzione non si chiedono
+  e non circolano. Avvio in locale in cinque minuti con i comandi veri e la nota
+  che i test unitari non aprono il database. Tre lavori per iniziare scelti per
+  essere utili davvero (provarsi una ricetta di `CONTRIBUTING.md` e correggerla,
+  coprire un ramo di errore con un test, aggiungere una guardia provandola con
+  l'errore piantato) e cosa **non** e' un buon primo lavoro. Le cinque cose da
+  non toccare sono le stesse di `AGENTS.md`, scritte una volta sola in due punti
+  con lo stesso contenuto.
+- **5.2 fatto**: il template della PR ora chiede le caselle vere al posto di "ho
+  testato": `./verifica.sh` e `--completo`, pin Python con venv pulito, deploy
+  Render verificato se si tocca `backend/` (con il rimando alla ricetta senza
+  chiave), `docs/ARCHITETTURA.md` aggiornato se cambia uno schema, nessun file
+  temporaneo committato.
+- **5.3 fatto**: `README.md` e `AGENTS.md` avevano gia' i link a ARCHITETTURA e
+  SICUREZZA in testa; aggiunto il rimando a `PRIMO-GIORNO.md` in entrambi e in
+  `CONTRIBUTING.md`, cosi' chi arriva non deve indovinare da dove partire.
+  `test_documentazione_link.py` copre anche il file nuovo: se un domani sposto
+  una sezione, il link che si rompe lo dice la CI.
 
 ---
 
@@ -188,15 +239,15 @@ fatto   blocco 0                la rete: schema, segreti, contratto variabili
   ▼
 fatto   blocco 1 (1.1-1.3)      demo lato server, guardia sul bundle, tenant di test
   ▼
-2.1-2.4 blocco 2            guardie sui rinomini
+fatto   blocco 2 (2.1-2.4)      guardie sui rinomini
   ▼
-3.1-3.2 blocco 3 (prima metà)   rami morti e cancellazione automatica
+fatto   blocco 3 (3.1-3.4)      rami morti, cancellazione automatica, dependabot, residui
   ▼
-4.1-4.2 blocco 4            verifica automatica del deploy
+fatto   blocco 4 (4.1-4.3)      verifica automatica del deploy e allarmi
+  ▼
+fatto   blocco 5 (5.1-5.3)      chi arriva domani: PRIMO-GIORNO, template PR, rimandi
   ▼
 1.4     blocco 1 (coda)         reset periodico della demo   ← serve il via di Federico
-  ▼
-3.3-3.4 · 5.1-5.3           dependabot, docs di ingresso
   ▼
 6.x                        le tre decisioni
 ```
