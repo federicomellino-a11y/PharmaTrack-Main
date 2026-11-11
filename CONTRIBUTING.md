@@ -44,6 +44,9 @@ git checkout -b fix/cosa-sto-sistemando
 # e prima di una modifica che tocca il frontend, anche:
 ./verifica.sh --completo     # aggiunge gli E2E sul build nuovo
 
+# se hai toccato configurazione, script o .env: nessun segreto finito nel repo
+bash scripts/controlla-segreti.sh
+
 # oppure i singoli pezzi
 cd frontend && npm run lint && npm run typecheck && npm test && npm run build && cd ..
 cd backend && python -m pytest tests/unit -q && cd ..
