@@ -67,7 +67,19 @@ export default function LandingPage() {
   const { isInstallable, install } = usePWAInstall();
   const [photo, setPhoto] = useState(0);
   const [demoLoading, setDemoLoading] = useState(null);
+  const [attesaLunga, setAttesaLunga] = useState(false);
   const navigate = useNavigate();
+
+  // Se la demo ci mette piu' di qualche secondo, il motivo va detto: il server
+  // si sta accendendo, non e' l'app piantata.
+  useEffect(() => {
+    if (!demoLoading) {
+      setAttesaLunga(false);
+      return undefined;
+    }
+    const timer = setTimeout(() => setAttesaLunga(true), 4000);
+    return () => clearTimeout(timer);
+  }, [demoLoading]);
 
   useEffect(() => {
     const t = setInterval(() => setPhoto((p) => (p + 1) % PHOTOS.length), 3500);
@@ -189,6 +201,11 @@ export default function LandingPage() {
                   {demoLoading === 'driver' ? 'Apro la demo…' : 'Demo Fattorino'}
                 </Button>
               </div>
+              {attesaLunga && (
+                <p className="text-xs text-muted-foreground mt-2" data-testid="demo-attesa">
+                  Sto accendendo il server della demo: la prima apertura della giornata può richiedere fino a un minuto.
+                </p>
+              )}
             </div>
 
             <div className="flex flex-wrap gap-5 text-sm text-muted-foreground">

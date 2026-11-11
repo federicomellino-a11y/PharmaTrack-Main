@@ -152,11 +152,18 @@ export const SocketProvider = ({ children, userId, userType, settings = {} }) =>
     return () => clearInterval(intervalId);
   }, [fetchNotifications, userId, userType]);
 
-  const requestNotificationPermission = useCallback(async () => {
+  /* `forza` serve quando e' l'utente a chiedere le notifiche con un gesto
+     esplicito (l'interruttore in Impostazioni): in quel caso la preferenza
+     salvata puo' essere ancora falsa, ma il permesso va chiesto lo stesso. */
+  const requestNotificationPermission = useCallback(async (forza = false) => {
     const currentPermission = getNotificationPermission();
     setNotificationPermission(currentPermission);
 
-    if (!notificationsEnabled || typeof window === 'undefined' || !('Notification' in window)) {
+    if (typeof window === 'undefined' || !('Notification' in window)) {
+      return currentPermission;
+    }
+
+    if (!forza && !notificationsEnabled) {
       return currentPermission;
     }
 
@@ -223,7 +230,7 @@ export const SocketProvider = ({ children, userId, userType, settings = {} }) =>
   const enablePushNotifications = useCallback(async () => {
     const permission = notificationPermission === 'granted'
       ? 'granted'
-      : await requestNotificationPermission();
+      : await requestNotificationPermission(true);
 
     if (permission !== 'granted') {
       return { ok: false, reason: 'permission_denied' };

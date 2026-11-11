@@ -38,14 +38,11 @@ const baseSettings = {
 };
 
 const propsNotifiche = {
-  handleDisableRealPush: vi.fn(),
-  handleEnableRealPush: vi.fn(),
-  handleRequestPermission: vi.fn(),
-  notificationPermissionInfo: { label: 'Consentito', className: '' },
-  pushConfigured: true,
-  pushLoading: false,
-  pushSubscribed: true,
-  pushSupported: true,
+  attive: true,
+  disponibili: true,
+  inCorso: false,
+  onCambiaNotifiche: vi.fn(),
+  permesso: 'granted',
 };
 
 describe('Aspetto: tre modi, non due', () => {
@@ -83,6 +80,52 @@ describe('Notifiche per famiglia di evento', () => {
     const nuovo = aggiorna(baseSettings);
     expect(nuovo.notifiche_eventi).toEqual({ delivery: true, shift: false });
     expect(nuovo.sound_enabled).toBe(true);
+  });
+});
+
+describe('Notifiche: un interruttore solo, parole normali', () => {
+  afterEach(() => { cleanup(); vi.clearAllMocks(); });
+
+  it('non usa piu il gergo di prima', () => {
+    const { container } = render(<NotificheCard {...propsNotifiche} setSettings={vi.fn()} settings={baseSettings} />);
+    const testo = container.textContent.toLowerCase();
+    ['service worker', 'push', 'permesso', 'configurat'].forEach((parola) => {
+      expect(testo).not.toContain(parola);
+    });
+    expect(screen.getByText('Ricevi le notifiche')).toBeTruthy();
+  });
+
+  it('non parla di telefono: le notifiche arrivano anche sul computer', () => {
+    const { container } = render(<NotificheCard {...propsNotifiche} setSettings={vi.fn()} settings={baseSettings} />);
+    expect(container.textContent.toLowerCase()).not.toContain('telefono');
+  });
+
+  it('accese, dice che arrivano anche ad app chiusa', () => {
+    render(<NotificheCard {...propsNotifiche} setSettings={vi.fn()} settings={baseSettings} />);
+    expect(screen.getByTestId('stato-notifiche').textContent).toContain('app chiusa');
+  });
+
+  it('spente, dice che gli avvisi restano nell app', () => {
+    render(<NotificheCard {...propsNotifiche} attive={false} setSettings={vi.fn()} settings={baseSettings} />);
+    expect(screen.getByTestId('stato-notifiche').textContent).toContain('dentro l');
+  });
+
+  it('accendendole chiama il genitore con true', () => {
+    const onCambiaNotifiche = vi.fn();
+    render(<NotificheCard {...propsNotifiche} attive={false} onCambiaNotifiche={onCambiaNotifiche} setSettings={vi.fn()} settings={baseSettings} />);
+    fireEvent.click(screen.getByTestId('notifiche-interruttore'));
+    expect(onCambiaNotifiche).toHaveBeenCalledWith(true);
+  });
+
+  it('se il browser le blocca lo dice e non lascia accendere', () => {
+    render(<NotificheCard {...propsNotifiche} attive={false} permesso="denied" setSettings={vi.fn()} settings={baseSettings} />);
+    expect(screen.getByTestId('stato-notifiche').textContent).toContain('lucchetto');
+    expect(screen.getByTestId('notifiche-interruttore').disabled).toBe(true);
+  });
+
+  it('su un dispositivo che non le permette lo dice senza gergo', () => {
+    render(<NotificheCard {...propsNotifiche} attive={false} disponibili={false} setSettings={vi.fn()} settings={baseSettings} />);
+    expect(screen.getByTestId('stato-notifiche').textContent).toContain('non permette');
   });
 });
 

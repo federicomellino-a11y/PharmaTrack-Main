@@ -1,18 +1,22 @@
 import React from 'react';
-import { Badge } from '../ui/badge';
-import { Bell } from 'lucide-react';
-import { Button } from '../ui/button';
+import { Bell, BellOff } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Switch } from '../ui/switch';
 
-/* NotificheCard: cosa arriva, come arriva e quando stare zitti.
+/* NotificheCard: un solo interruttore per la domanda vera ("il telefono mi
+   avvisa o no?") e sotto, in parole normali, cosa arriva e in quali ore
+   conviene tacere.
 
-   Tre livelli, dal piu' esterno al piu' interno: il permesso del browser, le
-   famiglie di avvisi che interessano alla farmacia, e le ore in cui il
-   telefono non deve suonare. Il silenzio vale per le push: la campanella
-   dentro l'app resta, cosi' aprendo si sa cosa e' successo.
+   Prima qui c'erano quattro comandi per la stessa cosa (permesso del browser,
+   "push reali via service worker", "attiva push", "disattiva push"): chi legge
+   non sapeva quale toccare. L'interruttore fa tutto: chiede il permesso,
+   registra il dispositivo e spegne tutto quando lo si chiude.
+
+   Le notifiche NON sono solo del telefono: arrivano anche sul computer, dove
+   la farmacia lavora al banco. Per questo le diciture non nominano nessun
+   dispositivo: vale quello che si sta usando in quel momento.
 */
 const EVENTI = [
   { chiave: 'delivery', etichetta: 'Consegne', descrizione: 'Consegna assegnata, ritirata, consegnata, annullata, vendita importata.' },
@@ -20,15 +24,21 @@ const EVENTI = [
   { chiave: 'message', etichetta: 'Messaggi', descrizione: 'Messaggi in chat dai fattorini.' },
 ];
 
+// Il messaggio sotto l'interruttore: dice sempre la verita' di questo
+// dispositivo, senza parole tecniche.
+export const statoNotifiche = ({ attive, disponibili, permesso }) => {
+  if (!disponibili) return 'Questo dispositivo non permette le notifiche.';
+  if (permesso === 'denied') return 'Il browser le ha bloccate: tocca il lucchetto accanto all\u2019indirizzo e scegli Consenti.';
+  if (attive) return 'Ti avvisiamo anche con l\u2019app chiusa, su questo dispositivo.';
+  return 'Spente: gli avvisi restano dentro l\u2019app.';
+};
+
 export default function NotificheCard({
-  handleDisableRealPush,
-  handleEnableRealPush,
-  handleRequestPermission,
-  notificationPermissionInfo,
-  pushConfigured,
-  pushLoading,
-  pushSubscribed,
-  pushSupported,
+  attive = false,
+  disponibili = true,
+  inCorso = false,
+  onCambiaNotifiche,
+  permesso = 'default',
   setSettings,
   settings,
 }) {
@@ -37,28 +47,41 @@ export default function NotificheCard({
     notifiche_eventi: { ...prev.notifiche_eventi, [chiave]: acceso },
   }));
   const silenzio = settings.silenzio_attivo === true;
+  const bloccate = permesso === 'denied' || !disponibili;
+  const messaggio = statoNotifiche({ attive, disponibili, permesso });
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2"><Bell className="w-5 h-5 text-primary" />Notifiche</CardTitle>
-        <CardDescription>Cosa arriva, dove arriva e in quali ore conviene tacere</CardDescription>
+        <CardTitle className="flex items-center gap-2">
+          {attive ? <Bell className="w-5 h-5 text-primary" /> : <BellOff className="w-5 h-5 text-muted-foreground" />}
+          Notifiche
+        </CardTitle>
+        <CardDescription>Se arrivano gli avvisi, di cosa e in quali ore</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
-        <div className="flex items-center justify-between gap-3 rounded-lg bg-secondary/30 p-3">
+        <div className="flex items-start justify-between gap-3 rounded-lg bg-secondary/30 p-3">
           <div>
-            <p className="font-medium">Notifiche browser</p>
-            <p className="text-xs text-muted-foreground">Ricevi notifiche push sul dispositivo</p>
+            <p className="font-medium">Ricevi le notifiche</p>
+            <p className={`text-xs ${permesso === 'denied' ? 'text-destructive' : 'text-muted-foreground'}`} data-testid="stato-notifiche">
+              {inCorso ? 'Un attimo…' : messaggio}
+            </p>
           </div>
-          <Switch checked={settings.notifications_enabled} onCheckedChange={(checked) => setSettings((prev) => ({ ...prev, notifications_enabled: checked }))} />
+          <Switch
+            checked={attive}
+            disabled={bloccate || inCorso}
+            onCheckedChange={(acceso) => onCambiaNotifiche?.(acceso)}
+            aria-label="Ricevi le notifiche"
+            data-testid="notifiche-interruttore"
+          />
         </div>
 
         <div className="flex items-center justify-between gap-3 rounded-lg bg-secondary/30 p-3">
           <div>
-            <p className="font-medium">Suoni notifiche</p>
-            <p className="text-xs text-muted-foreground">Riproduci un suono quando arriva un nuovo evento</p>
+            <p className="font-medium">Suono</p>
+            <p className="text-xs text-muted-foreground">Un suono quando arriva un avviso</p>
           </div>
-          <Switch checked={settings.sound_enabled} onCheckedChange={(checked) => setSettings((prev) => ({ ...prev, sound_enabled: checked }))} />
+          <Switch checked={settings.sound_enabled} onCheckedChange={(checked) => setSettings((prev) => ({ ...prev, sound_enabled: checked }))} data-testid="suono-notifiche" />
         </div>
 
         <div className="space-y-3 rounded-lg border border-border p-4" data-testid="eventi-notifiche">
@@ -86,7 +109,7 @@ export default function NotificheCard({
             <div>
               <p className="font-medium">Non disturbare</p>
               <p className="text-xs text-muted-foreground">
-                In queste ore il telefono non suona. Gli avvisi restano dentro l&apos;app: aprendola li trovi.
+                In queste ore non arriva niente. Gli avvisi restano dentro l&apos;app: aprendola li trovi.
               </p>
             </div>
             <Switch
@@ -117,38 +140,6 @@ export default function NotificheCard({
               </div>
             </div>
           )}
-        </div>
-
-        <div className="space-y-3 rounded-lg border border-border p-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="font-medium">Stato permesso notifiche</p>
-              <p className="text-xs text-muted-foreground">Se bloccato, va riabilitato dalle impostazioni del browser.</p>
-            </div>
-            <Badge variant="outline" className={notificationPermissionInfo.className}>{notificationPermissionInfo.label}</Badge>
-          </div>
-
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/60 pt-3">
-            <div>
-              <p className="font-medium">Push reali via service worker</p>
-              <p className="text-xs text-muted-foreground">Funzionano anche con app in background se browser, PWA e backend sono configurati.</p>
-            </div>
-            <Badge variant="outline" className={pushSubscribed ? 'bg-emerald-500/15 text-emerald-600 border-emerald-500/30' : pushConfigured ? 'bg-amber-500/15 text-amber-600 border-amber-500/30' : 'bg-muted text-muted-foreground border-border'}>
-              {!pushSupported ? 'Non supportate' : pushSubscribed ? 'Attive' : pushConfigured ? 'Pronte' : 'Da configurare'}
-            </Badge>
-          </div>
-
-          <div className="flex flex-wrap gap-2 border-t border-border/60 pt-3">
-            <Button type="button" variant="outline" onClick={handleRequestPermission} disabled={notificationPermissionInfo.label === 'Consentito'}>
-              Chiedi permesso
-            </Button>
-            <Button type="button" variant="outline" onClick={handleEnableRealPush} disabled={pushLoading || pushSubscribed}>
-              Attiva push
-            </Button>
-            <Button type="button" variant="outline" onClick={handleDisableRealPush} disabled={pushLoading || !pushSubscribed}>
-              Disattiva push
-            </Button>
-          </div>
         </div>
       </CardContent>
     </Card>
