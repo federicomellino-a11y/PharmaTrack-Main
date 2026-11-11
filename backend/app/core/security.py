@@ -59,10 +59,39 @@ def clear_cookie_variants(response: Response, key: str):
         response.delete_cookie(key, **variant)
 
 
+async def _elimina_foto_farmacia(user_id: str):
+    """Foto delle consegne: file su Cloudinary o GridFS, poi i loro metadati."""
+    from motor.motor_asyncio import AsyncIOMotorGridFSBucket
+    from app.core.cloudinary_client import LOCAL_STORAGE_BUCKET, PhotoManager
+
+    async for foto in db.delivery_photos.find({"pharmacy_id": user_id}, {"_id": 0, "cloudinary_public_id": 1}):
+        if foto.get("cloudinary_public_id"):
+            try:
+                await PhotoManager.delete_delivery_photo(public_id=foto["cloudinary_public_id"], pharmacy_id=user_id)
+            except Exception as exc:  # noqa: BLE001 — un file remoto non deve bloccare l'eliminazione
+                logger.warning("Foto non rimossa per %s: %s", user_id, exc)
+    # File GridFS rimasti senza metadato (caricamenti interrotti, righe gia' cancellate).
+    bucket = AsyncIOMotorGridFSBucket(db, bucket_name=LOCAL_STORAGE_BUCKET)
+    async for file in db[f"{LOCAL_STORAGE_BUCKET}.files"].find({"metadata.pharmacy_id": user_id}, {"_id": 1}):
+        try:
+            await bucket.delete(file["_id"])
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("File GridFS non rimosso per %s: %s", user_id, exc)
+    await db.delivery_photos.delete_many({"pharmacy_id": user_id})
+    await db.photo_files.delete_many({"pharmacy_id": user_id})
+
+
 async def delete_pharmacy_account_data(user_id: str):
+    """Elimina la farmacia e tutto cio' che le appartiene (GDPR, art. 17)."""
     driver_ids = await db.drivers.distinct("driver_id", {"pharmacy_id": user_id})
+    await _elimina_foto_farmacia(user_id)
     await db.notifications.delete_many({"$or": [{"user_id": user_id}, {"user_id": {"$in": driver_ids}}]})
     await db.messages.delete_many({"pharmacy_id": user_id})
+    await db.chat_threads.delete_many({"pharmacy_id": user_id})
+    await db.driver_shifts.delete_many({"pharmacy_id": user_id})
+    await db.audit_log.delete_many({"pharmacy_id": user_id})
+    await db.password_reset_tokens.delete_many({"user_id": user_id})
+    await db.email_verifications.delete_many({"user_id": user_id})
     await db.driver_sessions.delete_many({"driver_id": {"$in": driver_ids}})
     await db.push_subscriptions.delete_many({"$or": [{"user_id": user_id, "user_type": "pharmacy"}, {"user_id": {"$in": driver_ids}, "user_type": "driver"}]})
     await db.drivers.delete_many({"pharmacy_id": user_id})

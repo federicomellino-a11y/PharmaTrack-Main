@@ -236,25 +236,46 @@ async def google_config():
     return {"client_id": client_id, "enabled": bool(client_id)}
 
 
-@router.post("/auth/google")
-async def google_auth(data: GoogleAuthRequest, response: Response):
+GOOGLE_ISSUERS = ("accounts.google.com", "https://accounts.google.com")
+
+
+def _leggi_token_google(credential: str) -> dict:
+    import urllib.parse
     import urllib.request
     import json as _json
+    url = "https://oauth2.googleapis.com/tokeninfo?id_token=" + urllib.parse.quote(credential, safe="")
+    with urllib.request.urlopen(url, timeout=5) as r:
+        return _json.loads(r.read().decode())
+
+
+def controlla_token_google(payload: dict, client_id: str) -> str:
+    """Il token deve essere per PharmaTrack, emesso da Google, con email confermata."""
+    if not client_id:
+        raise HTTPException(status_code=503, detail="Accesso con Google non configurato")
+    if payload.get("aud") != client_id or payload.get("iss") not in GOOGLE_ISSUERS:
+        raise HTTPException(status_code=401, detail="Token Google non valido per questa applicazione")
+    email = payload.get("email")
+    if not email:
+        raise HTTPException(status_code=400, detail="Email non disponibile dall'account Google")
+    if str(payload.get("email_verified")).lower() != "true":
+        raise HTTPException(status_code=401, detail="Email Google non verificata")
+    return email
+
+
+@router.post("/auth/google")
+@limiter.limit(LOGIN_RATE_LIMIT)
+async def google_auth(request: Request, data: GoogleAuthRequest, response: Response):
+    import asyncio
+    google_client_id = os.environ.get("GOOGLE_CLIENT_ID") or os.environ.get("VITE_GOOGLE_CLIENT_ID") or ""
+    if not google_client_id:
+        raise HTTPException(status_code=503, detail="Accesso con Google non configurato")
     try:
-        url = f"https://oauth2.googleapis.com/tokeninfo?id_token={data.credential}"
-        with urllib.request.urlopen(url, timeout=5) as r:
-            payload = _json.loads(r.read().decode())
+        payload = await asyncio.to_thread(_leggi_token_google, data.credential)
     except Exception as exc:
         logger.error("Google token verification failed: %s", exc)
         raise HTTPException(status_code=401, detail="Token Google non valido")
 
-    google_client_id = os.environ.get("GOOGLE_CLIENT_ID") or os.environ.get("VITE_GOOGLE_CLIENT_ID")
-    if google_client_id and payload.get("aud") != google_client_id:
-        raise HTTPException(status_code=401, detail="Token Google non valido per questa applicazione")
-
-    email = payload.get("email")
-    if not email:
-        raise HTTPException(status_code=400, detail="Email non disponibile dall'account Google")
+    email = controlla_token_google(payload, google_client_id)
 
     user = await db.users.find_one({"email": email}, {"_id": 0})
 

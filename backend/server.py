@@ -11,7 +11,7 @@ from slowapi.middleware import SlowAPIMiddleware
 
 from app.core.database import db, client
 from app.core.legacy_deliveries import allinea_testi_consegne
-from app.core.websocket import manager
+from app.core.websocket import identita_websocket, manager
 from app.core.security import normalize_session_expiry
 from app.core.config import ADMIN_EMAIL, ADMIN_PASSWORD, IS_PRODUCTION
 from app.core.logging_config import setup_logging
@@ -95,7 +95,8 @@ app.add_middleware(SlowAPIMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
 # Difesa CSRF: l'origine delle richieste che scrivono deve essere una delle nostre.
 from app.core.security_middleware import OriginCheckMiddleware, origini_consentite  # noqa: E402
-app.add_middleware(OriginCheckMiddleware, consentite=origini_consentite(os.environ.get("CORS_ORIGINS")))
+_ORIGINI_CONSENTITE = origini_consentite(os.environ.get("CORS_ORIGINS"))
+app.add_middleware(OriginCheckMiddleware, consentite=_ORIGINI_CONSENTITE)
 
 # Gestione errori standardizzata
 register_exception_handlers(app)
@@ -125,8 +126,13 @@ for module in [
 
 
 # ============ WEBSOCKETS ============
+# Senza sessione valida, o con l'id di un altro, il canale si chiude prima di
+# aprirsi (1008 = violazione di policy; il browser vede un 403).
 @app.websocket("/ws/pharmacy/{user_id}")
 async def websocket_pharmacy(websocket: WebSocket, user_id: str):
+    if not await identita_websocket(websocket, "pharmacy", user_id, _ORIGINI_CONSENTITE):
+        await websocket.close(code=1008)
+        return
     await manager.connect(websocket, user_id, "pharmacy")
     try:
         while True:
@@ -134,11 +140,17 @@ async def websocket_pharmacy(websocket: WebSocket, user_id: str):
             if data.get("type") == "ping":
                 await websocket.send_json({"type": "pong"})
     except WebSocketDisconnect:
+        pass
+    finally:
         manager.disconnect(websocket, user_id, "pharmacy")
 
 
 @app.websocket("/ws/driver/{driver_id}")
 async def websocket_driver(websocket: WebSocket, driver_id: str):
+    driver = await identita_websocket(websocket, "driver", driver_id, _ORIGINI_CONSENTITE)
+    if not driver:
+        await websocket.close(code=1008)
+        return
     await manager.connect(websocket, driver_id, "driver")
     try:
         while True:
@@ -146,13 +158,13 @@ async def websocket_driver(websocket: WebSocket, driver_id: str):
             if data.get("type") == "ping":
                 await websocket.send_json({"type": "pong"})
             elif data.get("type") == "location":
-                driver = await db.drivers.find_one({"driver_id": driver_id}, {"_id": 0})
-                if driver:
-                    await manager.send_personal_message(
-                        {"type": "driver_location", "driver_id": driver_id, "lat": data.get("lat"), "lng": data.get("lng")},
-                        driver["pharmacy_id"], "pharmacy"
-                    )
+                await manager.send_personal_message(
+                    {"type": "driver_location", "driver_id": driver_id, "lat": data.get("lat"), "lng": data.get("lng")},
+                    driver["pharmacy_id"], "pharmacy"
+                )
     except WebSocketDisconnect:
+        pass
+    finally:
         manager.disconnect(websocket, driver_id, "driver")
 
 

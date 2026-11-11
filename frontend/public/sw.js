@@ -1,3 +1,4 @@
+/* global clients */
 self.addEventListener('install', () => self.skipWaiting());
 
 // Handler fetch volutamente pass-through: non cachea niente (l'app deve sempre

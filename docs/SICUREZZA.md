@@ -5,7 +5,7 @@ protetto, da chi, e dove sono i buchi**, così chi entra nel progetto sa dove
 può appoggiarsi e dove no. Se cambi un meccanismo di autenticazione, un
 permesso o un segreto, aggiorna questa pagina nello stesso commit.
 
-Ultimo aggiornamento: 12 novembre 2026.
+Ultimo aggiornamento: 11 novembre 2026.
 
 ---
 
@@ -17,6 +17,9 @@ Ultimo aggiornamento: 12 novembre 2026.
 | Ruoli | `get_current_user` / `get_current_driver` / `get_current_admin` | un fattorino non legge i dati della farmacia: cookie diversi |
 | Isolamento tenant | filtro `pharmacy_id` in ogni query | una farmacia non vede né i fattorini né le consegne di un'altra (test notturni) |
 | Difesa CSRF | `SecurityHeadersMiddleware`: `Origin` ammesso solo se in `CORS_ORIGINS` | POST/PUT/DELETE da un sito ostile; le richieste senza `Origin` (curl, job, bridge) passano, e va bene: un CSRF ha sempre un browser dietro |
+| Tempo reale | `identita_websocket` in `app/core/websocket.py` | `/ws/pharmacy/{id}` e `/ws/driver/{id}` si aprono solo col cookie di sessione di quell'id e da un'origine in `CORS_ORIGINS`; prima dell'11/11 bastava conoscere l'id (`tests/unit/test_tempo_reale_accesso.py`) |
+| Accesso con Google | `controlla_token_google` | token di altre app (`aud`), emittenti non Google, email non verificate; senza `GOOGLE_CLIENT_ID` la rotta risponde 503 invece di accettare tutto |
+| Eliminazione account | `delete_pharmacy_account_data` | oltre ad account, clienti e consegne cancella foto (Cloudinary e GridFS), chat, turni, registro modifiche e token di reset (`tests/unit/test_eliminazione_account.py`) |
 | CORS | `CORS_ORIGINS` | letture da origini estranee: nessun `Access-Control-Allow-Origin` |
 | Rate limit | middleware + `LOGIN_RATE_LIMIT` ecc. | forza bruta sul login (429 dal quarto tentativo sbagliato), spam su registrazione e segnalazioni pubbliche |
 | Header | middleware API + `frontend/vercel.json` | clickjacking (`X-Frame-Options: DENY`, `frame-ancestors 'none'`), sniffing MIME, HTTPS obbligato (HSTS 1 anno, preload) |
@@ -90,7 +93,11 @@ Nell'ordine in cui fanno male.
 6. **`'unsafe-inline'` nella CSP** resta su `script-src` e `style-src` perché
    Google Sign-In inietta script inline. Analisi e due strade possibili in
    [`SICUREZZA-CSP.md`](SICUREZZA-CSP.md).
-7. **La passphrase dei backup è in un solo posto** oltre al gestore password di
+7. **Il canale in tempo reale non si richiude da solo al logout.** L'accesso
+   si controlla all'apertura: una connessione già aperta resta viva fino alla
+   chiusura della scheda anche se la sessione viene revocata. Vede solo i dati
+   del proprio account.
+8. **La passphrase dei backup è in un solo posto** oltre al gestore password di
    Federico: se sparisce, i dump restano cifrati per sempre.
 
 ---

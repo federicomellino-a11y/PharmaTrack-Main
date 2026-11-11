@@ -1,3 +1,4 @@
+/* global __APP_RELEASE__ */
 import { API } from '@/lib/config';
 
 const reported = new Set();
