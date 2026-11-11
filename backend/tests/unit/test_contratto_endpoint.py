@@ -98,15 +98,41 @@ def _chiamate_frontend() -> dict[str, list[str]]:
     return trovate
 
 
+def _percorsi_delle_rotte(app) -> set[str]:
+    """Tutti i percorsi montati, comunque la versione di FastAPI li esponga.
+
+    Da FastAPI 0.162 `app.routes` non e' piu' un elenco piatto: i router inclusi
+    restano un oggetto annidato. Se il test leggesse solo il primo livello
+    troverebbe tre rotte e passerebbe a vuoto (e' successo in CI il 12/11),
+    quindi si scende nell'albero e in piu' si chiede lo schema OpenAPI.
+    """
+    percorsi: set[str] = set()
+
+    def cammina(rotte) -> None:
+        for rotta in rotte:
+            percorso = getattr(rotta, "path", None)
+            if isinstance(percorso, str):
+                percorsi.add(percorso)
+            for attributo in ("routes", "router", "app"):
+                annidato = getattr(rotta, attributo, None)
+                if annidato is None:
+                    continue
+                annidato = getattr(annidato, "routes", annidato)
+                if isinstance(annidato, (list, tuple)):
+                    cammina(annidato)
+
+    cammina(getattr(app, "routes", []))
+    try:  # rete di sicurezza: quello che l'app dichiara nello schema pubblico
+        percorsi.update(app.openapi().get("paths", {}).keys())
+    except Exception:  # noqa: BLE001 - lo schema non deve far fallire il contratto
+        pass
+    return percorsi
+
+
 def _rotte_backend() -> set[tuple[str, ...]]:
     from server import app
 
-    rotte = set()
-    for rotta in app.routes:
-        percorso = getattr(rotta, "path", None)
-        if percorso and percorso.startswith("/api"):
-            rotte.add(tuple(_segmenti(percorso)))
-    return rotte
+    return {tuple(_segmenti(percorso)) for percorso in _percorsi_delle_rotte(app) if percorso.startswith("/api")}
 
 
 def _compatibile(chiamata: list[str], rotta: tuple[str, ...]) -> bool:
