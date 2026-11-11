@@ -1,9 +1,19 @@
 self.addEventListener('install', () => self.skipWaiting());
 
 // Handler fetch volutamente pass-through: non cachea niente (l'app deve sempre
-// vedere l'ultimo deploy), ma la sua presenza e' un criterio che Chrome usa per
-// considerare il sito installabile e per far scattare beforeinstallprompt.
-self.addEventListener('fetch', () => { /* lascia passare la richiesta di rete */ });
+// vedere l'ultimo deploy), ma la sua presenza serve a Chrome per considerare il
+// sito installabile e far scattare beforeinstallprompt.
+//
+// Deve pero' fare davvero qualcosa: un handler che non chiama mai respondWith
+// viene segnalato da Chrome come "Fetch event handler is recognized as no-op",
+// perche' ogni navigazione pagherebbe il passaggio nel service worker senza
+// alcun vantaggio. Qui gestiamo solo le navigazioni, lasciando tutto il resto
+// al browser senza intercettarlo.
+self.addEventListener('fetch', (evento) => {
+  if (evento.request.mode === 'navigate') {
+    evento.respondWith(fetch(evento.request));
+  }
+});
 self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
 
 self.addEventListener('push', function(e) {
