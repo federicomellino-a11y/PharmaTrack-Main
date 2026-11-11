@@ -131,6 +131,36 @@ test('Dashboard fattorino: si carica con la sessione del fattorino', async ({ pa
   expect(erroriPagina, `errori JS: ${erroriPagina.join(' | ')}`).toHaveLength(0);
 });
 
+/* Le due rotte del fattorino con un parametro o una chat non le guardava
+   nessuno: la dashboard sì, il dettaglio consegna no. Sono le schermate che il
+   fattorino usa in strada, con una mano sola: se non si caricano, il turno si
+   ferma. */
+for (const pagina of [
+  { percorso: `/driver/delivery/${'c0a80101-1111-2222-3333-444455556666'}`, nome: 'dettaglio consegna' },
+  { percorso: '/driver/chat', nome: 'chat' },
+]) {
+  test(`Fattorino · ${pagina.nome}: si carica con la sessione del fattorino`, async ({ page }) => {
+    await page.route('**/api/**', async (route) => {
+      const url = new URL(route.request().url());
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(mockApiResponse(url.pathname)),
+      });
+    });
+    await page.route('**/ws**', (route) => route.abort());
+
+    const erroriPagina = [];
+    page.on('pageerror', (err) => erroriPagina.push(err.message));
+
+    await page.goto(pagina.percorso, { waitUntil: 'domcontentloaded' });
+
+    await expect(page.getByText('La schermata bianca è stata intercettata')).toHaveCount(0);
+    await expect(page.locator('body')).not.toHaveText(/^\s*$/);
+    expect(erroriPagina, `errori JS: ${erroriPagina.join(' | ')}`).toHaveLength(0);
+  });
+}
+
 /* Stessa ragione della dashboard fattorino: /admin nei test copriva solo il
    redirect senza sessione, quindi la pagina vera non la guardava nessuno. */
 test('Console admin: si carica con la sessione amministratore', async ({ page }) => {

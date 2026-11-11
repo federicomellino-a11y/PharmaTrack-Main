@@ -91,7 +91,30 @@ cosa e dimenticare uno dei due lati**. Oggi lo scopri in produzione.
 | 2.3 | Contratto già esistente esteso: nessun router scrive `status` a mano | la tabella `delivery_lifecycle` è l'unica autorità sugli stati | S |
 | 2.4 | `docs/` verificato: i link interni non devono essere rotti | documentazione che punta a file spostati | S |
 
-Tutti e quattro girano in `tests/unit` o in vitest, quindi costano secondi.
+Tutti e quattro girano in `tests/unit`, quindi costano secondi.
+
+**Stato al 12 novembre, tutto scritto e verde in locale:**
+
+- **2.1 fatto**: `backend/tests/unit/test_contratto_endpoint.py` confronta le
+  chiamate del frontend (111 distinte, sia `${API}/...` sia quelle del livello
+  unico di lettura `src/lib/api.js`) con le rotte vere lette da FastAPI (124).
+  Provato rinominando `/customers` in `/clienti` e `/deliveries` in
+  `/consegne`: va rosso e nomina il file e la chiamata.
+- **2.2 fatto**: `test_contratto_rotte.py` legge le 31 rotte di `App.tsx` e
+  pretende che il file importato esista e che il percorso compaia in
+  `frontend/e2e/`. Le quattro schermate scoperte sono state coperte davvero
+  (pubbliche `/reset-password` e `/verify-email` in `rotte.spec.js`, dettaglio
+  consegna e chat del fattorino in `smoke.spec.js`), non esentate. Provato
+  aggiungendo una rotta finta: va rosso.
+- **2.3 fatto**: `test_contratto_stati_consegna.py` legge i router con l'AST e
+  pretende che ogni scrittura di uno stato di consegna passi da
+  `valuta_scrittura()` o da un costruttore `build_*_updates()`. I filtri
+  (`{"status": "delivered"}`, `query["status"]`) sono riconosciuti come letture,
+  con un test che verifica la distinzione. Provato piantando
+  `modifiche["status"] = "delivered"`: va rosso.
+- **2.4 fatto**: `test_documentazione_link.py` verifica i link relativi in
+  README, AGENTS e `docs/`, comprese le ancore (`#sezione`), sul modello di
+  GitHub. Provato piantando un link a un file inesistente: va rosso.
 
 ---
 

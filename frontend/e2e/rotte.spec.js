@@ -13,6 +13,8 @@ const PUBBLICHE = [
   { path: '/', nome: 'Landing', atteso: /PharmaTrack|consegne|farmac/i },
   { path: '/register', nome: 'Registrazione', atteso: /Registr|Farmacia|Email/i },
   { path: '/forgot-password', nome: 'Password dimenticata', atteso: /Password|Email|reimpost/i },
+  { path: '/reset-password', nome: 'Nuova password', atteso: /passwor|token|link/i },
+  { path: '/verify-email', nome: 'Verifica email', atteso: /email|verific/i },
   { path: '/driver/login', nome: 'Login fattorino', atteso: /Fattorin|Accedi|Telefono|Password/i },
   { path: '/admin/login', nome: 'Login super admin', atteso: /Accedi|Email|Password|amministratore/i },
 ];
