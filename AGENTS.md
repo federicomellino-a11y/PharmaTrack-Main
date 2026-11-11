@@ -1,7 +1,9 @@
 # AGENTS.md — come si mette mano a PharmaTrack senza rompere niente
 
 Questo file è la prima cosa da leggere, per una persona o per un programma
-automatico. **Se è il tuo primo giorno sul progetto** parti da
+automatico. Gli assistenti che cercano un file specifico lo trovano qui:
+`CLAUDE.md` (Claude Code) e `.github/copilot-instructions.md` (GitHub Copilot)
+rimandano a questo file, così le regole sono le stesse per tutti. **Se è il tuo primo giorno sul progetto** parti da
 [`docs/PRIMO-GIORNO.md`](docs/PRIMO-GIORNO.md): accessi da chiedere, app che
 gira in cinque minuti, tre lavori per cominciare. Lo schema del sistema (topologia, ruoli, dati, macchina a stati,
 rilascio) sta in [`docs/ARCHITETTURA.md`](docs/ARCHITETTURA.md); cosa è
