@@ -127,6 +127,28 @@ Tutti e quattro girano in `tests/unit`, quindi costano secondi.
 | 3.3 | Dependabot | raggruppare gli aggiornamenti (un PR a settimana invece di dieci), escludere i salti di minor per Python (il 1/11 un bump raggruppato ha steso il backend) |
 | 3.4 | Residui | `docs/archivio` e `docs/outreach`: verificare che siano storia utile e non peso; `memory/` non deve tornare |
 
+**Stato al 12 novembre:**
+
+- **3.1 fatto**: undici rami cancellati, `main` è l'unico ramo rimasto. Prima di
+  cancellare ho confrontato ogni ramo con `main`: nove erano già dentro
+  (`ahead_by: 0`), due (`feature/auto-20261110-1902`, commit `b546549` e
+  `041795b`; `feature/notifiche-interruttore-unico`, commit `d53a17d`) avevano
+  commit "avanti" che erano però la stessa roba arrivata in `main` con squash
+  merge (PR 233 e PR 235). Verificato sulle firme: `svegliaBackend.js`,
+  `NotificheCard.jsx`, `sveglia-backend.yml` e `test_preferenze_notifiche.py`
+  sono in `main`, e `staff.py` è assente in entrambi. Nessuna PR aperta al
+  momento della cancellazione.
+  SHA cancellati, per ritrovarli se servisse: `f525083` `9e7e3ce` `532a56d`
+  `189293f` `b546549` `1bbf2ec` `41d6bad` `d53a17d` `0abc949` `2f0a0e4`
+  `1eb7705`.
+- **3.2 fatto**: `delete_branch_on_merge` ora è `true` sul repository, quindi il
+  ramo sparisce da solo quando la PR viene mergiata.
+- **3.3 fatto**: Dependabot era già raggruppato per npm (minor e patch) e pip
+  (solo patch, con i major e i minor ignorati: il bump che il 1/11 ha steso il
+  backend). Aggiunto il gruppo anche per `github-actions`, che era l'unico a
+  poter aprire fino a due PR separate al mese.
+- **3.4 resta aperto**: `docs/archivio` e `docs/outreach`.
+
 ---
 
 ## Blocco 4 — operatività (accorgersi in un minuto)
