@@ -19,3 +19,18 @@ Confrontato con il codice attuale:
 | `api_token_bearer_auth` | **mai entrato**: zero riferimenti a api_tokens |
 
 Le due voci mai entrate chiedevano anche collezioni (`subscriptions`, `api_tokens`) e variabili `STRIPE_*` su Render, che infatti non esistono. Il `status: ready_for_merge_after_rebase` era quindi ottimistico: quel ramo non e' mai stato rebasato ne' mergiato.
+
+## prd-emergent-2026.md
+
+Il documento dei requisiti che Emergent aveva scritto nell'agosto 2026, quando il
+progetto passava da quella piattaforma. Non e' la specifica attuale: meta' delle
+cose che descrive sono state costruite in un altro modo e alcune (abbonamenti
+Stripe, token API) non sono mai entrate. Resta per capire da dove viene qualche
+nome nel codice.
+
+## outreach/
+
+Due bozze di email commerciali del 29 ottobre 2026 (FederFarma e Pharmagest),
+tenute per memoria perche' possono servire a un secondo giro di contatti. Non
+sono documentazione tecnica del prodotto e non vanno aggiornate: se il testo
+cambia, si scrive un file nuovo. Le bozze non contengono dati di clienti.

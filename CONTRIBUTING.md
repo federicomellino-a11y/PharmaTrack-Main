@@ -7,6 +7,10 @@ come si è sicuri di non aver rotto niente.
 `main` **è** la produzione. Un merge su `main` pubblica su Vercel e Render in
 pochi minuti, davanti alle farmacie che usano il gestionale.
 
+Se è il tuo primo giorno, prima di questa pagina c'è
+[`docs/PRIMO-GIORNO.md`](docs/PRIMO-GIORNO.md): accessi da chiedere, avvio in
+locale, tre lavori per cominciare.
+
 ---
 
 ## 1. Preparare la macchina (una volta)

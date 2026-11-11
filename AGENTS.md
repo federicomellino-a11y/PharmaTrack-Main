@@ -1,7 +1,9 @@
 # AGENTS.md — come si mette mano a PharmaTrack senza rompere niente
 
 Questo file è la prima cosa da leggere, per una persona o per un programma
-automatico. Lo schema del sistema (topologia, ruoli, dati, macchina a stati,
+automatico. **Se è il tuo primo giorno sul progetto** parti da
+[`docs/PRIMO-GIORNO.md`](docs/PRIMO-GIORNO.md): accessi da chiedere, app che
+gira in cinque minuti, tre lavori per cominciare. Lo schema del sistema (topologia, ruoli, dati, macchina a stati,
 rilascio) sta in [`docs/ARCHITETTURA.md`](docs/ARCHITETTURA.md); cosa è
 protetto e cosa resta scoperto in [`docs/SICUREZZA.md`](docs/SICUREZZA.md). Non descrive l'applicazione (per quello c'è `README.md`): descrive
 cosa si può toccare, dove vive ogni cosa, e come si verifica di non aver rotto
