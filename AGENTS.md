@@ -1,7 +1,9 @@
 # AGENTS.md — come si mette mano a PharmaTrack senza rompere niente
 
 Questo file è la prima cosa da leggere, per una persona o per un programma
-automatico. Non descrive l'applicazione (per quello c'è `README.md`): descrive
+automatico. Lo schema del sistema (topologia, ruoli, dati, macchina a stati,
+rilascio) sta in [`docs/ARCHITETTURA.md`](docs/ARCHITETTURA.md); cosa è
+protetto e cosa resta scoperto in [`docs/SICUREZZA.md`](docs/SICUREZZA.md). Non descrive l'applicazione (per quello c'è `README.md`): descrive
 cosa si può toccare, dove vive ogni cosa, e come si verifica di non aver rotto
 niente. `CONTRIBUTING.md` è la versione per le persone, con le ricette passo
 passo; qui ci sono le regole e il perché.

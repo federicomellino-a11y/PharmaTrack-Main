@@ -25,6 +25,17 @@ jobs:
       - name: Compila i moduli Python
         run: python -m compileall -q backend/app backend/server.py
 
+  segreti:
+    name: Sicurezza (segreti)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # GitHub secret scanning richiede Advanced Security, che su un repo
+      # privato personale non c'e'. Questo controllo copre le forme di segreto
+      # che abbiamo davvero, sui soli file versionati: due secondi, zero costi.
+      - name: Segreti nei file versionati
+        run: bash scripts/controlla-segreti.sh
+
   frontend:
     name: Frontend (build)
     runs-on: ubuntu-latest
@@ -80,6 +91,10 @@ jobs:
       - name: Build di produzione
         working-directory: frontend
         run: npm run build
+      # Il bundle e' pubblico: qualunque cosa ci finisca la legge chiunque.
+      # Qui si controlla il file vero, non il sorgente.
+      - name: Segreti nel bundle di produzione
+        run: bash scripts/controlla-segreti.sh --dist
       - name: Smoke test end-to-end (bundle reale, API finte)
         working-directory: frontend
         run: npm run test:e2e

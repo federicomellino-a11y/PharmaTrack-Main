@@ -14,8 +14,6 @@ services:
         sync: false
       - key: DB_NAME
         value: Cluster0
-      - key: SESSION_SECRET
-        sync: false
       - key: ADMIN_EMAIL
         value: Admin@superadmin.it
       - key: ADMIN_PASSWORD
@@ -34,17 +32,11 @@ services:
         sync: false
       - key: SMTP_FROM
         value: noreply@pharmatrack.app
-      - key: SMTP_FROM_NAME
-        value: PharmaTrack
       - key: GOOGLE_CLIENT_ID
         sync: false
       - key: VAPID_PUBLIC_KEY
         sync: false
       - key: VAPID_PRIVATE_KEY
         sync: false
-      - key: VAPID_CLAIM_EMAIL
-        sync: false
-      - key: COOKIE_DOMAIN
-        value: ""
       - key: PYTHON_VERSION
         value: "3.11.9"

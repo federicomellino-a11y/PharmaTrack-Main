@@ -5,9 +5,12 @@ Coordina fattorini, traccia ogni ordine, gestisci cassa e turni, integrazione co
 
 🌐 Demo live: [pharmatrack-zeta.vercel.app](https://pharmatrack-zeta.vercel.app)
 
-> **Stai per modificare il codice?** Leggi prima
-> [`AGENTS.md`](AGENTS.md) (regole e perché) e [`CONTRIBUTING.md`](CONTRIBUTING.md)
-> (giro di lavoro e ricette). `main` è la produzione: un merge pubblica subito.
+> **Stai per modificare il codice?** Tre letture, in quest'ordine:
+> [`AGENTS.md`](AGENTS.md) (regole e perché), [`docs/ARCHITETTURA.md`](docs/ARCHITETTURA.md)
+> (la mappa: ruoli, flusso di una richiesta, macchina a stati, rilascio) e
+> [`CONTRIBUTING.md`](CONTRIBUTING.md) (giro di lavoro e ricette).
+> Cosa è protetto e cosa no: [`docs/SICUREZZA.md`](docs/SICUREZZA.md).
+> `main` è la produzione: un merge pubblica subito.
 
 ---
 
@@ -52,13 +55,18 @@ Coordina fattorini, traccia ogni ordine, gestisci cassa e turni, integrazione co
 3. Seleziona la repo → Render legge automaticamente `render.yaml`
 4. Compila i secret (marcati `sync: false`):
    - `MONGO_URL` → connection string Atlas
-   - `SESSION_SECRET` → stringa casuale lunga (es. `openssl rand -base64 64`)
+   - `DB_NAME` → nome del database (`Cluster0` in produzione). **Senza questa il backend non parte**
    - `ADMIN_PASSWORD` → password admin
    - `CORS_ORIGINS` → URL del frontend Vercel (es. `https://pharmatrack-zeta.vercel.app`)
    - `SMTP_USERNAME`, `SMTP_PASSWORD` → da [brevo.com](https://brevo.com)
+   - `ALERT_EMAIL` → casella che riceve gli allarmi automatici
    - `GOOGLE_CLIENT_ID` → da [console.cloud.google.com](https://console.cloud.google.com) (OAuth Web)
    - `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` → vedi sotto come generarle
-   - `VAPID_CLAIM_EMAIL` → `mailto:tua@email.com`
+   - `VAPID_SUBJECT` → `mailto:tua@email.com`
+
+   L'elenco completo e verificato è `backend/.env.example`: un test della CI
+   (`backend/tests/unit/test_env_contract.py`) diventa rosso se il codice legge
+   una variabile che lì non c'è, o se lì c'è una variabile che nessuno legge.
 5. Deploy → in ~3 min il backend è online su `https://pharmatrack-api.onrender.com`
 6. ⚠️ Il free tier va in "sleep" dopo 15 min di inattività; primo request impiega 30 sec.
 
