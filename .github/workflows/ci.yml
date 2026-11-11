@@ -87,7 +87,20 @@ jobs:
         run: npm ci
       - name: Installa Chromium per Playwright
         working-directory: frontend
-        run: npx playwright install --with-deps chromium
+        # Il runner a volte non risolve archive.ubuntu.com e `--with-deps` muore
+        # con exit 100 (successo l'11/11: E2E rosso senza una riga di test).
+        # Tre tentativi, poi si arrende per davvero.
+        run: |
+          for tentativo in 1 2 3; do
+            if npx playwright install --with-deps chromium; then
+              echo "browser installati al tentativo $tentativo"
+              exit 0
+            fi
+            echo "::warning::tentativo $tentativo fallito (rete apt?), riprovo fra 20 secondi"
+            sleep 20
+          done
+          echo "::error::installazione dei browser fallita tre volte: guardare la rete del runner"
+          exit 1
       - name: Build di produzione
         working-directory: frontend
         run: npm run build
