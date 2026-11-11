@@ -23,6 +23,12 @@ VAPID_PUBLIC_KEY = os.getenv("VAPID_PUBLIC_KEY")
 VAPID_PRIVATE_KEY = os.getenv("VAPID_PRIVATE_KEY")
 VAPID_SUBJECT = os.getenv("VAPID_SUBJECT", "mailto:support@pharmatrack.app")
 
+# Account demo: li identifica solo l'email. La password non serve piu', perche'
+# la sessione la apre il server (app/routers/demo.py): cosi' nessuna credenziale
+# finisce nel bundle pubblico.
+DEMO_PHARMACY_EMAIL = os.getenv("DEMO_PHARMACY_EMAIL", "test@farmaciaprova.it")
+DEMO_DRIVER_EMAIL = os.getenv("DEMO_DRIVER_EMAIL", "luca@fattorino.it")
+
 # Base URL del frontend per i link nelle email (verifica/reset)
 APP_BASE_URL = (os.getenv("APP_BASE_URL") or os.getenv("FRONTEND_URL") or "http://localhost:3000").rstrip("/")
 

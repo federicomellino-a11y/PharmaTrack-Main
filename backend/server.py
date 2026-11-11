@@ -25,6 +25,7 @@ from app.routers import (
     deliveries, driver_deliveries, messages, notifications, statistics,
     archive, doctors, useful_numbers, notes, reports, integrations, shifts,
     analytics, photos, client_errors, csp_reports, admin_db, plan, ricorrenze,
+    demo,
 )
 from app.core.security_middleware import SecurityHeadersMiddleware
 
@@ -108,7 +109,7 @@ _ROUTER_TAGS = {
     "archive": "archive", "doctors": "doctors", "useful_numbers": "useful-numbers",
     "notes": "notes", "reports": "reports", "integrations": "integrations", "shifts": "shifts",
     "analytics": "analytics", "csp_reports": "csp", "admin_db": "admin-db", "plan": "plan",
-    "ricorrenze": "ricorrenze",
+    "ricorrenze": "ricorrenze", "demo": "demo",
 }
 api_router = APIRouter(prefix="/api")
 from app.routers import geocode as geocode_router  # noqa: E402
@@ -117,7 +118,7 @@ for module in [
     deliveries, driver_deliveries, messages, notifications, statistics,
     archive, doctors, useful_numbers, notes, reports, integrations, shifts,
     analytics, photos, client_errors, csp_reports, admin_db, geocode_router, plan,
-    ricorrenze,
+    ricorrenze, demo,
 ]:
     tag = _ROUTER_TAGS.get(module.__name__.split(".")[-1])
     api_router.include_router(module.router, tags=[tag] if tag else None)
