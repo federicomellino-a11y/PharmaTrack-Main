@@ -25,6 +25,11 @@ def corrisponde(doc: dict, filtro: dict) -> bool:
                     return False
                 if op == "$lt" and not (valore is not None and valore < arg):
                     return False
+                if op == "$regex":
+                    import re
+                    flag = re.IGNORECASE if "i" in atteso.get("$options", "") else 0
+                    if not isinstance(valore, str) or not re.search(arg, valore, flag):
+                        return False
         elif valore != atteso:
             return False
     return True

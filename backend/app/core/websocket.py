@@ -73,3 +73,50 @@ class ConnectionManager:
                 logger.error(f"Broadcast error: {e}")
 
 manager = ConnectionManager()
+
+# Codice di chiusura "sessione non piu' valida": il frontend non riprova a collegarsi.
+CHIUSURA_SESSIONE_REVOCATA = 4401
+
+
+async def _ancora_valida(websocket: WebSocket, user_type: str, user_id: str) -> bool:
+    try:
+        if user_type == "pharmacy":
+            return (await get_current_user(websocket)).get("user_id") == user_id
+        return (await get_current_driver(websocket)).get("driver_id") == user_id
+    except HTTPException:
+        return False
+
+
+async def richiudi_canali_revocati(user_type: Optional[str] = None, user_id: Optional[str] = None) -> int:
+    """Chiude i canali la cui sessione non vale piu' (logout, revoca, account disattivato).
+
+    Si ricontrolla il cookie dell'handshake con le stesse regole delle rotte
+    HTTP. Senza argomenti passa tutti i canali aperti: lo fa il controllo
+    periodico, che copre anche le sessioni scadute o revocate da un'altra istanza.
+    """
+    chiusi = 0
+    for chiave, aperti in list(manager.user_sockets.items()):
+        tipo, _, uid = chiave.partition("_")
+        if (user_type and tipo != user_type) or (user_id and uid != user_id):
+            continue
+        for websocket in list(aperti):
+            if await _ancora_valida(websocket, tipo, uid):
+                continue
+            manager.disconnect(websocket, uid, tipo)
+            chiusi += 1
+            try:
+                await websocket.close(code=CHIUSURA_SESSIONE_REVOCATA)
+            except Exception:  # noqa: BLE001 — gia' chiuso dall'altra parte
+                pass
+    return chiusi
+
+
+async def sorveglia_canali(intervallo: float = 60):
+    """Ogni minuto chiude i canali rimasti aperti con una sessione scaduta o revocata."""
+    import asyncio
+    while True:
+        await asyncio.sleep(intervallo)
+        try:
+            await richiudi_canali_revocati()
+        except Exception as exc:  # noqa: BLE001 — il controllo non deve fermarsi
+            logger.warning("Controllo dei canali in tempo reale non riuscito: %s", exc)

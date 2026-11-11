@@ -1,4 +1,3 @@
-/* global clients */
 self.addEventListener('install', () => self.skipWaiting());
 
 // Handler fetch volutamente pass-through: non cachea niente (l'app deve sempre
@@ -42,14 +41,14 @@ self.addEventListener('notificationclick', function(e) {
   e.notification.close();
   const targetUrl = e.notification.data?.url || '/';
   e.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
       for (const client of clientList) {
         if (client.url.includes(self.registration.scope) && 'focus' in client) {
           client.postMessage({ type: 'NAVIGATE', url: targetUrl });
           return client.focus();
         }
       }
-      if (clients.openWindow) return clients.openWindow(targetUrl);
+      if (self.clients.openWindow) return self.clients.openWindow(targetUrl);
     })
   );
 });

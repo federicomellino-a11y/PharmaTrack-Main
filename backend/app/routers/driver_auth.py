@@ -5,10 +5,10 @@ from fastapi import APIRouter, HTTPException, Depends, Request, Response
 
 from app.core.database import db
 from app.core.passwords import needs_rehash, verify_password, hash_password
-from app.core.websocket import manager
+from app.core.websocket import manager, richiudi_canali_revocati
 from app.core.config import LOGIN_RATE_LIMIT
 from app.core.security import (
-    get_current_driver, clear_cookie_variants,
+    get_current_driver, clear_cookie_variants, trova_per_email,
 )
 # (nessun uso di app.models.schemas)
 
@@ -26,6 +26,7 @@ async def apri_sessione_fattorino(driver_id: str) -> str:
     """
     session_token = f"drv_sess_{uuid.uuid4().hex}"
     await db.driver_sessions.delete_many({"driver_id": driver_id})
+    await richiudi_canali_revocati("driver", driver_id)
     await db.driver_sessions.insert_one({
         "driver_id": driver_id,
         "session_token": session_token,
@@ -44,7 +45,7 @@ async def driver_login(request: Request, response: Response):
     if not email or not password:
         raise HTTPException(status_code=400, detail="Email e password richiesti")
     # Recupera solo i campi necessari, password_hash incluso per il check
-    driver = await db.drivers.find_one({"email": email}, {"_id": 0})
+    driver = await trova_per_email(db.drivers, email)
     if not driver:
         raise HTTPException(status_code=401, detail="Credenziali non valide")
     if not verify_password(password, driver.get("password_hash", "")):
@@ -77,7 +78,10 @@ async def get_driver_me(driver: dict = Depends(get_current_driver)):
 async def driver_logout(request: Request, response: Response):
     session_token = request.cookies.get("driver_session_token")
     if session_token:
+        sessione = await db.driver_sessions.find_one({"session_token": session_token}, {"_id": 0, "driver_id": 1})
         await db.driver_sessions.delete_many({"session_token": session_token})
+        if sessione:
+            await richiudi_canali_revocati("driver", sessione["driver_id"])
     clear_cookie_variants(response, "driver_session_token")
     return {"message": "Logged out"}
 

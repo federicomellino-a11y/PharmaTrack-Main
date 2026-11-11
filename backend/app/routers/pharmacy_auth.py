@@ -7,11 +7,13 @@ from fastapi import APIRouter, HTTPException, Depends, Request, Response
 
 from app.core.database import db
 from app.core.passwords import hash_password, needs_rehash, verify_password
-from app.core.config import APP_BASE_URL, FORGOT_RATE_LIMIT, LOGIN_RATE_LIMIT, REGISTER_RATE_LIMIT
+from app.core.config import APP_BASE_URL, FORGOT_RATE_LIMIT, LOGIN_RATE_LIMIT, REGISTER_RATE_LIMIT, RESET_RATE_LIMIT
 from app.core.piani import nuovo_profilo_piano
 from app.core.security import (
     get_current_user, clear_cookie_variants, delete_pharmacy_account_data,
+    normalizza_email, trova_per_email,
 )
+from app.core.websocket import richiudi_canali_revocati
 from app.core.notifications import (
     send_transactional_email,
 )
@@ -57,7 +59,8 @@ async def _send_verification_email(user_id: str, email: str, name: str) -> str:
 @router.post("/auth/register")
 @limiter.limit(REGISTER_RATE_LIMIT)
 async def register(request: Request, data: PharmacyRegister, response: Response):
-    existing = await db.users.find_one({"email": data.email})
+    email = normalizza_email(data.email)
+    existing = await trova_per_email(db.users, email)
     if existing:
         raise HTTPException(status_code=400, detail="Email già registrata")
     
@@ -66,7 +69,7 @@ async def register(request: Request, data: PharmacyRegister, response: Response)
     
     new_user = {
         "user_id": user_id,
-        "email": data.email,
+        "email": email,
         "role": "pharmacy",
         "name": data.name,
         "password_hash": password_hash,
@@ -87,16 +90,9 @@ async def register(request: Request, data: PharmacyRegister, response: Response)
         **nuovo_profilo_piano(),
     }
     await db.users.insert_one(new_user)
-    await _send_verification_email(user_id, data.email, data.name)
-    
-    session_token = f"sess_{uuid.uuid4().hex}"
-    expires_at = datetime.now(timezone.utc) + timedelta(days=7)
-    await db.user_sessions.insert_one({
-        "user_id": user_id,
-        "session_token": session_token,
-        "expires_at": expires_at,
-        "created_at": datetime.now(timezone.utc).isoformat()
-    })
+    await _send_verification_email(user_id, email, data.name)
+
+    session_token = await _apri_sessione(request, user_id)
     
     response.set_cookie(key="session_token", value=session_token, httponly=True,
                         secure=True, samesite="none", path="/", max_age=7*24*60*60)
@@ -106,7 +102,7 @@ async def register(request: Request, data: PharmacyRegister, response: Response)
 @router.post("/auth/login")
 @limiter.limit(LOGIN_RATE_LIMIT)
 async def login(request: Request, data: PharmacyLogin, response: Response):
-    user = await db.users.find_one({"email": data.email}, {"_id": 0})
+    user = await trova_per_email(db.users, data.email)
     if not user:
         raise HTTPException(status_code=401, detail="Credenziali non valide")
     
@@ -140,14 +136,17 @@ async def get_me(user: dict = Depends(get_current_user)):
 async def logout(request: Request, response: Response):
     session_token = request.cookies.get("session_token")
     if session_token:
+        sessione = await db.user_sessions.find_one({"session_token": session_token}, {"_id": 0, "user_id": 1})
         await db.user_sessions.delete_many({"session_token": session_token})
+        if sessione:
+            await richiudi_canali_revocati("pharmacy", sessione["user_id"])
     clear_cookie_variants(response, "session_token")
     return {"message": "Logged out"}
 
 @router.post("/auth/forgot-password")
 @limiter.limit(FORGOT_RATE_LIMIT)
 async def forgot_password(request: Request, data: ForgotPasswordRequest):
-    user = await db.users.find_one({"email": data.email}, {"_id": 0})
+    user = await trova_per_email(db.users, data.email)
     if not user:
         # Always return success to prevent email enumeration
         return {"message": "Se l'email esiste, riceverai le istruzioni"}
@@ -178,7 +177,7 @@ async def forgot_password(request: Request, data: ForgotPasswordRequest):
     """
     text_body = f"Ciao {user.get('name', '')},\n\nReimposta la tua password su PharmaTrack:\n{reset_url}\n\nIl link scade tra 1 ora."
 
-    email_sent = await send_transactional_email(data.email, "Recupero password PharmaTrack", text_body, html_body)
+    email_sent = await send_transactional_email(user["email"], "Recupero password PharmaTrack", text_body, html_body)
     if not email_sent:
         logger.info("SMTP non configurato – reset URL: %s", reset_url)
 
@@ -186,7 +185,8 @@ async def forgot_password(request: Request, data: ForgotPasswordRequest):
 
 
 @router.post("/auth/reset-password")
-async def reset_password(data: ResetPasswordRequest):
+@limiter.limit(RESET_RATE_LIMIT)
+async def reset_password(request: Request, data: ResetPasswordRequest):
     record = await db.password_reset_tokens.find_one({"token": data.token})
     if not record:
         raise HTTPException(status_code=400, detail="Link non valido o già utilizzato")
@@ -203,6 +203,7 @@ async def reset_password(data: ResetPasswordRequest):
     await db.users.update_one({"user_id": record["user_id"]}, {"$set": {"password_hash": new_hash}})
     await db.password_reset_tokens.delete_one({"token": data.token})
     await db.user_sessions.delete_many({"user_id": record["user_id"]})
+    await richiudi_canali_revocati("pharmacy", record["user_id"])
     return {"message": "Password aggiornata con successo"}
 
 
@@ -275,9 +276,9 @@ async def google_auth(request: Request, data: GoogleAuthRequest, response: Respo
         logger.error("Google token verification failed: %s", exc)
         raise HTTPException(status_code=401, detail="Token Google non valido")
 
-    email = controlla_token_google(payload, google_client_id)
+    email = normalizza_email(controlla_token_google(payload, google_client_id))
 
-    user = await db.users.find_one({"email": email}, {"_id": 0})
+    user = await trova_per_email(db.users, email)
 
     if not user:
         user_id = f"user_{uuid.uuid4().hex[:12]}"
@@ -421,10 +422,12 @@ async def revoca_sessioni(request: Request, user: dict = Depends(get_current_use
         if token == token_corrente:
             raise HTTPException(status_code=422, detail="Questa e' la sessione che stai usando: per uscire, esci.")
         await db.user_sessions.delete_one({"session_token": token})
+        await richiudi_canali_revocati("pharmacy", user["user_id"])
         return {"chiuse": 1, "restano": len(righe) - 1}
     altre = [r["session_token"] for r in righe if r.get("session_token") != token_corrente]
     if altre:
         await db.user_sessions.delete_many({"session_token": {"$in": altre}})
+        await richiudi_canali_revocati("pharmacy", user["user_id"])
     return {"chiuse": len(altre), "restano": 1}
 
 
@@ -457,6 +460,7 @@ async def change_password(request: Request, data: ChangePasswordRequest, user: d
         "user_id": proprietario,
         "session_token": {"$ne": token_corrente},
     })
+    await richiudi_canali_revocati("pharmacy", proprietario)
     return {"message": "Password aggiornata"}
 
 

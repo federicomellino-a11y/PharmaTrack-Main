@@ -22,13 +22,13 @@ da Impostazioni → Sessioni).
 from __future__ import annotations
 
 import logging
-import re
 
 from fastapi import APIRouter, HTTPException, Request, Response
 
 from app.core.config import DEMO_DRIVER_EMAIL, DEMO_PHARMACY_EMAIL, PUBLIC_WRITE_RATE_LIMIT
 from app.core.database import db
 from app.core.limiter import limiter
+from app.core.security import trova_per_email
 from app.routers.driver_auth import apri_sessione_fattorino
 from app.routers.pharmacy_auth import _apri_sessione
 
@@ -50,16 +50,6 @@ def email_demo(ruolo: str) -> str:
     raise ValueError(f"ruolo demo sconosciuto: {ruolo!r}")
 
 
-async def _trova_per_email(collezione, email: str) -> dict | None:
-    """Come il login: prima l'email esatta, poi senza badare alle maiuscole."""
-    documento = await collezione.find_one({"email": email}, {"_id": 0})
-    if documento:
-        return documento
-    return await collezione.find_one(
-        {"email": {"$regex": f"^{re.escape(email)}$", "$options": "i"}}, {"_id": 0}
-    )
-
-
 @router.post("/auth/demo")
 @limiter.limit(PUBLIC_WRITE_RATE_LIMIT)
 async def demo_login(request: Request, response: Response):
@@ -77,7 +67,7 @@ async def demo_login(request: Request, response: Response):
         raise HTTPException(status_code=503, detail="Demo non disponibile")
 
     if ruolo == "pharmacy":
-        utente = await _trova_per_email(db.users, email)
+        utente = await trova_per_email(db.users, email)
         if not utente or utente.get("is_active", True) is False:
             raise HTTPException(status_code=503, detail="Demo non disponibile")
         token = await _apri_sessione(request, utente["user_id"])
@@ -88,7 +78,7 @@ async def demo_login(request: Request, response: Response):
         logger.info("demo farmacia aperta da %s", request.client.host if request.client else "?")
         return {k: v for k, v in utente.items() if k != "password_hash"}
 
-    fattorino = await _trova_per_email(db.drivers, email)
+    fattorino = await trova_per_email(db.drivers, email)
     if not fattorino or not fattorino.get("is_active", True):
         raise HTTPException(status_code=503, detail="Demo non disponibile")
     farmacia = await db.users.find_one(

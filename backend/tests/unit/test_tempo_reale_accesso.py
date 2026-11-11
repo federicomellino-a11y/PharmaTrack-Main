@@ -25,13 +25,14 @@ NOSTRA = "https://pharmatrack.vercel.app"
 @pytest.fixture
 def ambiente(monkeypatch):
     import server
-    from app.core import security
+    from app.core import security, websocket
     from app.core.websocket import ConnectionManager
 
     finto = FintoDb()
     monkeypatch.setattr(security, "db", finto)
     nuovo = ConnectionManager()
     monkeypatch.setattr(server, "manager", nuovo)
+    monkeypatch.setattr(websocket, "manager", nuovo)
     monkeypatch.setattr(server, "_ORIGINI_CONSENTITE", [NOSTRA])
     scade = datetime.now(timezone.utc) + timedelta(days=1)
     for uid in ("user_a", "user_b"):

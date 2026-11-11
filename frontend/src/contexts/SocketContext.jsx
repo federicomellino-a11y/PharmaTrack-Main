@@ -384,10 +384,12 @@ export const SocketProvider = ({ children, userId, userType, settings = {} }) =>
         }
       };
 
-      ws.onclose = () => {
+      ws.onclose = (event) => {
         if (unmountedRef.current) return;
         setConnected(false);
         wsRef.current = null;
+        // 4401: la sessione e' stata chiusa (logout, revoca): riprovare non serve.
+        if (event?.code === 4401) return;
         if (retriesRef.current < MAX_RETRIES) {
           const delay = BASE_DELAY * Math.pow(2, retriesRef.current);
           retriesRef.current += 1;

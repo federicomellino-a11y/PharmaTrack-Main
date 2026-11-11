@@ -147,6 +147,19 @@ def origini_consentite(valore: str | None) -> list[str] | None:
     return [o.strip().rstrip("/") for o in grezzo.split(",") if o.strip()]
 
 
+def origini_per_ambiente(valore: str | None, produzione: bool) -> list[str] | None:
+    """In produzione CORS_ORIGINS e' obbligatorio: senza, CORS e difesa CSRF
+    accetterebbero qualsiasi sito. Meglio non partire (Render tiene in piedi
+    la versione precedente) che partire aperti."""
+    consentite = origini_consentite(valore)
+    if produzione and consentite is None:
+        raise RuntimeError(
+            "CORS_ORIGINS mancante o '*' in produzione: impostalo su Render "
+            "con gli indirizzi del frontend (es. https://pharmatrack.vercel.app)."
+        )
+    return consentite
+
+
 def origine_ammessa(origine: str, consentite: list[str] | None) -> bool:
     """Confronta un'origine con l'elenco ammesso. Senza elenco passa tutto."""
     if consentite is None:

@@ -1,4 +1,5 @@
 import logging
+import re
 from datetime import datetime, timezone
 from typing import Optional
 from fastapi import HTTPException, Request, Response
@@ -39,6 +40,25 @@ async def normalize_session_expiry(collection, session: dict) -> Optional[dateti
         return None
 
     return expires_at
+
+
+def normalizza_email(email) -> str:
+    """Le email si salvano e si cercano in minuscolo: Mario@ e mario@ sono la stessa casella."""
+    return str(email or "").strip().lower()
+
+
+async def trova_per_email(collection, email) -> Optional[dict]:
+    """Prima l'email in minuscolo; poi, per gli account salvati con le maiuscole
+    prima dell'11/11/2026, la stessa email senza badare alle maiuscole."""
+    pulita = normalizza_email(email)
+    if not pulita:
+        return None
+    documento = await collection.find_one({"email": pulita}, {"_id": 0})
+    if documento:
+        return documento
+    return await collection.find_one(
+        {"email": {"$regex": f"^{re.escape(pulita)}$", "$options": "i"}}, {"_id": 0}
+    )
 
 
 def clear_cookie_variants(response: Response, key: str):
@@ -102,6 +122,10 @@ async def delete_pharmacy_account_data(user_id: str):
     await db.useful_numbers.delete_many({"pharmacy_id": user_id})
     await db.user_sessions.delete_many({"user_id": user_id})
     await db.users.delete_one({"user_id": user_id})
+    from app.core.websocket import richiudi_canali_revocati
+    await richiudi_canali_revocati("pharmacy", user_id)
+    for driver_id in driver_ids:
+        await richiudi_canali_revocati("driver", driver_id)
 
 
 # ============ AUTH HELPERS ============

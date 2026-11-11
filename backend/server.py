@@ -1,3 +1,4 @@
+import asyncio
 import os
 import logging
 import uuid
@@ -11,7 +12,7 @@ from slowapi.middleware import SlowAPIMiddleware
 
 from app.core.database import db, client
 from app.core.legacy_deliveries import allinea_testi_consegne
-from app.core.websocket import identita_websocket, manager
+from app.core.websocket import identita_websocket, manager, sorveglia_canali
 from app.core.security import normalize_session_expiry
 from app.core.config import ADMIN_EMAIL, ADMIN_PASSWORD, IS_PRODUCTION
 from app.core.logging_config import setup_logging
@@ -43,9 +44,11 @@ async def lifespan(_app: FastAPI):
     chiusura del client Mongo allo spegnimento.
     """
     await setup_indexes()
+    sorveglianza = asyncio.create_task(sorveglia_canali())
     try:
         yield
     finally:
+        sorveglianza.cancel()
         client.close()
 
 
@@ -94,8 +97,8 @@ app.add_middleware(SlowAPIMiddleware)
 # Security headers from PR blocco-1: wired so they actually apply (were dead code)
 app.add_middleware(SecurityHeadersMiddleware)
 # Difesa CSRF: l'origine delle richieste che scrivono deve essere una delle nostre.
-from app.core.security_middleware import OriginCheckMiddleware, origini_consentite  # noqa: E402
-_ORIGINI_CONSENTITE = origini_consentite(os.environ.get("CORS_ORIGINS"))
+from app.core.security_middleware import OriginCheckMiddleware, origini_per_ambiente  # noqa: E402
+_ORIGINI_CONSENTITE = origini_per_ambiente(os.environ.get("CORS_ORIGINS"), IS_PRODUCTION)
 app.add_middleware(OriginCheckMiddleware, consentite=_ORIGINI_CONSENTITE)
 
 # Gestione errori standardizzata
@@ -168,13 +171,10 @@ async def websocket_driver(websocket: WebSocket, driver_id: str):
         manager.disconnect(websocket, driver_id, "driver")
 
 
-# ============ CORS — FIX CRITICO ============
-# allow_credentials=True è incompatibile con allow_origins=["*"].
-# Se CORS_ORIGINS è "*" usiamo allow_all senza credentials (fallback sicuro per dev locale).
-# In produzione impostare su Render: CORS_ORIGINS=https://tuo-frontend.vercel.app
-_raw_origins = os.environ.get('CORS_ORIGINS', '*').strip()
-
-if _raw_origins == '*':
+# ============ CORS ============
+# allow_credentials=True è incompatibile con allow_origins=["*"]: senza elenco
+# (solo sviluppo locale, in produzione l'avvio si ferma prima) niente cookie.
+if _ORIGINI_CONSENTITE is None:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
@@ -183,10 +183,9 @@ if _raw_origins == '*':
         allow_headers=["*"],
     )
 else:
-    _origins_list = [o.strip() for o in _raw_origins.split(',') if o.strip()]
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=_origins_list,
+        allow_origins=_ORIGINI_CONSENTITE,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

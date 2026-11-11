@@ -20,8 +20,11 @@ Ultimo aggiornamento: 11 novembre 2026.
 | Tempo reale | `identita_websocket` in `app/core/websocket.py` | `/ws/pharmacy/{id}` e `/ws/driver/{id}` si aprono solo col cookie di sessione di quell'id e da un'origine in `CORS_ORIGINS`; prima dell'11/11 bastava conoscere l'id (`tests/unit/test_tempo_reale_accesso.py`) |
 | Accesso con Google | `controlla_token_google` | token di altre app (`aud`), emittenti non Google, email non verificate; senza `GOOGLE_CLIENT_ID` la rotta risponde 503 invece di accettare tutto |
 | Eliminazione account | `delete_pharmacy_account_data` | oltre ad account, clienti e consegne cancella foto (Cloudinary e GridFS), chat, turni, registro modifiche e token di reset (`tests/unit/test_eliminazione_account.py`) |
+| Canale chiuso alla revoca | `richiudi_canali_revocati` + `sorveglia_canali` | logout, revoca di una sessione, cambio/reset password, account o fattorino disattivati chiudono subito il canale (codice 4401, il frontend non riprova); ogni minuto si ricontrollano tutti i canali, così anche scadenze e revoche da un'altra istanza si chiudono entro 60 s |
+| Email senza doppioni | `normalizza_email` / `trova_per_email` | `Mario@` e `mario@` sono lo stesso account (farmacia e fattorino); gli account vecchi salvati con maiuscole entrano ancora |
+| CORS obbligatorio in produzione | `origini_per_ambiente` | con `ENVIRONMENT=production` e `CORS_ORIGINS` vuoto o `*` il backend non parte invece di partire aperto (Render tiene la versione precedente) |
 | CORS | `CORS_ORIGINS` | letture da origini estranee: nessun `Access-Control-Allow-Origin` |
-| Rate limit | middleware + `LOGIN_RATE_LIMIT` ecc. | forza bruta sul login (429 dal quarto tentativo sbagliato), spam su registrazione e segnalazioni pubbliche |
+| Rate limit | middleware + `LOGIN_RATE_LIMIT` ecc. | forza bruta sul login (429 dal quarto tentativo sbagliato), sul reset password (`RESET_RATE_LIMIT`, 5/minuto) e sull'accesso con Google, spam su registrazione e segnalazioni pubbliche |
 | Header | middleware API + `frontend/vercel.json` | clickjacking (`X-Frame-Options: DENY`, `frame-ancestors 'none'`), sniffing MIME, HTTPS obbligato (HSTS 1 anno, preload) |
 | CSP bloccante | `frontend/vercel.json` | script e sorgenti non dichiarate; attiva dal 4/11, zero violazioni reali |
 | Documentazione API chiusa | `ENVIRONMENT=production` | `/api/docs`, `/api/redoc`, `/api/openapi.json` rispondono 404 |
@@ -93,11 +96,7 @@ Nell'ordine in cui fanno male.
 6. **`'unsafe-inline'` nella CSP** resta su `script-src` e `style-src` perché
    Google Sign-In inietta script inline. Analisi e due strade possibili in
    [`SICUREZZA-CSP.md`](SICUREZZA-CSP.md).
-7. **Il canale in tempo reale non si richiude da solo al logout.** L'accesso
-   si controlla all'apertura: una connessione già aperta resta viva fino alla
-   chiusura della scheda anche se la sessione viene revocata. Vede solo i dati
-   del proprio account.
-8. **La passphrase dei backup è in un solo posto** oltre al gestore password di
+7. **La passphrase dei backup è in un solo posto** oltre al gestore password di
    Federico: se sparisce, i dump restano cifrati per sempre.
 
 ---
