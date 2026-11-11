@@ -18,6 +18,23 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+async def apri_sessione_fattorino(driver_id: str) -> str:
+    """Apre la sessione del fattorino e restituisce il token.
+
+    Una sola copia: la usano il login del fattorino e l'accesso demo
+    (app/routers/demo.py), che altrimenti duplicherebbe nome del cookie e durata.
+    """
+    session_token = f"drv_sess_{uuid.uuid4().hex}"
+    await db.driver_sessions.delete_many({"driver_id": driver_id})
+    await db.driver_sessions.insert_one({
+        "driver_id": driver_id,
+        "session_token": session_token,
+        "expires_at": datetime.now(timezone.utc) + timedelta(days=7),
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    return session_token
+
+
 @router.post("/driver/login")
 @limiter.limit(LOGIN_RATE_LIMIT)
 async def driver_login(request: Request, response: Response):
@@ -47,15 +64,7 @@ async def driver_login(request: Request, response: Response):
     if not pharmacy or pharmacy.get("is_active", True) is False:
         raise HTTPException(status_code=403, detail="Farmacia associata disattivata")
     
-    session_token = f"drv_sess_{uuid.uuid4().hex}"
-    expires_at = datetime.now(timezone.utc) + timedelta(days=7)
-    await db.driver_sessions.delete_many({"driver_id": driver["driver_id"]})
-    await db.driver_sessions.insert_one({
-        "driver_id": driver["driver_id"],
-        "session_token": session_token,
-        "expires_at": expires_at,
-        "created_at": datetime.now(timezone.utc).isoformat()
-    })
+    session_token = await apri_sessione_fattorino(driver["driver_id"])
     response.set_cookie(key="driver_session_token", value=session_token, httponly=True,
                         secure=True, samesite="none", path="/", max_age=7*24*60*60)
     return {k: v for k, v in driver.items() if k not in ["_id", "password_hash"]}

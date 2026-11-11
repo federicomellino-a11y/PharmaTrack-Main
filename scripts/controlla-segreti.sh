@@ -73,6 +73,16 @@ if [ "$CON_DIST" = "1" ]; then
   fi
   printf 'Segreti · bundle di produzione\n'
   controlla 'grep -rIE "." frontend/dist/assets 2>/dev/null'
+
+  # Le credenziali dell'account demo sono state nel bundle fino all'11/11
+  # (LandingPage.jsx: test@farmaciaprova.it / Test1234!). La demo ora la apre il
+  # server, quindi nel JavaScript pubblico non deve restare nessuna traccia.
+  printf 'Segreti · credenziali demo nel bundle\n'
+  demo="$(grep -rInE 'Test1234!|Driver123!|farmaciaprova\.it|luca@fattorino\.it|VITE_DEMO_' frontend/dist/assets 2>/dev/null | head -5)"
+  if [ -n "$demo" ]; then
+    printf '\n!! credenziali o email demo finite nel bundle pubblico\n%s\n' "$demo"
+    esiti=$((esiti + 1))
+  fi
 fi
 
 if [ "$esiti" -gt 0 ]; then

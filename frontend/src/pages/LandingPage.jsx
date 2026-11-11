@@ -86,25 +86,17 @@ export default function LandingPage() {
     return () => clearInterval(t);
   }, []);
 
+  // La demo la apre il server: qui non c'e' nessuna credenziale, quindi niente
+  // password nel JavaScript pubblico. Il server sceglie l'account demo e apre
+  // la sessione; se gli account demo non ci sono risponde 503 e lo diciamo.
   const handleDemoLogin = async (kind) => {
     setDemoLoading(kind);
-    const demoCreds = {
-      pharmacy: {
-        email: import.meta.env.VITE_DEMO_PHARMACY_EMAIL || 'test@farmaciaprova.it',
-        password: import.meta.env.VITE_DEMO_PHARMACY_PASSWORD || 'Test1234!',
-      },
-      driver: {
-        email: import.meta.env.VITE_DEMO_DRIVER_EMAIL || 'luca@fattorino.it',
-        password: import.meta.env.VITE_DEMO_DRIVER_PASSWORD || 'Driver123!',
-      },
-    };
     try {
+      await axios.post(`${API}/auth/demo`, { ruolo: kind }, { withCredentials: true });
       if (kind === 'pharmacy') {
-        await axios.post(`${API}/auth/login`, demoCreds.pharmacy, { withCredentials: true });
         toast.success('Demo farmacia attiva — buona esplorazione!');
         navigate('/dashboard');
-      } else if (kind === 'driver') {
-        await axios.post(`${API}/driver/login`, demoCreds.driver, { withCredentials: true });
+      } else {
         toast.success('Demo fattorino attiva');
         navigate('/driver');
       }
