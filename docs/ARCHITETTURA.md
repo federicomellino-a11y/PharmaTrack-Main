@@ -4,7 +4,7 @@ Una pagina per rispondere a tre domande: **cosa c'è**, **dove sta**, **cosa
 succede quando qualcuno clicca**. Se stai per modificare qualcosa, questo file
 e [`AGENTS.md`](../AGENTS.md) sono le due cose da leggere prima.
 
-Ultimo aggiornamento: 12 novembre 2026, `main` a `385787e`.
+Ultimo aggiornamento: 12 novembre 2026, `main` a `652ea31`.
 
 ---
 
@@ -117,6 +117,11 @@ core) sta in [`AGENTS.md`](../AGENTS.md#dove-mettere-le-mani).
 1. **Login** `POST /api/auth/login` → password bcrypt (costo 10, ri-hash
    trasparente dal 12) → riga in `sessions` + cookie `HttpOnly; Secure;
    SameSite=None; Max-Age=7 giorni`.
+   La **demo** non fa eccezione: `POST /api/auth/demo` con
+   `{"ruolo":"pharmacy"|"driver"}` trova l'account demo per email
+   (`DEMO_PHARMACY_EMAIL` / `DEMO_DRIVER_EMAIL`) e apre la stessa sessione, senza
+   che il browser conosca una password. Il fattorino e la farmacia condividono
+   `apri_sessione_fattorino()` / `_apri_sessione()` con il login normale.
 2. **Ogni chiamata** passa da `SecurityHeadersMiddleware` (header), dal
    controllo di origine (CSRF), dal rate limit, poi da `get_current_user`, che
    legge la sessione dal database e riempie `request.state`.

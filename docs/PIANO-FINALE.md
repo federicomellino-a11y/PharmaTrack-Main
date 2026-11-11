@@ -5,8 +5,9 @@ PharmaTrack senza rischiare di rompere qualcosa**, con uno schema chiaro e tutto
 pronto. Questo file è il programma: cosa si fa, in che ordine, come si verifica
 che sia fatto, e cosa serve da lui.
 
-Stato al 12 novembre 2026. Il **blocco 0 è già in produzione**; gli altri sono
-pronti per essere eseguiti uno per giro.
+Stato al 12 novembre 2026. **Blocco 0 in produzione**, **blocco 1 quasi chiuso**
+(1.1, 1.2 e 1.3 fatti e verificati; resta 1.4). Gli altri sono pronti per essere
+eseguiti uno per giro.
 
 ---
 
@@ -39,11 +40,12 @@ ne accorgi prima di pubblicare. Quindi tre strati, in quest'ordine:
 
 ## Blocco 1 — le credenziali demo (P0, il buco più grosso)
 
-Oggi il bundle pubblico contiene `test@farmaciaprova.it` / `Test1234!` e
-`luca@fattorino.it` / `Driver123!`. Non è solo una password in chiaro: quel
-tenant **è lo stesso account su cui girano i test di integrazione notturni**, e
-quindi chiunque può entrare e falsificare o cancellare i dati su cui misuriamo la
-sicurezza dell'isolamento fra farmacie.
+Fino all'11 novembre il bundle pubblico conteneva `test@farmaciaprova.it` /
+`Test1234!` e `luca@fattorino.it` / `Driver123!`. Non era solo una password in
+chiaro: quel tenant **era lo stesso account su cui giravano i test di
+integrazione notturni**, quindi chiunque poteva entrare e falsificare i dati su
+cui misuriamo l'isolamento fra farmacie. Oggi il bundle è pulito e i test hanno
+un account proprio.
 
 | # | Intervento | Come | Rischio | Verifica |
 | --- | --- | --- | --- | --- |
@@ -52,8 +54,28 @@ sicurezza dell'isolamento fra farmacie.
 | 1.3 | Tenant di test dedicato | farmacia `test-suite@...` creata con un workflow usa e getta via `MONGO_URL_ADMIN` (gli utenti non si creano da codice con le chiavi Atlas), secret `PT_TEST_EMAIL` / `PT_TEST_PASSWORD` aggiornati, una notte di test verdi | medio: tocca la suite notturna | il run delle 03:00 passa su 17 test |
 | 1.4 | Demo libera di sporcarsi | con il test su un altro account, il tenant demo può essere usato da chiunque senza conseguenze; aggiungere un reset settimanale facoltativo (svuota consegne e clienti creati dalla demo) | basso | login demo → crea consegna → la demo altrui non si rompe |
 
-**Serve da Federico:** un via libera prima di 1.3 (crea un account di produzione e
-cambia i secret dei test). 1.1 e 1.2 posso farli subito.
+**Stato, verificato in produzione l'11-12 novembre:**
+
+- **1.1 fatto** (PR 238, `main` a `652ea31`): `POST /api/auth/demo` apre la
+  sessione per il ruolo richiesto. Verificato live: 200 con l'email demo giusta
+  per farmacia e fattorino, 422 su un ruolo inventato, sessione valida su
+  `/auth/me` e `/driver/me`.
+- **1.2 fatto** (PR 238): il controllo sta in `scripts/controlla-segreti.sh
+  --dist` e gira nel job `Sicurezza (segreti)`, che è fra i cinque check
+  obbligatori. Provato piantando le stringhe: la CI va rossa. Il chunk
+  `LandingPage-*.js` servito dal sito ha zero occorrenze di `Test1234!`,
+  `Driver123!`, `farmaciaprova`, `VITE_DEMO_`.
+- **1.3 fatto** (12/11): farmacia `federicomellino+pharmatrack-qa@` creata in
+  produzione via `POST /api/auth/register` (niente `MONGO_URL_ADMIN`: non
+  serviva), con un cliente, un fattorino e una consegna di prova perché i test
+  di isolamento non risultassero verdi a vuoto. Secret `PT_TEST_EMAIL` /
+  `PT_TEST_PASSWORD` aggiornati con l'API di GitHub. Prova: 10 test notturni
+  verdi in locale sul nuovo account, poi `test-integrazione.yml` lanciato a mano
+  → run 43008864168 **success** con tutti e tre gli step.
+- **1.4 resta aperto**: reset periodico del tenant demo.
+
+**Serve da Federico:** niente per chiudere il blocco 1; solo la conferma se
+vuole il reset automatico della demo (1.4).
 
 ---
 
@@ -117,9 +139,9 @@ Tutti e quattro girano in `tests/unit` o in vitest, quindi costano secondi.
 ## Ordine consigliato
 
 ```
-fatto   blocco 0            la rete: schema, segreti, contratto variabili
+fatto   blocco 0                la rete: schema, segreti, contratto variabili
   ▼
-1.1-1.2 blocco 1 (prima metà)   credenziali fuori dal bundle, con la guardia
+fatto   blocco 1 (1.1-1.3)      demo lato server, guardia sul bundle, tenant di test
   ▼
 2.1-2.4 blocco 2            guardie sui rinomini
   ▼
@@ -127,7 +149,7 @@ fatto   blocco 0            la rete: schema, segreti, contratto variabili
   ▼
 4.1-4.2 blocco 4            verifica automatica del deploy
   ▼
-1.3-1.4 blocco 1 (seconda metà) tenant di test dedicato e demo libera   ← serve il via di Federico
+1.4     blocco 1 (coda)         reset periodico della demo   ← serve il via di Federico
   ▼
 3.3-3.4 · 5.1-5.3           dependabot, docs di ingresso
   ▼
