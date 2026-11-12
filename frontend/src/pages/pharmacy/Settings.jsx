@@ -116,7 +116,7 @@ export default function SettingsPage() {
   useEffect(() => {
     setFormData(buildFormData(user));
     setSettings(buildSettingsData(user));
-  }, [user]);
+  }, [user?.user_id]);
 
   const { data: driversQuery = [] } = useDriversQuery();
   useEffect(() => {
@@ -229,6 +229,14 @@ export default function SettingsPage() {
     }
   };
 
+  const chiaviNotifiche = (s) => JSON.stringify([s.sound_enabled, s.notifiche_eventi, s.silenzio_attivo, s.silenzio_da, s.silenzio_a]);
+  const notificheCambiate = chiaviNotifiche(settings) !== chiaviNotifiche(buildSettingsData(user));
+  useEffect(() => {
+    if (!notificheCambiate) return undefined;
+    const attesa = setTimeout(() => salvaNotifiche({}), 600);
+    return () => clearTimeout(attesa);
+  }, [chiaviNotifiche(settings), notificheCambiate]);
+
   /* L'interruttore fa tutto quello che serve: chiede il permesso, registra il
      dispositivo e spegne davvero. Se il browser blocca le notifiche si dice
      dove sbloccarle, senza gergo. */
@@ -272,7 +280,7 @@ export default function SettingsPage() {
     <Layout title="Impostazioni">
       <div className="max-w-2xl space-y-6" data-testid="settings-page">
         <Tabs value={scheda} onValueChange={setScheda}>
-          <TabsList className="w-full justify-start overflow-x-auto" data-testid="settings-tabs">
+          <TabsList className="h-auto w-full flex-wrap justify-start gap-1" data-testid="settings-tabs">
             <TabsTrigger value="farmacia">Farmacia</TabsTrigger>
             <TabsTrigger value="consegne">Consegne</TabsTrigger>
             <TabsTrigger value="notifiche">Notifiche</TabsTrigger>
@@ -320,9 +328,6 @@ export default function SettingsPage() {
                 settings,
               }}
             />
-            <Button type="button" onClick={handleSubmit} disabled={saving} className="w-full">
-              {saving ? 'Salvataggio...' : 'Salva'}
-            </Button>
           </TabsContent>
 
           <TabsContent value="aspetto" className="space-y-6 mt-4">

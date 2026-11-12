@@ -92,10 +92,8 @@ export default function AccountCard({ onSaveName, salvandoNome, user }) {
           </div>
           <div>
             <Label>Email</Label>
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="text-sm font-medium" data-testid="account-email">{user?.email}</p>
-              <Badge variant="outline">Per cambiarla scrivi all'assistenza</Badge>
-            </div>
+            <p className="text-sm font-medium" data-testid="account-email">{user?.email}</p>
+            <p className="text-xs text-muted-foreground">Per cambiarla scrivi all'assistenza</p>
           </div>
           <Button type="button" onClick={() => onSaveName(nome)} disabled={salvandoNome || nome === (user?.name || '')} data-testid="account-salva-nome">
             <Save className="w-4 h-4 mr-2" />{salvandoNome ? 'Salvataggio...' : 'Salva nome'}

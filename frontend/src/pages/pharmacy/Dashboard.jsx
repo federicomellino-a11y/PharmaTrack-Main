@@ -211,7 +211,7 @@ export default function PharmacyDashboard() {
 
         {/* Email verification banner */}
         {user?.email_verified === false && (
-          <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-5 py-3.5 flex items-center justify-between gap-4" data-testid="verify-email-banner">
+          <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-5 py-3.5 flex flex-wrap items-center justify-between gap-4" data-testid="verify-email-banner">
             <div className="flex items-start gap-3">
               <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
               <div>
