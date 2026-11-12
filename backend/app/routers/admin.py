@@ -27,6 +27,7 @@ from app.core.limiter import limiter
 from pydantic import BaseModel, Field
 from typing import Literal, Optional
 from app.core.piani import nuova_assegnazione, piano_corrente
+from app.core.funzioni_pro import funzioni_sbloccate
 
 
 class AdminLoginLoose(BaseModel):
@@ -43,6 +44,11 @@ class AdminCodiceEmail(BaseModel):
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+def stato_piano(utente: dict) -> dict:
+    piano = piano_corrente(utente)
+    return {**piano, "pro": funzioni_sbloccate(piano)}
 
 
 def credenziali_admin_giuste(email: str, password: str) -> bool:
@@ -231,7 +237,7 @@ async def admin_users(admin: dict = Depends(get_current_admin)):
     enriched_users = []
     for item in users:
         user_id = item["user_id"]
-        item["piano_stato"] = piano_corrente(item)
+        item["piano_stato"] = stato_piano(item)
         item["stats"] = {
             "drivers": await db.drivers.count_documents({"pharmacy_id": user_id}),
             "customers": await db.customers.count_documents({"pharmacy_id": user_id}),
@@ -303,7 +309,7 @@ async def admin_user_details(user_id: str, admin: dict = Depends(get_current_adm
         {"_id": 0, "notification_id": 1, "title": 1, "message": 1, "created_at": 1, "is_read": 1}
     ).sort("created_at", -1).limit(12).to_list(12)
 
-    user["piano_stato"] = piano_corrente(user)
+    user["piano_stato"] = stato_piano(user)
     return {
         "user": user,
         "stats": stats,
@@ -348,7 +354,7 @@ async def admin_assegna_pro(user_id: str, data: AssegnaPro, admin: dict = Depend
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Utente non trovato")
     user = await db.users.find_one({"user_id": user_id}, {"_id": 0, "password_hash": 0})
-    user["piano_stato"] = piano_corrente(user)
+    user["piano_stato"] = stato_piano(user)
     return user
 
 
