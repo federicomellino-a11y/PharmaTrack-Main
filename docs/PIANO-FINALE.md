@@ -31,8 +31,8 @@ ne accorgi prima di pubblicare. Quindi tre strati, in quest'ordine:
 | --- | --- | --- | --- |
 | 0.1 | `docs/ARCHITETTURA.md` | non esisteva un posto unico con topologia, ruoli, flusso di una richiesta, macchina a stati e percorso di rilascio | riletto contro il codice, riga per riga |
 | 0.2 | `docs/SICUREZZA.md` | le difese erano sparse in memoria e chat; i buchi noti non erano scritti da nessuna parte | ogni difesa indicata ha un file o un test che la prova |
-| 0.3 | `backend/tests/unit/test_env_contract.py` | `.env.example` prometteva `MONGO_DB_NAME` (il codice legge `DB_NAME`, senza default: `KeyError` al primo avvio) e `SESSION_SECRET` (che nessuno legge); `render.yaml` dichiarava tre variabili morte | 8 test; rosso se codice, esempi e `render.yaml` divergono |
-| 0.4 | `backend/.env.example` e `frontend/.env.example` riscritti | un file di esempio sbagliato costa mezz'ora a chi arriva e insegna una difesa inesistente | il test 0.3 è verde |
+| 0.3 | `backend/tests/unit/test_env_contract.py` | `env.example` prometteva `MONGO_DB_NAME` (il codice legge `DB_NAME`, senza default: `KeyError` al primo avvio) e `SESSION_SECRET` (che nessuno legge); `render.yaml` dichiarava tre variabili morte | 8 test; rosso se codice, esempi e `render.yaml` divergono |
+| 0.4 | `backend/env.example` e `frontend/env.example` riscritti | un file di esempio sbagliato costa mezz'ora a chi arriva e insegna una difesa inesistente | il test 0.3 è verde |
 | 0.5 | `scripts/controlla-segreti.sh` + job CI `Sicurezza (segreti)` | GitHub secret scanning richiede Advanced Security, che qui non c'è; il 4/11 una password admin è rimasta versionata per settimane | controlla i file versionati e il bundle dopo il build; provato piantando una chiave AWS finta |
 | 0.6 | `render.yaml` ripulito | togliere le variabili morte evita che qualcuno le "configuri" credendo che servano | deploy Render verificato dopo il merge |
 

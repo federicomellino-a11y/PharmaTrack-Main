@@ -22,20 +22,14 @@ export default function FunzioniCard({ settings, setSettings }) {
     <Card data-testid="funzioni-farmacia">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <SlidersHorizontal className="w-5 h-5 text-primary" />Cosa mostra il menu
+          <SlidersHorizontal className="w-5 h-5 text-primary" />Funzioni attive
         </CardTitle>
-        <CardDescription>
-          Spegni quello che la tua farmacia non usa. La voce sparisce dal menu e la pagina non si apre
-          piu&apos;, ne&apos; dal menu ne&apos; da un link salvato; i dati restano al loro posto.
-        </CardDescription>
+        <CardDescription>Spegni quello che non usi. I dati restano salvati.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-2">
         {FUNZIONI_FARMACIA.map((funzione) => (
           <div key={funzione.chiave} className="flex items-center justify-between gap-3 rounded-lg bg-secondary/30 p-3">
-            <div className="min-w-0">
-              <p className="font-medium">{funzione.nome}</p>
-              <p className="text-xs text-muted-foreground">{funzione.descrizione}</p>
-            </div>
+            <p className="font-medium">{funzione.nome}</p>
             <Switch
               checked={funzioni[funzione.chiave] !== false}
               onCheckedChange={(acceso) => cambia(funzione.chiave, acceso)}
@@ -44,9 +38,6 @@ export default function FunzioniCard({ settings, setSettings }) {
             />
           </div>
         ))}
-        <p className="pt-1 text-xs text-muted-foreground">
-          Consegne, clienti, fattorini, report, archivio e impostazioni restano sempre accesi: sono il lavoro del banco.
-        </p>
       </CardContent>
     </Card>
   );

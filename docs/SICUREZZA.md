@@ -113,7 +113,7 @@ Nell'ordine in cui fanno male.
 - **Un campo nuovo sui clienti** → è un dato personale: la privacy è in
   `docs/PRIVACY_INFORMATIVA_BOZZA.md`, aggiornala.
 - **Un segreto nuovo** → sta nell'ambiente (Render/Vercel/GitHub), mai nel repo,
-  e va aggiunto alla tabella del punto 2 e a `.env.example`.
+  e va aggiunto alla tabella del punto 2 e a `env.example`.
 
 ---
 

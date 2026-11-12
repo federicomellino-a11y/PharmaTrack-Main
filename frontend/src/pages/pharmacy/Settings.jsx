@@ -11,6 +11,8 @@ import AspettoCard from '../../components/settings/AspettoCard';
 import AccountCard from '../../components/settings/AccountCard';
 import OrariConsegnaCard from '../../components/settings/OrariConsegnaCard';
 import FunzioniCard from '../../components/settings/FunzioniCard';
+import MenuCard from '../../components/settings/MenuCard';
+import PreferenzeCard from '../../components/settings/PreferenzeCard';
 import { FASCE_PREDEFINITE, FASCIA_PRIMA, normalizzaFasce } from '../../lib/fasce';
 import { funzioniDellaFarmacia } from '../../lib/funzioniFarmacia';
 import { giorniConsegnati, taglioOrdini } from '../../lib/giorniConsegna';
@@ -23,7 +25,7 @@ import { Layout } from '../../components/Layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import { Button } from '../../components/ui/button';
-import { Compass, Plug, Save } from 'lucide-react';
+import { Plug, Save } from 'lucide-react';
 import { toast } from 'sonner';
 import { usePWAInstall } from '@/hooks/usePWAInstall';
 
@@ -78,6 +80,8 @@ const buildSettingsData = (user) => {
     taglio_ordini: taglioOrdini(salvate),
     pagina_iniziale: salvate.pagina_iniziale === 'deliveries' ? 'deliveries' : 'dashboard',
     funzioni: funzioniDellaFarmacia({ settings: salvate }),
+    dimensione_testo: salvate.dimensione_testo || 'normale',
+    ordine_menu: Array.isArray(salvate.ordine_menu) ? salvate.ordine_menu : [],
   };
 };
 
@@ -112,7 +116,7 @@ export default function SettingsPage() {
   useEffect(() => {
     setFormData(buildFormData(user));
     setSettings(buildSettingsData(user));
-  }, [user]);
+  }, [user?.user_id]);
 
   const { data: driversQuery = [] } = useDriversQuery();
   useEffect(() => {
@@ -225,6 +229,14 @@ export default function SettingsPage() {
     }
   };
 
+  const chiaviNotifiche = (s) => JSON.stringify([s.sound_enabled, s.notifiche_eventi, s.silenzio_attivo, s.silenzio_da, s.silenzio_a]);
+  const notificheCambiate = chiaviNotifiche(settings) !== chiaviNotifiche(buildSettingsData(user));
+  useEffect(() => {
+    if (!notificheCambiate) return undefined;
+    const attesa = setTimeout(() => salvaNotifiche({}), 600);
+    return () => clearTimeout(attesa);
+  }, [chiaviNotifiche(settings), notificheCambiate]);
+
   /* L'interruttore fa tutto quello che serve: chiede il permesso, registra il
      dispositivo e spegne davvero. Se il browser blocca le notifiche si dice
      dove sbloccarle, senza gergo. */
@@ -268,7 +280,7 @@ export default function SettingsPage() {
     <Layout title="Impostazioni">
       <div className="max-w-2xl space-y-6" data-testid="settings-page">
         <Tabs value={scheda} onValueChange={setScheda}>
-          <TabsList className="w-full justify-start overflow-x-auto" data-testid="settings-tabs">
+          <TabsList className="h-auto w-full flex-wrap justify-start gap-1" data-testid="settings-tabs">
             <TabsTrigger value="farmacia">Farmacia</TabsTrigger>
             <TabsTrigger value="consegne">Consegne</TabsTrigger>
             <TabsTrigger value="notifiche">Notifiche</TabsTrigger>
@@ -293,9 +305,6 @@ export default function SettingsPage() {
               }}
             />
             <FunzioniCard settings={settings} setSettings={setSettings} />
-            <p className="text-xs text-muted-foreground">
-              Indirizzo e telefono compaiono al fattorino e sulle stampe: se cambiano, si cambiano qui.
-            </p>
           </TabsContent>
 
           <TabsContent value="consegne" className="space-y-6 mt-4">
@@ -305,10 +314,6 @@ export default function SettingsPage() {
               setSettings={setSettings}
               settings={settings}
             />
-            <p className="text-xs text-muted-foreground">
-              Il pulsante &quot;Salva orari&quot; salva anche il resto della farmacia: e&apos; una sola scheda da
-              tenere in ordine, non due che si sovrascrivono.
-            </p>
           </TabsContent>
 
           <TabsContent value="notifiche" className="space-y-6 mt-4">
@@ -323,43 +328,14 @@ export default function SettingsPage() {
                 settings,
               }}
             />
-            <Button type="button" onClick={handleSubmit} disabled={saving} className="w-full">
-              {saving ? 'Salvataggio...' : 'Salva le altre preferenze di notifica'}
-            </Button>
           </TabsContent>
 
           <TabsContent value="aspetto" className="space-y-6 mt-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Compass className="w-5 h-5 text-primary" />Dove riparte l&apos;app
-                </CardTitle>
-                <CardDescription>La prima pagina che trovi aprendo PharmaTrack dopo l&apos;accesso</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {[
-                    { valore: 'dashboard', etichetta: 'La home', descrizione: 'Consegne di oggi, cassa e mappa' },
-                    { valore: 'deliveries', etichetta: 'Le consegne', descrizione: 'Direttamente la lista da lavorare' },
-                  ].map(({ valore, etichetta, descrizione }) => (
-                    <Button
-                      key={valore}
-                      type="button"
-                      variant={settings.pagina_iniziale === valore ? 'default' : 'outline'}
-                      className="h-auto flex-col items-start gap-0.5 py-3"
-                      onClick={() => setSettings((prev) => ({ ...prev, pagina_iniziale: valore }))}
-                      data-testid={`pagina-iniziale-${valore}`}
-                    >
-                      <span className="font-semibold">{etichetta}</span>
-                      <span className="text-xs font-normal opacity-80">{descrizione}</span>
-                    </Button>
-                  ))}
-                </div>
-                <Button type="button" onClick={handleSubmit} disabled={saving} data-testid="salva-avvio">
-                  <Save className="w-4 h-4 mr-2" />{saving ? 'Salvataggio...' : 'Salva la pagina di avvio'}
-                </Button>
-              </CardContent>
-            </Card>
+            <PreferenzeCard settings={settings} setSettings={setSettings} />
+            <MenuCard settings={settings} setSettings={setSettings} />
+            <Button type="button" onClick={handleSubmit} disabled={saving} className="w-full" data-testid="salva-avvio">
+              <Save className="w-4 h-4 mr-2" />{saving ? 'Salvataggio...' : 'Salva'}
+            </Button>
             <AspettoCard
               isInstallable={isInstallable}
               isInstalled={isInstalled}
@@ -390,13 +366,9 @@ export default function SettingsPage() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2"><Plug className="w-5 h-5 text-primary" />Integrazioni</CardTitle>
-                <CardDescription>Winfarm, pulsante magico, Dock e import delle vendite</CardDescription>
+                <CardDescription>Winfarm, Dock e import vendite</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-3">
-                <p className="text-sm text-muted-foreground">
-                  Le integrazioni hanno una pagina loro perché sono istruzioni da seguire al computer:
-                  qui c&apos;è la porta d&apos;ingresso, per non doverla cercare nel menu.
-                </p>
+              <CardContent>
                 <Button asChild variant="outline" data-testid="apri-integrazioni">
                   <Link to="/integrations">Apri le integrazioni</Link>
                 </Button>
@@ -412,23 +384,21 @@ export default function SettingsPage() {
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">PharmaTrack</CardTitle>
-                <CardDescription>Versione 1.1.0 · consegne e pazienti della farmacia</CardDescription>
+                <CardDescription>Versione 1.1.0</CardDescription>
               </CardHeader>
               <CardContent className="text-sm text-muted-foreground">
                 <p>
-                  Se qualcosa non torna, scrivi a{' '}
-                  <a className="underline" href="mailto:assistenza@pharmatrack.it">assistenza@pharmatrack.it</a>{' '}
-                  raccontando cosa stavi facendo.
+                  Assistenza:{' '}
+                  <a className="underline" href="mailto:assistenza@pharmatrack.it">assistenza@pharmatrack.it</a>
                 </p>
               </CardContent>
             </Card>
             <Card className="border-destructive/30">
               <CardHeader>
                 <CardTitle className="text-base text-destructive">Zona pericolosa</CardTitle>
-                <CardDescription>Elimina account, iscrizione e dati collegati della farmacia.</CardDescription>
+                <CardDescription>Cancella la farmacia e tutti i suoi dati.</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-3">
-                <p className="text-sm text-muted-foreground">Verranno rimossi clienti, consegne, fattorini, messaggi e sessioni associate.</p>
+              <CardContent>
                 <Button type="button" variant="destructive" onClick={handleDeleteAccount} disabled={deletingAccount}>
                   {deletingAccount ? 'Eliminazione...' : 'Elimina account'}
                 </Button>

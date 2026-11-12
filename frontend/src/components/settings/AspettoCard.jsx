@@ -1,5 +1,5 @@
 import React from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { InstallAppButton } from '../InstallAppButton';
@@ -28,8 +28,7 @@ export default function AspettoCard({
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2"><Palette className="w-5 h-5 text-primary" />Aspetto</CardTitle>
-          <CardDescription>Scegli come si vede l'app su questo dispositivo</CardDescription>
+          <CardTitle className="flex items-center gap-2"><Palette className="w-5 h-5 text-primary" />Tema</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="grid gap-2 sm:grid-cols-3">
@@ -46,24 +45,17 @@ export default function AspettoCard({
               </Button>
             ))}
           </div>
-          <p className="text-xs text-muted-foreground">
-            La scelta resta su questo dispositivo. "Come il sistema" segue la modalita' notte del telefono o del PC.
-          </p>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><Smartphone className="w-5 h-5 text-primary" />App sul dispositivo</CardTitle>
-          <CardDescription>Installala per aprirla dalla schermata home, senza passare dal browser</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="rounded-lg border border-border p-4 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="font-medium">Stato installazione</p>
-                <p className="text-xs text-muted-foreground">Avvio standalone e supporto offline di base.</p>
-              </div>
+              <p className="font-medium">Stato</p>
               <Badge variant="outline" className={isInstalled ? 'bg-emerald-500/15 text-emerald-600 border-emerald-500/30' : 'bg-secondary text-foreground'}>
                 {isInstalled ? 'Installata' : isInstallable ? 'Pronta da installare' : pwaSupported ? 'Disponibile' : 'Non supportata'}
               </Badge>

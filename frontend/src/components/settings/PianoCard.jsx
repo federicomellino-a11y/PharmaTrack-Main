@@ -31,7 +31,7 @@ export default function PianoCard({ limiti, piano, provaFinita, uso, vicinoAlTet
             )}
             {provaFinita && (
               <p className="text-sm font-medium text-destructive">
-                La prova è finita: le consegne già aperte si chiudono, ma non se ne possono creare di nuove.
+                Prova finita: non puoi creare nuove consegne.
               </p>
             )}
             <div className="grid grid-cols-2 gap-3 text-sm">
@@ -52,7 +52,7 @@ export default function PianoCard({ limiti, piano, provaFinita, uso, vicinoAlTet
             </div>
             {vicinoAlTetto && !provaFinita && (
               <p className="text-xs text-amber-600">
-                Sei vicino al tetto del piano: oltre, le creazioni si fermano finché non passi a un piano superiore.
+                Sei vicino al limite del piano.
               </p>
             )}
             {piano?.catalogo?.length > 0 && (

@@ -13,6 +13,7 @@ import { SocketProvider } from './contexts/SocketContext'
 import ErrorBoundary from './components/ErrorBoundary'
 import ProGate from './components/ProGate'
 import FunzioneGate from './components/FunzioneGate'
+import { useDimensioneTesto } from './hooks/useDimensioneTesto'
 import './App.css'
 
 const LandingPage = lazyWithRetry(() => import('./pages/LandingPage'))
@@ -61,6 +62,7 @@ const PageShell = ({ children }: { children: React.ReactNode }) => (
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth() as any
   const location = useLocation()
+  useDimensioneTesto(user?.settings?.dimensione_testo)
 
   if (loading) return <FullscreenLoader />
   if (!user) return <Navigate to="/login" state={{ from: location }} replace />

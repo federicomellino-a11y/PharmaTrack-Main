@@ -3,7 +3,6 @@ import { Building2 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Card } from '../ui/card';
 import { CardContent } from '../ui/card';
-import { CardDescription } from '../ui/card';
 import { CardHeader } from '../ui/card';
 import { CardTitle } from '../ui/card';
 import { Input } from '../ui/input';
@@ -25,13 +24,12 @@ export default function DatiFarmaciaCard({ activeDrivers, formData, handleSubmit
   return (
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2"><Building2 className="w-5 h-5 text-primary" />Dati Farmacia</CardTitle>
-            <CardDescription>Configura le informazioni della tua farmacia</CardDescription>
+            <CardTitle className="flex items-center gap-2"><Building2 className="w-5 h-5 text-primary" />Dati farmacia</CardTitle>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <Label>Nome Farmacia</Label>
+                <Label>Nome</Label>
                 <Input
                   value={formData.pharmacy_name}
                   onChange={(e) => setFormData((prev) => ({ ...prev, pharmacy_name: e.target.value }))}
@@ -41,7 +39,7 @@ export default function DatiFarmaciaCard({ activeDrivers, formData, handleSubmit
 
               <div>
                 <AddressAutocomplete
-                  label="Indirizzo Farmacia"
+                  label="Indirizzo"
                   value={formData.pharmacy_address}
                   onChange={(value) => setFormData((prev) => ({ ...prev, pharmacy_address: value, pharmacy_lat: null, pharmacy_lng: null }))}
                   onAddressSelect={(selection) => setFormData((prev) => ({
@@ -54,12 +52,12 @@ export default function DatiFarmaciaCard({ activeDrivers, formData, handleSubmit
                   id="settings-pharmacy-address"
                 />
                 {formData.pharmacy_lat && formData.pharmacy_lng && (
-                  <p className="text-xs text-emerald-600 mt-2">Indirizzo farmacia verificato sulla mappa</p>
+                  <p className="text-xs text-emerald-600 mt-2">Indirizzo verificato</p>
                 )}
               </div>
 
               <div>
-                <Label>Telefono Farmacia</Label>
+                <Label>Telefono</Label>
                 <Input
                   value={formData.pharmacy_phone}
                   onChange={(e) => setFormData((prev) => ({ ...prev, pharmacy_phone: e.target.value }))}
@@ -70,7 +68,7 @@ export default function DatiFarmaciaCard({ activeDrivers, formData, handleSubmit
               <Separator />
 
               <div>
-                <Label>Fattorino Predefinito</Label>
+                <Label>Fattorino predefinito</Label>
                 <Select
                   value={formData.default_driver_id || 'none'}
                   onValueChange={(value) => setFormData((prev) => ({ ...prev, default_driver_id: value === 'none' ? '' : value }))}
@@ -83,13 +81,12 @@ export default function DatiFarmaciaCard({ activeDrivers, formData, handleSubmit
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-muted-foreground mt-1">Questo fattorino sarà suggerito automaticamente per le nuove consegne</p>
               </div>
 
               <Separator />
 
               <div>
-                <Label htmlFor="soglia-pazienti">Pazienti fermi: quanti giorni prima di segnalarli</Label>
+                <Label htmlFor="soglia-pazienti">Giorni prima di segnalare un paziente fermo</Label>
                 <Input
                   id="soglia-pazienti"
                   type="number"
@@ -99,14 +96,11 @@ export default function DatiFarmaciaCard({ activeDrivers, formData, handleSubmit
                   onChange={(e) => setSettings((prev) => ({ ...prev, giorni_pazienti_fermi: e.target.value }))}
                   data-testid="soglia-pazienti"
                 />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Compare in Report &gt; Pazienti e ritorni: chi non ordina da piu' di questi giorni finisce nell'elenco dei fermi.
-                </p>
               </div>
 
               <Button type="submit" disabled={saving}>
                 <Save className="w-4 h-4 mr-2" />
-                {saving ? 'Salvataggio...' : 'Salva Modifiche'}
+                {saving ? 'Salvataggio...' : 'Salva'}
               </Button>
             </form>
           </CardContent>

@@ -2,7 +2,7 @@
 
 Perché esiste questo test
 -------------------------
-Il 12 novembre `backend/.env.example` diceva `MONGO_DB_NAME` mentre il codice
+Il 12 novembre `backend/env.example` diceva `MONGO_DB_NAME` mentre il codice
 legge `DB_NAME` (che non ha default: `os.environ['DB_NAME']` -> KeyError al
 primo avvio). Prometteva anche `SESSION_SECRET`, che nessuno legge: chi lo
 impostava credeva di firmare le sessioni, e le sessioni invece sono righe nel
@@ -104,9 +104,9 @@ def variabili_frontend() -> set[str]:
 
 
 def test_il_codice_non_legge_variabili_non_documentate():
-    mancanti = variabili_lette_dal_backend() - chiavi_env(BACKEND / ".env.example")
+    mancanti = variabili_lette_dal_backend() - chiavi_env(BACKEND / "env.example")
     assert not mancanti, (
-        "Il backend legge variabili che non sono in backend/.env.example: "
+        "Il backend legge variabili che non sono in backend/env.example: "
         f"{sorted(mancanti)}. Chi clona il repo non sa che esistono."
     )
 
@@ -115,14 +115,14 @@ def test_le_variabili_obbligatorie_sono_documentate():
     """DB_NAME e MONGO_URL sono lette con os.environ[]: se mancano, KeyError."""
     obbligatorie = variabili_obbligatorie()
     assert obbligatorie, "La ricerca non ha trovato nessuna variabile obbligatoria: regex da rivedere"
-    mancanti = obbligatorie - chiavi_env(BACKEND / ".env.example")
+    mancanti = obbligatorie - chiavi_env(BACKEND / "env.example")
     assert not mancanti, f"Senza queste il server non parte e non sono documentate: {sorted(mancanti)}"
 
 
 def test_il_file_di_esempio_non_promette_variabili_inesistenti():
-    morte = chiavi_env(BACKEND / ".env.example") - variabili_lette_dal_backend()
+    morte = chiavi_env(BACKEND / "env.example") - variabili_lette_dal_backend()
     assert not morte, (
-        "backend/.env.example documenta variabili che nessuno legge: "
+        "backend/env.example documenta variabili che nessuno legge: "
         f"{sorted(morte)}. Chi le imposta crede di aver configurato qualcosa."
     )
 
@@ -135,22 +135,22 @@ def test_render_yaml_non_dichiara_variabili_inesistenti():
 
 
 def test_il_frontend_non_legge_variabili_non_documentate():
-    morte = variabili_frontend() - chiavi_env(FRONTEND / ".env.example")
+    morte = variabili_frontend() - chiavi_env(FRONTEND / "env.example")
     assert not morte, (
         f"Il frontend legge import.meta.env non documentate: {sorted(morte)}"
     )
 
 
 def test_il_file_di_esempio_del_frontend_non_ha_variabili_morte():
-    morte = chiavi_env(FRONTEND / ".env.example") - variabili_frontend()
+    morte = chiavi_env(FRONTEND / "env.example") - variabili_frontend()
     assert not morte, (
-        f"frontend/.env.example documenta variabili che nessuno legge: {sorted(morte)}"
+        f"frontend/env.example documenta variabili che nessuno legge: {sorted(morte)}"
     )
 
 
-@pytest.mark.parametrize("percorso", ["backend/.env.example", "frontend/.env.example"])
+@pytest.mark.parametrize("percorso", ["backend/env.example", "frontend/env.example"])
 def test_nessun_segreto_compilato_nei_file_di_esempio(percorso):
-    """Un .env.example con una password vera è un segreto pubblicato."""
+    """Un env.example con una password vera è un segreto pubblicato."""
     testo = (RADICE / percorso).read_text(encoding="utf-8")
     for riga in testo.splitlines():
         if "=" not in riga or riga.strip().startswith("#"):

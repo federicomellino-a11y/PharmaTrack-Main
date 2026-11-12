@@ -55,8 +55,6 @@ test-results/
 test_reports/
 venv/
 
-# Eccezioni: i file di esempio devono restare nel repo
-# (backend/tests/unit/test_env_contract.py li legge e la CI fallisce senza)
-!.env.example
-!backend/.env.example
-!frontend/.env.example
+# I file di esempio si chiamano `env.example` (senza punto iniziale): nessuna
+# regola qui sopra li esclude, così restano nel repo. Li legge
+# backend/tests/unit/test_env_contract.py e senza di loro la CI è rossa.

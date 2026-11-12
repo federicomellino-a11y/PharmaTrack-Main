@@ -1,5 +1,5 @@
 import React from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -49,10 +49,6 @@ export default function OrariConsegnaCard({ onSalva, saving, setSettings, settin
         <CardTitle className="flex items-center gap-2">
           <Clock className="w-5 h-5 text-primary" />Orari di consegna
         </CardTitle>
-        <CardDescription>
-          Le fasce che scegli quando crei una consegna: sono le stesse che il paziente legge dal link di
-          tracciamento. Se domani cambi orario, torni qui.
-        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">
@@ -60,7 +56,7 @@ export default function OrariConsegnaCard({ onSalva, saving, setSettings, settin
             <div key={indice} className="grid grid-cols-[1fr_auto] gap-2 rounded-lg border border-border p-3">
               <div className="grid gap-2 sm:grid-cols-[1.2fr_0.8fr_0.8fr]">
                 <div>
-                  <Label className="text-xs">Come si chiama</Label>
+                  <Label className="text-xs">Nome</Label>
                   <Input
                     value={fascia.etichetta || ''}
                     placeholder="Es. Pomeriggio"
@@ -116,9 +112,6 @@ export default function OrariConsegnaCard({ onSalva, saving, setSettings, settin
           >
             <Plus className="w-4 h-4 mr-2" />Aggiungi fascia
           </Button>
-          <p className="text-xs text-muted-foreground">
-            Si consegna fra le 06:00 e le 23:00. Oltre {MASSIMO_FASCE} fasce il menu diventa un indovinello.
-          </p>
         </div>
 
         {!validate.ok && (
@@ -128,7 +121,7 @@ export default function OrariConsegnaCard({ onSalva, saving, setSettings, settin
         <Separator />
 
         <div>
-          <Label>Fascia predefinita per le nuove consegne</Label>
+          <Label>Fascia predefinita</Label>
           <Select
             value={predefinita}
             onValueChange={(valore) => setSettings((prev) => ({ ...prev, fascia_predefinita: valore }))}
@@ -143,20 +136,13 @@ export default function OrariConsegnaCard({ onSalva, saving, setSettings, settin
               ))}
             </SelectContent>
           </Select>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Cosi&apos; il modulo consegna si apre gia&apos; sull&apos;orario giusto. &quot;La prima possibile&quot; e
-            &quot;Orario preciso&quot; ci sono sempre: non sono fasce, sono modi di dire quando.
-          </p>
         </div>
 
-        <p className="text-xs text-muted-foreground">
-          Le consegne gia&apos; prese tengono l&apos;orario promesso: cambiare una fascia vale dalle prossime.
-        </p>
 
         <Separator />
 
         <div>
-          <Label>Giorni in cui consegni</Label>
+          <Label>Giorni di consegna</Label>
           <div className="mt-2 flex flex-wrap gap-2" data-testid="giorni-consegna">
             {GIORNI_SETTIMANA.map(({ numero, breve, nome }) => {
               const acceso = giorni.includes(numero);
@@ -182,13 +168,10 @@ export default function OrariConsegnaCard({ onSalva, saving, setSettings, settin
               );
             })}
           </div>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Il modulo &quot;Nuova consegna&quot; propone gia&apos; il primo giorno buono: se oggi non consegni, parte da domani.
-          </p>
         </div>
 
         <div>
-          <Label htmlFor="taglio-ordini">Ordini presi entro le</Label>
+          <Label htmlFor="taglio-ordini">Ordini per oggi entro le</Label>
           <Input
             id="taglio-ordini"
             type="time"
@@ -196,10 +179,6 @@ export default function OrariConsegnaCard({ onSalva, saving, setSettings, settin
             onChange={(e) => setSettings((prev) => ({ ...prev, taglio_ordini: e.target.value }))}
             data-testid="taglio-ordini"
           />
-          <p className="mt-1 text-xs text-muted-foreground">
-            Dopo quest&apos;ora un ordine si propone per il giorno dopo: e&apos; il momento in cui il fattorino
-            esce, non un&apos;imposizione.
-          </p>
         </div>
 
         <Button type="button" onClick={onSalva} disabled={saving || !validate.ok} data-testid="salva-orari">
