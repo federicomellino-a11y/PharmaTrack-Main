@@ -53,8 +53,8 @@ cd backend && python3 -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt && cd ..
 
 # variabili d'ambiente: i due esempi sono già pronti e commentati
-cp backend/.env.example backend/.env
-cp frontend/.env.example frontend/.env
+cp backend/env.example backend/.env
+cp frontend/env.example frontend/.env
 ```
 
 Poi il controllo che dice se il repository è sano:

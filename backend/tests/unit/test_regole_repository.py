@@ -24,7 +24,7 @@ ROUTERS = APP / "routers"
 FRONTEND_SRC = RADICE / "frontend" / "src"
 
 # Cosa puo' stare nella radice di backend/ (le cartelle non si controllano).
-AMMESSI_IN_RADICE_BACKEND = {"server.py", "requirements.txt", "runtime.txt", "Procfile"}
+AMMESSI_IN_RADICE_BACKEND = {"server.py", "requirements.txt", "runtime.txt", "Procfile", "env.example"}
 
 # Dipendenze che possono usare un intervallo invece del pin esatto.
 PIN_LIBERI_AMMESSI = {"cloudinary"}

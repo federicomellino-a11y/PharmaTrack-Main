@@ -68,7 +68,7 @@ Coordina fattorini, traccia ogni ordine, gestisci cassa e turni, integrazione co
    - `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` → vedi sotto come generarle
    - `VAPID_SUBJECT` → `mailto:tua@email.com`
 
-   L'elenco completo e verificato è `backend/.env.example`: un test della CI
+   L'elenco completo e verificato è `backend/env.example`: un test della CI
    (`backend/tests/unit/test_env_contract.py`) diventa rosso se il codice legge
    una variabile che lì non c'è, o se lì c'è una variabile che nessuno legge.
 5. Deploy → in ~3 min il backend è online su `https://pharmatrack-api.onrender.com`
@@ -108,13 +108,13 @@ PY
 ```bash
 # Backend
 cd backend
-cp .env.example .env  # compila i secret
+cp env.example .env  # compila i secret
 pip install -r requirements.txt
 uvicorn server:app --reload --port 8001
 
 # Frontend (in altro terminale)
 cd frontend
-cp .env.example .env
+cp env.example .env
 npm ci
 npm run dev  # http://localhost:3000
 ```
@@ -163,7 +163,7 @@ Endpoint REST anche disponibile: `POST /api/integrations/winfarm/import` (dettag
 │   ├── scripts/            # seed_data.py (dati di test), audit_db.py (controllo dati)
 │   ├── requirements.txt    # 20 dipendenze dirette, pin esatti
 │   ├── runtime.txt         # Python 3.11.9
-│   ├── .env.example
+│   ├── env.example
 │   └── tests/              # pytest (unit + contratto)
 │
 ├── frontend/               # React + Vite + Tailwind 4
@@ -188,7 +188,7 @@ Endpoint REST anche disponibile: `POST /api/integrations/winfarm/import` (dettag
 │   ├── vite.config.ts
 │   ├── vercel.json         # config deploy (rewrites SPA, header CSP)
 │   ├── tsconfig.json
-│   └── .env.example
+│   └── env.example
 │
 ├── docs/                   # note tecniche (backup, privacy, CSP) e archivio storico
 ├── .github/                # CI, test notturni, backup database, allarmi, modello di PR

@@ -27,7 +27,7 @@ cd backend && python -m venv .venv && . .venv/bin/activate && pip install -r req
 ```
 
 Per far girare l'app in locale servono le variabili d'ambiente: copia
-`backend/.env.example` in `backend/.env` e `frontend/.env.example` in
+`backend/env.example` in `backend/.env` e `frontend/env.example` in
 `frontend/.env`. Il database è su MongoDB Atlas (la stringa sta su Render →
 `pharmatrack-api` → Environment, variabile `MONGO_URL`).
 
