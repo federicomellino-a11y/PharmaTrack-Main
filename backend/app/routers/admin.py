@@ -24,7 +24,9 @@ from app.core.notifications import (
 from app.models.schemas import AdminUserStatusUpdate
 
 from app.core.limiter import limiter
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from typing import Literal, Optional
+from app.core.piani import nuova_assegnazione, piano_corrente
 
 
 class AdminLoginLoose(BaseModel):
@@ -229,6 +231,7 @@ async def admin_users(admin: dict = Depends(get_current_admin)):
     enriched_users = []
     for item in users:
         user_id = item["user_id"]
+        item["piano_stato"] = piano_corrente(item)
         item["stats"] = {
             "drivers": await db.drivers.count_documents({"pharmacy_id": user_id}),
             "customers": await db.customers.count_documents({"pharmacy_id": user_id}),
@@ -300,6 +303,7 @@ async def admin_user_details(user_id: str, admin: dict = Depends(get_current_adm
         {"_id": 0, "notification_id": 1, "title": 1, "message": 1, "created_at": 1, "is_read": 1}
     ).sort("created_at", -1).limit(12).to_list(12)
 
+    user["piano_stato"] = piano_corrente(user)
     return {
         "user": user,
         "stats": stats,
@@ -325,6 +329,28 @@ async def admin_update_user_status(user_id: str, data: AdminUserStatusUpdate, ad
 
     user = await db.users.find_one({"user_id": user_id}, {"_id": 0, "password_hash": 0})
     return user
+
+class AssegnaPro(BaseModel):
+    """Funzioni Pro decise dall'amministratore: accese (con o senza scadenza), spente o automatiche."""
+    stato: Literal["attivo", "spento", "automatico"]
+    mesi: Optional[int] = Field(default=None, ge=1, le=36)
+    scadenza: Optional[str] = Field(default=None, max_length=32)
+
+
+@router.put("/admin/users/{user_id}/pro")
+async def admin_assegna_pro(user_id: str, data: AssegnaPro, admin: dict = Depends(get_current_admin)):
+    try:
+        assegnazione = nuova_assegnazione(data.stato, data.mesi, data.scadenza)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    modifica = {"$set": {"pro_admin": assegnazione}} if assegnazione else {"$unset": {"pro_admin": ""}}
+    result = await db.users.update_one({"user_id": user_id}, modifica)
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Utente non trovato")
+    user = await db.users.find_one({"user_id": user_id}, {"_id": 0, "password_hash": 0})
+    user["piano_stato"] = piano_corrente(user)
+    return user
+
 
 @router.get("/admin/database/health")
 async def admin_database_health(admin: dict = Depends(get_current_admin)):

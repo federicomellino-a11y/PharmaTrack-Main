@@ -19,7 +19,7 @@ from typing import Optional
 from fastapi import Depends, HTTPException
 
 from app.core.database import db
-from app.core.piani import GIORNI_PROVA, piano_corrente
+from app.core.piani import CAMPI_PIANO, GIORNI_PROVA, piano_corrente
 from app.core.security import get_current_user
 
 FUNZIONI = {
@@ -31,7 +31,7 @@ FUNZIONI = {
     "ricorrenze": {
         "nome": "Ricorrenze e richiami",
         "descrizione": "Chi aspetta la consegna periodica, chi non ordina da troppo tempo, i richiami da fare",
-        "dove": "Pagina Richiami",
+        "dove": "Pagina Report e scheda cliente",
     },
     "report_avanzati": {
         "nome": "Report avanzati",
@@ -69,6 +69,10 @@ PIANI_CON_PRO = {"prova", "pro", "catena"}
 
 def funzioni_sbloccate(piano: dict) -> bool:
     """Vero se il piano apre le funzioni Pro. Funzione pura: si può testare."""
+    # La scelta dell'amministratore viene prima di tutto: accende o spegne.
+    assegnazione = piano.get("assegnazione")
+    if assegnazione:
+        return bool(assegnazione.get("attivo"))
     if not piano.get("piano"):
         return True
     if piano.get("scaduto"):
@@ -118,9 +122,7 @@ def richiedi_pro(chiave: str):
     """
 
     async def dipendenza(user: dict = Depends(get_current_user)) -> dict:
-        farmacia = await db.users.find_one(
-            {"user_id": user["user_id"]}, {"_id": 0, "piano": 1, "prova_scadenza": 1}
-        ) or {}
+        farmacia = await db.users.find_one({"user_id": user["user_id"]}, CAMPI_PIANO) or {}
         motivo = verifica_funzione(piano_corrente(farmacia), chiave)
         if motivo:
             raise HTTPException(

@@ -18,7 +18,7 @@ export const FUNZIONI_PRO = [
     chiave: 'ricorrenze',
     nome: 'Ricorrenze e richiami',
     descrizione: 'Chi aspetta la consegna periodica, chi non ordina da troppo tempo, i richiami da fare',
-    dove: 'Pagina Richiami',
+    dove: 'Pagina Report e scheda cliente',
   },
   {
     chiave: 'report_avanzati',

@@ -7,6 +7,7 @@ non devono mai rompere una farmacia che sta già lavorando. Quindi:
 - a prova scaduta si blocca solo la creazione (consegne e fattorini), non la
   lettura né la consegna già in corso: si chiude il giro, non si butta fuori.
 """
+import calendar
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
@@ -33,6 +34,9 @@ PIANI = {
     },
 }
 
+# I campi della farmacia che servono a calcolare il piano: una proiezione sola.
+CAMPI_PIANO = {"_id": 0, "piano": 1, "prova_scadenza": 1, "pro_admin": 1}
+
 # Piani scaduti o sconosciuti: si applicano i limiti della prova, senza scadenza.
 PIANO_RIPIEGO = "prova"
 
@@ -54,9 +58,86 @@ def _data(valore) -> Optional[datetime]:
         return None
 
 
+def assegnazione_pro(utente: dict, adesso: Optional[datetime] = None) -> Optional[dict]:
+    """La scelta dell'amministratore sulle funzioni Pro, se c'e' ed e' ancora valida.
+
+    Un'assegnazione attiva oltre la sua scadenza non conta piu': la farmacia
+    torna alle regole normali (prova o piano), senza che nessuno debba spegnerla.
+    """
+    scelta = (utente or {}).get("pro_admin")
+    if not isinstance(scelta, dict):
+        return None
+    adesso = adesso or _adesso()
+    attivo = bool(scelta.get("attivo"))
+    scadenza = _data(scelta.get("scadenza")) if attivo else None
+    if scadenza and scadenza <= adesso:
+        return None
+    return {
+        "attivo": attivo,
+        "scadenza": scadenza.isoformat() if scadenza else None,
+        "giorni_rimasti": (scadenza - adesso).days if scadenza else None,
+    }
+
+
+def _piu_mesi(quando: datetime, mesi: int) -> datetime:
+    indice = quando.month - 1 + mesi
+    anno, mese = quando.year + indice // 12, indice % 12 + 1
+    giorno = min(quando.day, calendar.monthrange(anno, mese)[1])
+    return quando.replace(year=anno, month=mese, day=giorno)
+
+
+def nuova_assegnazione(stato: str, mesi: Optional[int] = None, scadenza: Optional[str] = None,
+                       adesso: Optional[datetime] = None) -> Optional[dict]:
+    """Cosa scrivere in `pro_admin`. None vuol dire "togli la scelta" (automatico).
+
+    - "attivo": Pro aperto per `mesi`, fino a `scadenza` (giorno compreso) o senza fine;
+    - "spento": Pro chiuso finche' l'amministratore non cambia idea;
+    - "automatico": valgono di nuovo prova e piano.
+    """
+    adesso = adesso or _adesso()
+    if stato == "automatico":
+        return None
+    if stato == "spento":
+        return {"attivo": False, "scadenza": None, "assegnato_il": adesso.isoformat()}
+    if stato != "attivo":
+        raise ValueError("Stato non valido")
+    fine = None
+    if scadenza:
+        giorno = _data(scadenza)
+        if not giorno:
+            raise ValueError("Data di scadenza non valida")
+        fine = giorno.replace(hour=23, minute=59, second=59, microsecond=0)
+        if fine <= adesso:
+            raise ValueError("La scadenza deve essere nel futuro")
+    elif mesi:
+        fine = _piu_mesi(adesso, mesi)
+    return {"attivo": True, "scadenza": fine.isoformat() if fine else None, "assegnato_il": adesso.isoformat()}
+
+
 def piano_corrente(utente: dict, adesso: Optional[datetime] = None) -> dict:
     """Fotografia del piano di una farmacia. Funzione pura: si può testare."""
     adesso = adesso or _adesso()
+    base = _piano_base(utente, adesso)
+    assegnazione = assegnazione_pro(utente, adesso)
+    base["assegnazione"] = assegnazione
+    # Pro assegnato a una farmacia in prova (anche scaduta): lavora come Professional.
+    # Chi e' senza limiti o ha gia' un piano a pagamento tiene i suoi limiti.
+    if assegnazione and assegnazione["attivo"] and base["piano"] == "prova":
+        limiti = PIANI["pro"]
+        base.update({
+            "piano": "pro",
+            "nome": limiti["nome"],
+            "prezzo_mese": limiti["prezzo_mese"],
+            "limiti": {"max_fattorini": limiti["max_fattorini"], "max_consegne_mese": limiti["max_consegne_mese"]},
+            "in_prova": False,
+            "scaduto": False,
+            "giorni_rimasti": None,
+            "scadenza": None,
+        })
+    return base
+
+
+def _piano_base(utente: dict, adesso: datetime) -> dict:
     piano = (utente or {}).get("piano")
     scadenza = _data((utente or {}).get("prova_scadenza"))
 

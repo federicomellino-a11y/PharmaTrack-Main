@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException, Depends, Request
 
 from app.core.analisi_cliente import analisi_cliente
 from app.core.funzioni_pro import funzioni_sbloccate
-from app.core.piani import piano_corrente
+from app.core.piani import CAMPI_PIANO, piano_corrente
 from app.core.delivery_lifecycle import FOLLOW_UP_STATUSES
 from app.core.database import db
 # (nessun uso di app.core.config)
@@ -147,7 +147,7 @@ async def get_customer_stats(customer_id: str, user: dict = Depends(get_current_
     # (il resto della scheda deve continuare a funzionare), semplicemente non
     # viene calcolato e il frontend mostra il lucchetto.
     farmacia = await db.users.find_one(
-        {"user_id": user["user_id"]}, {"_id": 0, "piano": 1, "prova_scadenza": 1}
+        {"user_id": user["user_id"]}, CAMPI_PIANO
     ) or {}
     pro = funzioni_sbloccate(piano_corrente(farmacia))
 

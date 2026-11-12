@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useDeliveriesQuery, useDriversQuery } from '@/hooks/queries';
+import { useDeliveriesQuery, useDriversQuery, usePlanQuery } from '@/hooks/queries';
+import ProGate from '../../components/ProGate';
+import { funzioneSbloccata } from '@/lib/funzioniPro';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { safeInvalidateSize } from '@/lib/leafletSafe';
@@ -161,6 +163,7 @@ export default function TrackingPage() {
   const mapKey = useRef(`map-${Date.now()}`);
 
   const queryClient = useQueryClient();
+  const { data: piano } = usePlanQuery();
   // Letture dalla cache condivisa; lo stato locale resta la fonte per gli
   // aggiornamenti live del websocket (posizioni dei fattorini).
   const {
@@ -306,6 +309,14 @@ export default function TrackingPage() {
     picked_up: 'Ritirata',
     in_transit: 'In consegna',
   };
+
+  if (!funzioneSbloccata(piano, 'tracking_live')) {
+    return (
+      <Layout title="Tracking">
+        <div className="p-4" data-testid="tracking-page"><ProGate funzione="tracking_live" /></div>
+      </Layout>
+    );
+  }
 
   if (loading) {
     return (

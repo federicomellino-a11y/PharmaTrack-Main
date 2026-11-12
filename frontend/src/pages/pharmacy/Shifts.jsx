@@ -1,7 +1,9 @@
 import React, { useState, useCallback } from 'react';
 import axios from 'axios';
 import { useQueryClient } from '@tanstack/react-query';
-import { useShiftsQuery, useDriversQuery } from '@/hooks/queries';
+import { useShiftsQuery, useDriversQuery, usePlanQuery } from '@/hooks/queries';
+import ProGate from '../../components/ProGate';
+import { funzioneSbloccata } from '@/lib/funzioniPro';
 import { chiavi, letture } from '@/lib/api';
 import { API } from '@/lib/config';
 import { Layout } from '../../components/Layout';
@@ -32,6 +34,7 @@ const STATUS_CONFIG = {
 
 export default function ShiftsPage() {
   const queryClient = useQueryClient();
+  const { data: piano } = usePlanQuery();
   const { data: shiftsData = [], isLoading: shiftsLoading } = useShiftsQuery();
   const { data: driversData = [], isLoading: driversLoading } = useDriversQuery();
   const shifts = ensureArray(shiftsData);
@@ -123,6 +126,14 @@ export default function ShiftsPage() {
       toast.error('Errore caricamento');
     }
   };
+
+  if (!funzioneSbloccata(piano, 'turni_cassa')) {
+    return (
+      <Layout title="Turni & Cassa">
+        <div className="p-4" data-testid="shifts-page"><ProGate funzione="turni_cassa" /></div>
+      </Layout>
+    );
+  }
 
   if (loading) return <Layout title="Turni"><div className="flex items-center justify-center h-64"><div className="spinner" /></div></Layout>;
 
