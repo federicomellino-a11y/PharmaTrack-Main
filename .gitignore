@@ -54,3 +54,9 @@ replit.nix
 test-results/
 test_reports/
 venv/
+
+# Eccezioni: i file di esempio devono restare nel repo
+# (backend/tests/unit/test_env_contract.py li legge e la CI fallisce senza)
+!.env.example
+!backend/.env.example
+!frontend/.env.example
