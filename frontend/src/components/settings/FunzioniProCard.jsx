@@ -28,8 +28,8 @@ export default function FunzioniProCard({ piano }) {
         <CardTitle className="flex items-center gap-2"><Crown className="w-5 h-5 text-purple-400" />Funzioni PRO</CardTitle>
         <CardDescription>
           {nessunaChiusa
-            ? 'Comprese nel tuo piano, tutte attive'
-            : 'Comprese nel piano Professional: la prova le apre tutte'}
+            ? 'Tutte attive'
+            : 'Incluse nel piano Professional'}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -48,17 +48,10 @@ export default function FunzioniProCard({ piano }) {
                   {funzione.nome}
                   {funzione.in_arrivo && <span className="ml-2 text-[11px] font-normal text-muted-foreground">in arrivo</span>}
                 </p>
-                <p className="text-xs text-muted-foreground">{funzione.descrizione}</p>
-                {funzione.dove && <p className="text-[11px] text-muted-foreground/80 mt-0.5">Dove: {funzione.dove}</p>}
               </div>
             </div>
           ))}
         </div>
-        <p className="text-xs text-center text-muted-foreground mt-4">
-          {nessunaChiusa
-            ? 'Quello che non è qui (consegne, clienti, anagrafica, chat, archivio) resta nel piano base.'
-            : 'Passando a un piano a pagamento si riaprono; i dati già salvati restano.'}
-        </p>
       </CardContent>
     </Card>
   );

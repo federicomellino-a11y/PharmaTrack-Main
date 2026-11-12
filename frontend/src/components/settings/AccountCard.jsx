@@ -3,7 +3,7 @@ import axios from 'axios';
 import { useSessioniQuery } from '@/hooks/queries';
 import { API } from '@/lib/config';
 import { ensureArray } from '@/lib/collections';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Input } from '../ui/input';
@@ -77,8 +77,7 @@ export default function AccountCard({ onSaveName, salvandoNome, user }) {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2"><User className="w-5 h-5 text-primary" />Il tuo account</CardTitle>
-          <CardDescription>Il nome con cui firmi le consegne e l'email di accesso</CardDescription>
+          <CardTitle className="flex items-center gap-2"><User className="w-5 h-5 text-primary" />Account</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
@@ -97,9 +96,6 @@ export default function AccountCard({ onSaveName, salvandoNome, user }) {
               <p className="text-sm font-medium" data-testid="account-email">{user?.email}</p>
               <Badge variant="outline">Per cambiarla scrivi all'assistenza</Badge>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              L'email e' la chiave d'accesso del tuo account: si cambia a mano per evitare che un errore di battitura ti chiuda fuori.
-            </p>
           </div>
           <Button type="button" onClick={() => onSaveName(nome)} disabled={salvandoNome || nome === (user?.name || '')} data-testid="account-salva-nome">
             <Save className="w-4 h-4 mr-2" />{salvandoNome ? 'Salvataggio...' : 'Salva nome'}
@@ -110,7 +106,6 @@ export default function AccountCard({ onSaveName, salvandoNome, user }) {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><KeyRound className="w-5 h-5 text-primary" />Password</CardTitle>
-          <CardDescription>Cambiala da qui, senza uscire e senza aspettare una mail</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={cambiaPassword} className="space-y-4">
@@ -148,9 +143,6 @@ export default function AccountCard({ onSaveName, salvandoNome, user }) {
             <Button type="submit" disabled={salvandoPassword || !password.current_password || !password.new_password}>
               <ShieldCheck className="w-4 h-4 mr-2" />{salvandoPassword ? 'Aggiornamento...' : 'Aggiorna password'}
             </Button>
-            <p className="text-xs text-muted-foreground">
-              Cambiando la password si chiudono le sessioni aperte sugli altri dispositivi.
-            </p>
           </form>
         </CardContent>
       </Card>
@@ -158,7 +150,6 @@ export default function AccountCard({ onSaveName, salvandoNome, user }) {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><Laptop className="w-5 h-5 text-primary" />Dispositivi connessi</CardTitle>
-          <CardDescription>Dove il tuo account e' aperto in questo momento</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           {leggendoDispositivi && <p className="text-sm text-muted-foreground">Lettura in corso...</p>}
@@ -183,7 +174,7 @@ export default function AccountCard({ onSaveName, salvandoNome, user }) {
           </Button>
           <p className="text-xs text-muted-foreground">
             {altriDispositivi
-              ? `${altriDispositivi} sessioni aperte altrove. Utile se hai prestato il telefono o il PC del banco.`
+              ? `${altriDispositivi} sessioni aperte altrove.`
               : 'Sei collegato solo da qui.'}
           </p>
         </CardContent>

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Bell, BellOff } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Switch } from '../ui/switch';
@@ -57,7 +57,6 @@ export default function NotificheCard({
           {attive ? <Bell className="w-5 h-5 text-primary" /> : <BellOff className="w-5 h-5 text-muted-foreground" />}
           Notifiche
         </CardTitle>
-        <CardDescription>Se arrivano gli avvisi, di cosa e in quali ore</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="flex items-start justify-between gap-3 rounded-lg bg-secondary/30 p-3">
@@ -77,24 +76,15 @@ export default function NotificheCard({
         </div>
 
         <div className="flex items-center justify-between gap-3 rounded-lg bg-secondary/30 p-3">
-          <div>
-            <p className="font-medium">Suono</p>
-            <p className="text-xs text-muted-foreground">Un suono quando arriva un avviso</p>
-          </div>
+          <p className="font-medium">Suono</p>
           <Switch checked={settings.sound_enabled} onCheckedChange={(checked) => setSettings((prev) => ({ ...prev, sound_enabled: checked }))} data-testid="suono-notifiche" />
         </div>
 
         <div className="space-y-3 rounded-lg border border-border p-4" data-testid="eventi-notifiche">
-          <div>
-            <p className="font-medium">Cosa vuoi sapere</p>
-            <p className="text-xs text-muted-foreground">Spegnere una famiglia di avvisi non tocca quelli gia&apos; ricevuti.</p>
-          </div>
-          {EVENTI.map(({ chiave, etichetta, descrizione }) => (
+          <p className="font-medium">Avvisi per</p>
+          {EVENTI.map(({ chiave, etichetta }) => (
             <div key={chiave} className="flex items-center justify-between gap-3 border-t border-border/60 pt-3">
-              <div>
-                <p className="font-medium">{etichetta}</p>
-                <p className="text-xs text-muted-foreground">{descrizione}</p>
-              </div>
+              <p>{etichetta}</p>
               <Switch
                 checked={settings.notifiche_eventi[chiave] !== false}
                 onCheckedChange={(acceso) => cambiaEvento(chiave, acceso)}
@@ -106,12 +96,7 @@ export default function NotificheCard({
 
         <div className="space-y-3 rounded-lg border border-border p-4" data-testid="orario-silenzio">
           <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="font-medium">Non disturbare</p>
-              <p className="text-xs text-muted-foreground">
-                In queste ore non arriva niente. Gli avvisi restano dentro l&apos;app: aprendola li trovi.
-              </p>
-            </div>
+            <p className="font-medium">Non disturbare</p>
             <Switch
               checked={silenzio}
               onCheckedChange={(acceso) => setSettings((prev) => ({ ...prev, silenzio_attivo: acceso }))}

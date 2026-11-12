@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Download, Loader2 } from 'lucide-react';
@@ -24,7 +24,6 @@ export default function EsportaCard({ piano }) {
   const [occupato, setOccupato] = useState(false);
 
   const attiva = voci.some((voce) => voce.chiave === scelta) ? scelta : voci[0]?.chiave;
-  const dettaglio = voci.find((voce) => voce.chiave === attiva);
 
   const scarica = async () => {
     if (!attiva) return;
@@ -49,7 +48,6 @@ export default function EsportaCard({ piano }) {
         <CardTitle className="flex items-center gap-2">
           <Download className="w-5 h-5 text-primary" />Esporta i dati
         </CardTitle>
-        <CardDescription>Un CSV da aprire in Excel, con quello che scegli dal menu</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="flex flex-col gap-2 sm:flex-row">
@@ -68,11 +66,6 @@ export default function EsportaCard({ piano }) {
             {occupato ? 'Preparo...' : 'Scarica CSV'}
           </Button>
         </div>
-        {dettaglio && <p className="text-sm text-muted-foreground">{dettaglio.descrizione}</p>}
-        <p className="text-xs text-muted-foreground">
-          I file sono gli stessi di prima, spostati qui: chi cambia gestionale o passa i dati al
-          commercialista li trova senza girare le pagine.
-        </p>
       </CardContent>
     </Card>
   );

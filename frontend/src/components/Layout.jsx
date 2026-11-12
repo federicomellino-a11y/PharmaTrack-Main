@@ -15,37 +15,20 @@ import { Badge } from './ui/badge';
 import CommandPalette from './CommandPalette';
 import { ensureArray } from '@/lib/collections';
 import { funzioniDellaFarmacia } from '@/lib/funzioniFarmacia';
+import { VOCI_MENU, ordinaMenu } from '@/lib/vociMenu';
 import { useConversationsQuery } from '@/hooks/queries';
 import {
-  LayoutDashboard, Users, Package, Truck, MessageSquare, Archive, Settings,
-  Bell, LogOut, Menu, X, ChevronRight, BarChart3, Stethoscope,
-  Phone, StickyNote, Sun, Moon, Plus, Home, Check, Trash2, RefreshCw, Map, Wallet, Plug, Search,
+  Settings, Bell, LogOut, Menu, X, ChevronRight,
+  Sun, Moon, Plus, Home, Check, Trash2, RefreshCw, Search,
 } from 'lucide-react';
 
-const navItems = [
-  { path: '/dashboard',     icon: LayoutDashboard, label: 'Home',          mobile: true },
-  { path: '/deliveries',    icon: Package,         label: 'Consegne',      mobile: true },
-  { path: '/customers',     icon: Users,           label: 'Clienti',       mobile: true },
-  { path: '/drivers',        icon: Truck,           label: 'Fattorini' },
-  { path: '/chat',          icon: MessageSquare,   label: 'Chat',          mobile: true, badge: true, funzione: 'chat' },
-  { divider: true },
-  { path: '/shifts',        icon: Wallet,          label: 'Turni & Cassa' },
-  { path: '/tracking',      icon: Map,             label: 'Tracking Live' },
-  { path: '/reports',       icon: BarChart3,       label: 'Report' },
-  { path: '/doctors',       icon: Stethoscope,     label: 'Medici',        funzione: 'medici' },
-  { path: '/useful-numbers',icon: Phone,           label: 'Numeri Utili',  funzione: 'numeri_utili' },
-  { path: '/notes',         icon: StickyNote,      label: 'Block Notes',   funzione: 'block_notes' },
-  { divider: true },
-  { path: '/integrations',  icon: Plug,            label: 'Integrazioni' },
-  { path: '/archive',       icon: Archive,         label: 'Archivio' },
-  { path: '/settings',      icon: Settings,        label: 'Impostazioni' },
-];
 
 // Una funzione spenta dalla farmacia non compare nel menu, ne' sul computer
 // ne' sul telefono: il filtro e' lo stesso per entrambi.
 const navVisibili = (user) => {
   const accese = funzioniDellaFarmacia(user);
-  return navItems.filter((item) => item.divider || !item.funzione || accese[item.funzione] !== false);
+  const voci = ordinaMenu(VOCI_MENU, user?.settings?.ordine_menu);
+  return voci.filter((item) => item.divider || !item.funzione || accese[item.funzione] !== false);
 };
 const isArchivedDeliveryNotification = (notification) => (
   notification?.type === 'delivery' && ['delivered', 'cancelled'].includes(notification?.data?.status)
