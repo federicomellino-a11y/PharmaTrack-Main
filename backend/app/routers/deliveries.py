@@ -14,7 +14,7 @@ from app.core.cloudinary_client import PhotoManager
 from app.core.websocket import manager
 # (nessun uso di app.core.config)
 from app.core.fasce import descrivi_fascia, descrivi_giorno, fascia_scaduta, valida_fascia
-from app.core.piani import piano_corrente, inizio_mese, verifica_consegne
+from app.core.piani import CAMPI_PIANO, piano_corrente, inizio_mese, verifica_consegne
 from app.core.security import (
     get_current_user,
 )
@@ -142,7 +142,7 @@ async def get_deliveries(response: Response, status: Optional[str] = None, drive
 async def create_delivery(delivery: DeliveryCreate, user: dict = Depends(get_current_user)):
     # Limite del piano: si ferma la creazione, non la lettura né la chiusura di
     # quello che è già aperto. Chi ha un piano vecchio senza campo "piano" passa.
-    farmacia = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0, "piano": 1, "prova_scadenza": 1}) or {}
+    farmacia = await db.users.find_one({"user_id": user["user_id"]}, CAMPI_PIANO) or {}
     piano = piano_corrente(farmacia)
     if piano.get("piano"):
         usate = await db.deliveries.count_documents({

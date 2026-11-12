@@ -78,3 +78,11 @@ def test_senza_client_id_la_rotta_risponde_503(client, monkeypatch):
     monkeypatch.delenv("GOOGLE_CLIENT_ID")
     monkeypatch.delenv("VITE_GOOGLE_CLIENT_ID", raising=False)
     assert c.post("/api/auth/google", json={"credential": "token"}).status_code == 503
+
+
+def test_il_nuovo_account_google_riceve_il_piano_iniziale(client):
+    c, finto = client
+    assert c.post("/api/auth/google", json={"credential": "token"}).status_code == 200
+    utente = finto.users.docs[0]
+    assert utente["piano"] == "prova"
+    assert utente["prova_scadenza"] and utente["piano_attivato_il"]

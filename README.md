@@ -28,7 +28,7 @@ Coordina fattorini, traccia ogni ordine, gestisci cassa e turni, integrazione co
 | **Chat real-time** | Farmacia ↔ fattorino via WebSocket. |
 | **Tracking live** | Posizione fattorino aggiornata sulla mappa farmacia. |
 | **Notifiche push** | WebPush con VAPID anche con browser chiuso. |
-| **Bridge Winfarm** | Hotkey AutoHotkey + endpoint REST per importare vendite da Winfarm senza API. |
+| **Integrazione Winfarm** | Copia e incolla della vendita o pulsante magico sul PC, senza API. |
 | **Auth multi-portale** | Farmacia, Fattorino, Admin (path nascosto `/console-federico`). |
 | **PWA installabile** | Funziona offline-ready su mobile e desktop. |
 | **Report & archivio** | Statistiche, KPI fatturato, export. |
@@ -141,13 +141,12 @@ in `ADMIN_PASSWORD`, se presente.
 
 ## 🔌 Integrazione Winfarm (Pharmaservice)
 
-Winfarm non espone API. Il bridge funziona via **hotkey AutoHotkey + clipboard**:
+Winfarm non espone API. Due strade, dalla pagina **Integrazioni**:
 
-1. Su [AutoHotkey 1.1](https://www.autohotkey.com/) fai l'installazione (una volta sola)
-2. Vai su **Integrazioni** → **Scarica bridge**: il file contiene già URL e chiave della farmacia
-3. Doppio-click sul file → icona verde "H" in tray (per l'autostart: `shell:startup`)
-4. Su Winfarm seleziona il blocco di vendita → **Alt+C** → la consegna entra in coda "Da preparare"
-   (se la selezione non è riconosciuta si apre il modulo pre-compilato). **Alt+D** apre il Dock.
+1. **Incolla la vendita** (niente da installare): in Winfarm selezioni la vendita, Ctrl+C,
+   la incolli in PharmaTrack e si apre la consegna già compilata.
+2. **Pulsante magico** (programma PowerShell per il PC del banco): Ctrl+Shift+C in Winfarm
+   e la vendita arriva da sola.
 
 Endpoint REST anche disponibile: `POST /api/integrations/winfarm/import` (dettagli nella pagina `/integrations`).
 

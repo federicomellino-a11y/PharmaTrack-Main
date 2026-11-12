@@ -8,6 +8,7 @@ import { render, screen, cleanup } from '@testing-library/react';
 vi.mock('@/hooks/queries', () => ({
   useDeliveriesQuery: vi.fn(),
   useDriversQuery: vi.fn(),
+  usePlanQuery: () => ({ data: { pro: true } }),
 }));
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: vi.fn() }) }));
 vi.mock('react-leaflet', () => ({

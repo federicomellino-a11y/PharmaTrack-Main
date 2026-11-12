@@ -5,6 +5,7 @@ import { Badge } from '../ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
 import { STATUS_LABELS } from '@/lib/deliveryDisplay';
 import { formatCurrency, formatDateTimeLong } from '@/lib/format';
+import AssegnaProCard from './AssegnaProCard';
 
 /**
  * Il dettaglio di un account nella console: anagrafica, consegne recenti,
@@ -19,6 +20,7 @@ export default function DettaglioAccountDialog({
   fattorini = [],
   notifiche = [],
   caricamento = false,
+  onAggiornato,
 }) {
   return (
   <Dialog open={open} onOpenChange={onOpenChange}>
@@ -75,6 +77,8 @@ export default function DettaglioAccountDialog({
               </div>
             </CardContent>
           </Card>
+
+          {utente?.user_id && <AssegnaProCard utente={utente} onAggiornato={onAggiornato} />}
 
           <div className="grid xl:grid-cols-[1.1fr_1fr] gap-6">
             <Card>

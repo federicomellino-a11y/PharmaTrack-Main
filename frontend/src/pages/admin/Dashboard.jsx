@@ -240,6 +240,11 @@ export default function AdminDashboardPage() {
                           <p className="font-semibold truncate">{user.name}</p>
                           <Badge variant="outline">{user.role || 'pharmacy'}</Badge>
                           <Badge variant={active ? 'secondary' : 'destructive'}>{active ? 'Attivo' : 'Disattivato'}</Badge>
+                          {user.piano_stato?.assegnazione && (
+                            <Badge variant="outline" data-testid={`admin-pro-badge-${user.user_id}`} className={user.piano_stato.assegnazione.attivo ? 'border-purple-500/50 text-purple-600 dark:text-purple-300' : ''}>
+                              {user.piano_stato.assegnazione.attivo ? 'Pro assegnato' : 'Pro spento'}
+                            </Badge>
+                          )}
                         </div>
                         <p className="text-sm text-muted-foreground truncate mt-1">{user.email}</p>
                         <p className="text-sm mt-1">{user.pharmacy_name || 'Farmacia senza nome'}{user.pharmacy_phone ? ` · ${user.pharmacy_phone}` : ''}</p>
@@ -420,6 +425,10 @@ export default function AdminDashboardPage() {
         fattorini={detailDrivers}
         notifiche={detailRecentNotifications}
         caricamento={detailsLoading}
+        onAggiornato={(aggiornato) => {
+          setSelectedUserDetails((prev) => (prev ? { ...prev, user: aggiornato } : prev))
+          queryClient.invalidateQueries({ queryKey: ['admin'] })
+        }}
       />
     </div>
   )

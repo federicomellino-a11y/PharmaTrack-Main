@@ -304,6 +304,7 @@ async def google_auth(request: Request, data: GoogleAuthRequest, response: Respo
                 "driver_tracking_enabled": False,
             },
             "created_at": datetime.now(timezone.utc).isoformat(),
+            **nuovo_profilo_piano(),
         }
         await db.users.insert_one(user)
     elif user.get("is_active", True) is False:

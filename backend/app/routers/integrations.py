@@ -15,7 +15,6 @@ from app.core.security import (
 from app.core.notifications import (
     create_notification_internal,
 )
-from app.core.winfarm_bridge import render_bridge_script
 from app.core.winfarm_tray import con_bom, render_tray_script
 from app.core.winfarm_parse import estrai_vendita, estrai_vendita_da_controlli
 
@@ -296,24 +295,6 @@ async def winfarm_status(request: Request, user: dict = Depends(get_current_user
         "pharmacy_name": user.get("pharmacy_name") or user.get("name"),
         "base_url": (request.headers.get("origin") or "").rstrip("/"),
     }
-
-
-@router.get("/integrations/winfarm/bridge/download")
-async def winfarm_bridge_download(request: Request, user: dict = Depends(get_current_user)):
-    """Script AutoHotkey già configurato (URL + token della farmacia)."""
-    token = user.get("bridge_token")
-    if not token:
-        token = f"wf_{secrets.token_urlsafe(24)}"
-        await db.users.update_one({"user_id": user["user_id"]}, {"$set": {"bridge_token": token}})
-    base_url = (request.query_params.get("base") or request.headers.get("origin")
-                or os.environ.get("APP_BASE_URL") or "https://pharmatrack-zeta.vercel.app")
-    script = render_bridge_script(base_url, token, user.get("pharmacy_name") or user.get("name") or "")
-    filename = "pharmatrack-bridge-winfarm.ahk"
-    return Response(
-        content=script,
-        media_type="text/plain; charset=utf-8",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
-    )
 
 
 @router.get("/integrations/winfarm/tray/download")
