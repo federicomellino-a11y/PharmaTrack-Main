@@ -1,3 +1,4 @@
+import hmac
 import uuid
 import logging
 from datetime import datetime, timezone, timedelta
@@ -42,12 +43,19 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def credenziali_admin_giuste(email: str, password: str) -> bool:
+    """Confronto a tempo costante: il tempo di risposta non rivela quanto si e' vicini."""
+    email_ok = hmac.compare_digest((email or "").encode(), (ADMIN_EMAIL or "").encode())
+    password_ok = hmac.compare_digest((password or "").encode(), (ADMIN_PASSWORD or "").encode())
+    return email_ok and password_ok
+
+
 @router.post("/admin/login")
 @limiter.limit(LOGIN_RATE_LIMIT)
 async def admin_login(request: Request, data: AdminLoginLoose, response: Response):
     if not ADMIN_EMAIL or not ADMIN_PASSWORD:
         raise HTTPException(status_code=503, detail="Super amministratore non configurato")
-    if data.email != ADMIN_EMAIL or data.password != ADMIN_PASSWORD:
+    if not credenziali_admin_giuste(data.email, data.password):
         raise HTTPException(status_code=401, detail="Credenziali admin non valide")
     # Secondo fattore. Tre modi, in ordine di preferenza:
     # 1) TOTP configurato: il codice arriva dall'app, niente da spedire;
