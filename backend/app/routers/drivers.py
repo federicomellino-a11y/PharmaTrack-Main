@@ -9,7 +9,8 @@ from app.core.database import db
 from app.core.passwords import hash_password
 # (nessun uso di app.core.config)
 from app.core.piani import piano_corrente, verifica_fattorini
-from app.core.security import get_current_user  # noqa: F401
+from app.core.security import get_current_user, normalizza_email, trova_per_email  # noqa: F401
+from app.core.websocket import richiudi_canali_revocati
 from app.models.schemas import DriverCreate
 
 logger = logging.getLogger(__name__)
@@ -31,14 +32,14 @@ async def create_driver(driver: DriverCreate, user: dict = Depends(get_current_u
         if motivo:
             raise HTTPException(status_code=402, detail=motivo)
 
-    existing = await db.drivers.find_one({"email": driver.email})
+    existing = await trova_per_email(db.drivers, driver.email)
     if existing:
         raise HTTPException(status_code=400, detail="Email già in uso")
     password_hash = hash_password(driver.password)
     driver_data = {
         "driver_id": f"drv_{uuid.uuid4().hex[:12]}",
         "pharmacy_id": user["user_id"],
-        "name": driver.name, "phone": driver.phone, "email": driver.email,
+        "name": driver.name, "phone": driver.phone, "email": normalizza_email(driver.email),
         "password_hash": password_hash, "vehicle_type": driver.vehicle_type,
         "is_active": True, "current_lat": None, "current_lng": None,
         "last_location_update": None, "created_at": datetime.now(timezone.utc).isoformat()
@@ -183,6 +184,8 @@ async def update_driver(driver_id: str, request: Request, user: dict = Depends(g
         result = await db.drivers.update_one({"driver_id": driver_id, "pharmacy_id": user["user_id"]}, {"$set": update_data})
         if result.matched_count == 0:
             raise HTTPException(status_code=404, detail="Fattorino non trovato")
+        if update_data.get("is_active") is False:
+            await richiudi_canali_revocati("driver", driver_id)
     return await db.drivers.find_one({"driver_id": driver_id, "pharmacy_id": user["user_id"]}, {"_id": 0, "password_hash": 0})
 
 @router.delete("/drivers/{driver_id}")
@@ -205,5 +208,6 @@ async def delete_driver(driver_id: str, user: dict = Depends(get_current_user)):
     )
     await invalida_riepiloghi(user["user_id"])
     await db.driver_sessions.delete_many({"driver_id": driver_id})
+    await richiudi_canali_revocati("driver", driver_id)
     await db.push_subscriptions.delete_many({"user_id": driver_id, "user_type": "driver"})
     return {"message": "Fattorino eliminato"}

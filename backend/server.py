@@ -1,3 +1,4 @@
+import asyncio
 import os
 import logging
 import uuid
@@ -11,7 +12,7 @@ from slowapi.middleware import SlowAPIMiddleware
 
 from app.core.database import db, client
 from app.core.legacy_deliveries import allinea_testi_consegne
-from app.core.websocket import manager
+from app.core.websocket import identita_websocket, manager, sorveglia_canali
 from app.core.security import normalize_session_expiry
 from app.core.config import ADMIN_EMAIL, ADMIN_PASSWORD, IS_PRODUCTION
 from app.core.logging_config import setup_logging
@@ -43,9 +44,11 @@ async def lifespan(_app: FastAPI):
     chiusura del client Mongo allo spegnimento.
     """
     await setup_indexes()
+    sorveglianza = asyncio.create_task(sorveglia_canali())
     try:
         yield
     finally:
+        sorveglianza.cancel()
         client.close()
 
 
@@ -94,8 +97,9 @@ app.add_middleware(SlowAPIMiddleware)
 # Security headers from PR blocco-1: wired so they actually apply (were dead code)
 app.add_middleware(SecurityHeadersMiddleware)
 # Difesa CSRF: l'origine delle richieste che scrivono deve essere una delle nostre.
-from app.core.security_middleware import OriginCheckMiddleware, origini_consentite  # noqa: E402
-app.add_middleware(OriginCheckMiddleware, consentite=origini_consentite(os.environ.get("CORS_ORIGINS")))
+from app.core.security_middleware import OriginCheckMiddleware, origini_per_ambiente  # noqa: E402
+_ORIGINI_CONSENTITE = origini_per_ambiente(os.environ.get("CORS_ORIGINS"), IS_PRODUCTION)
+app.add_middleware(OriginCheckMiddleware, consentite=_ORIGINI_CONSENTITE)
 
 # Gestione errori standardizzata
 register_exception_handlers(app)
@@ -125,8 +129,13 @@ for module in [
 
 
 # ============ WEBSOCKETS ============
+# Senza sessione valida, o con l'id di un altro, il canale si chiude prima di
+# aprirsi (1008 = violazione di policy; il browser vede un 403).
 @app.websocket("/ws/pharmacy/{user_id}")
 async def websocket_pharmacy(websocket: WebSocket, user_id: str):
+    if not await identita_websocket(websocket, "pharmacy", user_id, _ORIGINI_CONSENTITE):
+        await websocket.close(code=1008)
+        return
     await manager.connect(websocket, user_id, "pharmacy")
     try:
         while True:
@@ -134,11 +143,17 @@ async def websocket_pharmacy(websocket: WebSocket, user_id: str):
             if data.get("type") == "ping":
                 await websocket.send_json({"type": "pong"})
     except WebSocketDisconnect:
+        pass
+    finally:
         manager.disconnect(websocket, user_id, "pharmacy")
 
 
 @app.websocket("/ws/driver/{driver_id}")
 async def websocket_driver(websocket: WebSocket, driver_id: str):
+    driver = await identita_websocket(websocket, "driver", driver_id, _ORIGINI_CONSENTITE)
+    if not driver:
+        await websocket.close(code=1008)
+        return
     await manager.connect(websocket, driver_id, "driver")
     try:
         while True:
@@ -146,23 +161,20 @@ async def websocket_driver(websocket: WebSocket, driver_id: str):
             if data.get("type") == "ping":
                 await websocket.send_json({"type": "pong"})
             elif data.get("type") == "location":
-                driver = await db.drivers.find_one({"driver_id": driver_id}, {"_id": 0})
-                if driver:
-                    await manager.send_personal_message(
-                        {"type": "driver_location", "driver_id": driver_id, "lat": data.get("lat"), "lng": data.get("lng")},
-                        driver["pharmacy_id"], "pharmacy"
-                    )
+                await manager.send_personal_message(
+                    {"type": "driver_location", "driver_id": driver_id, "lat": data.get("lat"), "lng": data.get("lng")},
+                    driver["pharmacy_id"], "pharmacy"
+                )
     except WebSocketDisconnect:
+        pass
+    finally:
         manager.disconnect(websocket, driver_id, "driver")
 
 
-# ============ CORS — FIX CRITICO ============
-# allow_credentials=True è incompatibile con allow_origins=["*"].
-# Se CORS_ORIGINS è "*" usiamo allow_all senza credentials (fallback sicuro per dev locale).
-# In produzione impostare su Render: CORS_ORIGINS=https://tuo-frontend.vercel.app
-_raw_origins = os.environ.get('CORS_ORIGINS', '*').strip()
-
-if _raw_origins == '*':
+# ============ CORS ============
+# allow_credentials=True è incompatibile con allow_origins=["*"]: senza elenco
+# (solo sviluppo locale, in produzione l'avvio si ferma prima) niente cookie.
+if _ORIGINI_CONSENTITE is None:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
@@ -171,10 +183,9 @@ if _raw_origins == '*':
         allow_headers=["*"],
     )
 else:
-    _origins_list = [o.strip() for o in _raw_origins.split(',') if o.strip()]
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=_origins_list,
+        allow_origins=_ORIGINI_CONSENTITE,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

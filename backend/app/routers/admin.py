@@ -4,7 +4,7 @@ from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, HTTPException, Depends, Request, Response
 
 from app.core.database import db
-from app.core.websocket import manager
+from app.core.websocket import manager, richiudi_canali_revocati
 from app.core.config import (
     ADMIN_EMAIL, ADMIN_NAME, ADMIN_PASSWORD, LOGIN_RATE_LIMIT, ADMIN_TOTP_SECRET, ALERT_EMAIL,
     ADMIN_2FA_EMAIL,
@@ -311,6 +311,9 @@ async def admin_update_user_status(user_id: str, data: AdminUserStatusUpdate, ad
         driver_ids = await db.drivers.distinct("driver_id", {"pharmacy_id": user_id})
         if driver_ids:
             await db.driver_sessions.delete_many({"driver_id": {"$in": driver_ids}})
+        await richiudi_canali_revocati("pharmacy", user_id)
+        for driver_id in driver_ids:
+            await richiudi_canali_revocati("driver", driver_id)
 
     user = await db.users.find_one({"user_id": user_id}, {"_id": 0, "password_hash": 0})
     return user
