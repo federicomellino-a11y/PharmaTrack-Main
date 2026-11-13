@@ -22,6 +22,28 @@ from app.core.cloudinary_client import PhotoManager
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
+MAX_UPLOAD_BYTES = PhotoManager.MAX_FILE_SIZE_MB * 1024 * 1024
+_IMAGE_SIGNATURES = {
+    "jpg": lambda data: data.startswith(b"\xff\xd8\xff"),
+    "jpeg": lambda data: data.startswith(b"\xff\xd8\xff"),
+    "png": lambda data: data.startswith(b"\x89PNG\r\n\x1a\n"),
+    "webp": lambda data: len(data) >= 12 and data.startswith(b"RIFF") and data[8:12] == b"WEBP",
+}
+
+
+def validate_uploaded_photo_bytes(data: bytes, filename: str) -> None:
+    """Reject empty, oversized, or obviously mismatched image payloads."""
+    if not data:
+        raise ValueError("File vuoto")
+    ext = os.path.splitext(filename or "")[1].lower().lstrip(".")
+    if ext not in PhotoManager.ALLOWED_FORMATS:
+        raise ValueError(f"Formato non valido. Ammessi: {', '.join(sorted(PhotoManager.ALLOWED_FORMATS))}")
+    if len(data) > MAX_UPLOAD_BYTES:
+        raise ValueError(f"File oltre {PhotoManager.MAX_FILE_SIZE_MB}MB")
+    signature_check = _IMAGE_SIGNATURES.get(ext)
+    if signature_check and not signature_check(data):
+        raise ValueError("Il contenuto del file non corrisponde al formato dichiarato")
+
 
 async def get_photo_actor(request: Request) -> dict:
     """Resolve actor as driver (preferred, POD taken on the road) or pharmacy."""
@@ -65,9 +87,14 @@ async def upload_delivery_photo(
     if not file.filename or not PhotoManager.validate_file_extension(file.filename):
         raise HTTPException(status_code=422, detail=f"Formato non valido. Ammessi: {', '.join(PhotoManager.ALLOWED_FORMATS)}")
 
-    content = await file.read()
-    if not PhotoManager.validate_file_size(len(content)):
-        raise HTTPException(status_code=422, detail=f"File oltre {PhotoManager.MAX_FILE_SIZE_MB}MB")
+    # Read at most the allowed size plus one byte. This prevents a huge upload
+    # from being copied fully into application memory before size validation.
+    content = await file.read(MAX_UPLOAD_BYTES + 1)
+    await file.close()
+    try:
+        validate_uploaded_photo_bytes(content, file.filename)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.filename)[1]) as tmp:
         tmp.write(content)

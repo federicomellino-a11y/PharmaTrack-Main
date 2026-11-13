@@ -66,11 +66,15 @@ def test_account_senza_limiti_con_pro_acceso_tiene_i_suoi_limiti():
     assert funzioni_sbloccate(piano)
 
 
-def test_la_rotta_admin_esiste_ed_e_protetta():
-    import os
-    os.environ.setdefault("MONGO_URL", "mongodb://127.0.0.1:27017")
-    os.environ.setdefault("DB_NAME", "pharmatrack_test")
+def test_la_rotta_admin_esiste_ed_e_protetta(monkeypatch):
+    from app.core import security
+
+    # La CI non deve dipendere dalle credenziali admin configurate nell'ambiente.
+    monkeypatch.setattr(security, "ADMIN_EMAIL", "admin@example.invalid")
+    monkeypatch.setattr(security, "ADMIN_PASSWORD", "password-di-test")
+
     from fastapi.testclient import TestClient
     import server
+
     risposta = TestClient(server.app).put("/api/admin/users/user_x/pro", json={"stato": "attivo", "mesi": 1})
     assert risposta.status_code == 401
