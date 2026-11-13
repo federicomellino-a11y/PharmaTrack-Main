@@ -262,7 +262,7 @@ export default function DeliveriesPage() {
   };
 
   // La fascia scelta si ricava dallo stato: così resta coerente anche quando
-  // l'orario arriva dal pulsante magico o dal Dock.
+  // l'orario arriva da Consegna veloce o dal Dock.
 
   const applicaFascia = (valore) => {
     setFasciaScelta(valore);

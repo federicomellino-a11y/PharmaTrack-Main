@@ -57,7 +57,7 @@ vede né i fattorini né le consegne di un'altra.
         │  allarmi             controlla API, backup e test notturni  │
         └─────────────────────────────────────────────────────────────┘
 
-  PC della farmacia (facoltativo): Winfarm ──▶ pulsante magico (PowerShell)
+  PC della farmacia (facoltativo): Winfarm ──▶ Consegna veloce (PowerShell)
      preme Ctrl+Shift+C, legge la schermata, POST /api/integrations/winfarm/bridge
      con header X-Bridge-Token (nessuna sessione browser)
 ```

@@ -108,3 +108,12 @@ def test_la_scheda_si_apre_sempre_con_quello_che_si_e_letto():
         assert '$parametri.' + campo in blocco
     assert 'Apri-Dock -Parametri $parametri' in blocco
     assert '--window-size=420,640' in script
+
+
+def test_lo_script_porta_la_versione_che_il_server_si_aspetta():
+    """Se le due cifre divergono il programma si riscarica a ogni battito, per sempre."""
+    from app.core.winfarm_tray import render_tray_script
+    from app.routers.integrations import VERSIONE_PULSANTE
+    script = render_tray_script('https://a.test', 'wf_x', 'Farmacia')
+    assert f"$VERSIONE = '{VERSIONE_PULSANTE}'" in script
+    assert 'Leggi-Parole' in script and 'prodotti_testo' in script

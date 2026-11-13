@@ -5,7 +5,7 @@ import { Button } from '../ui/button';
 import { Save, Zap } from 'lucide-react';
 import { OPZIONI_PULSANTE } from '@/lib/pulsanteMagico';
 
-/** Gli extra del pulsante magico: spenti finche' la farmacia non li accende. */
+/** Gli extra di Consegna veloce: spenti finche' la farmacia non li accende. */
 export default function PulsanteMagicoCard({ settings, setSettings, onSalva, salvando }) {
   const scelte = settings.pulsante || {};
   const cambia = (chiave, acceso) => setSettings((prev) => ({
@@ -16,7 +16,7 @@ export default function PulsanteMagicoCard({ settings, setSettings, onSalva, sal
   return (
     <Card data-testid="pulsante-magico-impostazioni">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2"><Zap className="w-5 h-5 text-primary" />Pulsante magico</CardTitle>
+        <CardTitle className="flex items-center gap-2"><Zap className="w-5 h-5 text-primary" />Consegna veloce</CardTitle>
       </CardHeader>
       <CardContent className="space-y-2">
         {OPZIONI_PULSANTE.map((opzione) => (

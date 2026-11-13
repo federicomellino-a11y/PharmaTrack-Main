@@ -67,8 +67,8 @@ export default function IntegrationsPage() {
     try {
       const base = encodeURIComponent(window.location.origin);
       await scaricaFile(`/integrations/winfarm/tray/download?base=${base}`,
-        'pharmatrack-pulsante-magico.ps1', 'application/octet-stream');
-      toast.success('Pulsante magico scaricato: mettilo in una cartella fissa e avvialo');
+        'pharmatrack-consegna-veloce.ps1', 'application/octet-stream');
+      toast.success('Consegna veloce scaricata: metti il file in una cartella fissa e avvialo');
     } catch {
       toast.error('Download non riuscito, riprova');
     } finally {
@@ -94,7 +94,7 @@ export default function IntegrationsPage() {
   const stato = vivo
     ? { testo: 'Programma collegato', sotto: `Ultimo giro ${ultimoBattito}`, badge: 'Attivo' }
     : giorni === null
-      ? { testo: 'Pronto da collegare', sotto: 'Scarica il pulsante magico per cominciare', badge: 'Da attivare' }
+      ? null
       : giorni <= 1
         ? { testo: 'Collegato a Winfarm', sotto, badge: 'Attivo' }
         : { testo: `Fermo da ${giorni} giorni`, sotto, badge: 'Da controllare' };
@@ -107,8 +107,8 @@ export default function IntegrationsPage() {
           <p className="text-sm text-muted-foreground mt-1">Da Winfarm a consegna, senza riscrivere.</p>
         </div>
 
-        {/* Stato */}
-        <Card className={active ? 'border-emerald-500/30 bg-emerald-500/[0.04]' : 'border-primary/20 bg-primary/[0.03]'}>
+        {/* Stato: compare solo quando il programma si e' collegato almeno una volta */}
+        {(loading || stato) && <Card className={active ? 'border-emerald-500/30 bg-emerald-500/[0.04]' : 'border-primary/20 bg-primary/[0.03]'}>
           <CardContent className="p-4 space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-3">
@@ -117,16 +117,16 @@ export default function IntegrationsPage() {
                 </div>
                 <div>
                   <p className="font-semibold text-sm">
-                    {loading ? 'Controllo stato…' : stato.testo}
+                    {loading ? 'Controllo stato…' : stato?.testo}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {loading ? 'Un attimo…' : stato.sotto}
+                    {loading ? 'Un attimo…' : stato?.sotto}
                   </p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
                 <Badge variant="outline" className={active ? 'border-emerald-500/40 text-emerald-600 dark:text-emerald-400' : ''}>
-                  {stato.badge}
+                  {stato?.badge}
                 </Badge>
                 <Button variant="ghost" size="sm" onClick={loadStatus} aria-label="Aggiorna stato">
                   <RefreshCw className="w-4 h-4" />
@@ -143,7 +143,7 @@ export default function IntegrationsPage() {
               />
             </div>
           </CardContent>
-        </Card>
+        </Card>}
 
         <Card data-testid="pulsante-magico-card">
           <CardContent className="p-4 space-y-4">
@@ -153,7 +153,7 @@ export default function IntegrationsPage() {
                   <Monitor className="w-4 h-4" />
                 </div>
                 <div>
-                  <p className="font-semibold text-sm">Pulsante magico</p>
+                  <p className="font-semibold text-sm">Consegna veloce Winfarm</p>
                   <p className="text-xs text-muted-foreground">Programma per il PC del banco, Windows 10 o 11.</p>
                 </div>
               </div>
@@ -178,7 +178,7 @@ export default function IntegrationsPage() {
                 <ol className="space-y-1.5 text-sm list-decimal pl-4 marker:text-muted-foreground">
                   <li>In Winfarm tieni aperta la vendita, con il cliente selezionato.</li>
                   <li>Premi <kbd className="px-1 rounded bg-secondary text-[11px] font-mono">Ctrl+Shift+C</kbd>.</li>
-                  <li>Si apre una scheda piccola con cliente e importo già scritti.</li>
+                  <li>Si apre una scheda piccola con cliente, importo e farmaci già scritti.</li>
                   <li>Scegli orario e pagamento, premi <kbd className="px-1 rounded bg-secondary text-[11px] font-mono">Invio</kbd>: la consegna è in lista.</li>
                 </ol>
               </div>

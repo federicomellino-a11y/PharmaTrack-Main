@@ -231,3 +231,35 @@ def test_accessibilita_vuota_non_esplode():
     esito = estrai_vendita_da_controlli([])
     assert esito["utilizzabile"] is False
     assert esito["righe_lette"] == 0
+
+
+def _p(t, x, y, w=60, h=22):
+    return {"t": t, "x": x, "y": y, "w": w, "h": h}
+
+
+# Posizioni prese dalla schermata vera di Winfarm (1920x1080, vendita del 13/11/2026).
+PAROLE_VENDITA = [
+    _p("Descrizione", 213, 128, 92, 18), _p("Cl.", 527, 128, 22, 18), _p("Cat.", 588, 128, 30, 18),
+    _p("Q.tà", 694, 128, 34, 18), _p("Totale", 1354, 128, 50, 18),
+    _p("CARDIOASPIRIN*30CPR", 20, 160, 270), _p("GAST", 306, 160, 60), _p("100MG", 380, 160, 82),
+    _p("A", 528, 160, 16), _p("Rip", 586, 160, 36), _p("1", 724, 160, 10), _p("2,58", 1395, 160, 48), _p("LIB", 1465, 160, 36),
+    _p("TACHIPIRINA*20CPR", 20, 200, 240), _p("1000MG", 270, 200, 90), _p("C", 528, 200, 16), _p("2", 724, 200, 10),
+    _p("In", 20, 240, 20), _p("Corso", 48, 240, 60), _p("[Vendita", 118, 240, 90), _p("Libera]", 216, 240, 80), _p("3", 724, 240, 10),
+    _p("Segnalazioni", 470, 486, 120), _p("ACIDO", 172, 645, 60), _p("ACETILSALICILICO", 240, 645, 150),
+]
+
+
+def test_prodotti_letti_dalla_griglia():
+    from app.core.winfarm_parse import prodotti_da_parole, testo_prodotti
+    prodotti = prodotti_da_parole(PAROLE_VENDITA)
+    assert prodotti == [
+        {"nome": "CARDIOASPIRIN*30CPR GAST 100MG", "quantita": 1},
+        {"nome": "TACHIPIRINA*20CPR 1000MG", "quantita": 2},
+    ]
+    assert testo_prodotti(prodotti) == "CARDIOASPIRIN*30CPR GAST 100MG; 2x TACHIPIRINA*20CPR 1000MG"
+
+
+def test_prodotti_senza_griglia_o_con_dati_rotti():
+    from app.core.winfarm_parse import prodotti_da_parole
+    assert prodotti_da_parole(None) == []
+    assert prodotti_da_parole([{"t": "ciao"}, "x", _p("CARDIOASPIRIN", 20, 160)]) == []

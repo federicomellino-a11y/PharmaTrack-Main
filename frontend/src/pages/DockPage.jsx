@@ -195,7 +195,7 @@ export default function DockPage() {
       </div>
 
       <p className="text-center text-[10px] text-muted-foreground">
-        Tieni il Dock aperto: mantiene il sistema sempre pronto · con il pulsante magico si apre da sé dopo ogni vendita
+        Tieni il Dock aperto: mantiene il sistema sempre pronto · con Consegna veloce si apre da sé dopo ogni vendita
       </p>
     </div>
   );

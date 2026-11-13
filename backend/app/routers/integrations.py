@@ -15,8 +15,8 @@ from app.core.security import (
 from app.core.notifications import (
     create_notification_internal,
 )
-from app.core.winfarm_tray import con_bom, render_tray_script
-from app.core.winfarm_parse import estrai_vendita, estrai_vendita_da_controlli
+from app.core.winfarm_tray import VERSIONE_PULSANTE, con_bom, render_tray_script
+from app.core.winfarm_parse import estrai_vendita, estrai_vendita_da_controlli, prodotti_da_parole, testo_prodotti
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -33,11 +33,6 @@ PAGAMENTI = {
     "other": "other", "altro": "other",
 }
 
-
-# Versione del pulsante magico che il server considera corrente. La stessa
-# cifra finisce dentro lo script scaricato: quando la alzo, i PC in farmacia la
-# leggono al giro successivo e si aggiornano da soli.
-VERSIONE_PULSANTE = 5
 
 def _api_pubblico(request: Request) -> str:
     """L'indirizzo dell'API, che non e' quello del sito.
@@ -310,7 +305,7 @@ async def winfarm_oggi(user: dict = Depends(get_current_user)):
 
 @router.get("/integrations/winfarm/tray/download")
 async def winfarm_tray_download(request: Request):
-    """Pulsante magico (icona + tasto) gia' configurato con indirizzo e token.
+    """Consegna veloce (icona + tasto) gia' configurato con indirizzo e token.
 
     Accetta la sessione del browser e anche il token del PC: e' cosi' che il
     programma si riscarica da solo quando c'e' una versione nuova.
@@ -334,7 +329,7 @@ async def winfarm_tray_download(request: Request):
     return Response(
         content=con_bom(script),
         media_type="application/octet-stream",
-        headers={"Content-Disposition": 'attachment; filename="pharmatrack-pulsante-magico.ps1"'},
+        headers={"Content-Disposition": 'attachment; filename="pharmatrack-consegna-veloce.ps1"'},
     )
 
 
@@ -393,7 +388,7 @@ async def winfarm_parse(request: Request):
         await _bridge_pharmacy(request)
     else:
         await get_current_user(request)
-    if len(await request.body()) > 40000:
+    if len(await request.body()) > 200000:
         raise HTTPException(status_code=413, detail="Testo troppo lungo")
     try:
         body = await request.json()
@@ -404,7 +399,11 @@ async def winfarm_parse(request: Request):
     if controlli is not None:
         if not isinstance(controlli, list) or len(controlli) > 3000:
             raise HTTPException(status_code=400, detail="Elenco controlli non valido")
-        return estrai_vendita_da_controlli([str(c) for c in controlli if c is not None])
+        letto = estrai_vendita_da_controlli([str(c) for c in controlli if c is not None])
+        parole = body.get("parole")
+        letto["prodotti"] = prodotti_da_parole(parole[:3000]) if isinstance(parole, list) else []
+        letto["prodotti_testo"] = testo_prodotti(letto["prodotti"])
+        return letto
     testo = str(body.get("testo") or "")
     if not testo.strip():
         raise HTTPException(status_code=400, detail="Serve 'controlli' oppure 'testo'")

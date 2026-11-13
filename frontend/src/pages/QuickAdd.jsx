@@ -51,7 +51,7 @@ export default function QuickAddPage() {
     fascia: FASCIA_PRIMA.valore,
     giorno: 'oggi',
     driver_id: '',
-    contenuto: '',
+    contenuto: searchParams.get('prodotti') || '',
   });
   const pezzi = searchParams.get('pezzi') || '';
   const daWinfarm = searchParams.get('origine') === 'winfarm';
@@ -60,7 +60,7 @@ export default function QuickAddPage() {
   const fasce = useMemo(() => fasceDellaFarmacia(user).filter((f) => f.da !== '__manuale__'), [user]);
   const { data: fattorini } = useDriversQuery({ enabled: opzioni.fattorino });
   const [creating, setCreating] = useState(false);
-  // Arrivo dal pulsante magico: il cliente va scelto in anagrafica, non inventato.
+  // Arrivo dal programma Consegna veloce: il cliente va scelto in anagrafica, non inventato.
   // Due casi: il cliente e' stato letto (va cercato) oppure in Winfarm non c'era
   // nessun cliente selezionato (si sceglie qui, con l'importo gia' scritto).
   const customerFromSale = !!searchParams.get('customer_name');
@@ -106,7 +106,7 @@ export default function QuickAddPage() {
   };
   useEffect(() => { load(); }, []);
 
-  // Il pulsante magico passa il codice fiscale: se il cliente esiste si
+  // Il programma Consegna veloce passa il codice fiscale: se il cliente esiste si
   // seleziona da solo, senza che nessuno lo cerchi a mano.
   useEffect(() => {
     const cf = (searchParams.get('fiscal_code') || '').trim().toUpperCase();
@@ -493,7 +493,7 @@ export default function QuickAddPage() {
             )}
             {opzioni.farmaci && (
               <div className="flex items-center gap-2">
-                <Input className="h-9" placeholder="Contenuto del sacchetto" value={form.contenuto} data-testid="qa-contenuto"
+                <Input className="h-9" placeholder="Farmaci nel sacchetto" value={form.contenuto} data-testid="qa-contenuto"
                   onChange={(e) => setForm({ ...form, contenuto: e.target.value })} />
                 {pezzi && <span className="shrink-0 rounded-md bg-secondary px-2 py-1 text-xs font-medium" data-testid="qa-pezzi">{pezzi} pz</span>}
               </div>

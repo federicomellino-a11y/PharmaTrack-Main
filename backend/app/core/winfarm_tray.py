@@ -10,14 +10,12 @@ Winfarm e li manda a /api/integrations/winfarm/parse, dove vivono le regole.
 """
 from datetime import datetime, timezone
 
-# La stessa cifra sta in integrations.py (VERSIONE_PULSANTE): qui la importo per
-# non averne due copie. Se il router non e' importabile (script isolato) resta 2.
-try:
-    from app.routers.integrations import VERSIONE_PULSANTE
-except Exception:  # pragma: no cover - solo per esecuzioni isolate
-    VERSIONE_PULSANTE = 4
+# Versione del programma che il server considera corrente. Finisce dentro lo
+# script scaricato: quando si alza, i PC in farmacia la leggono al giro
+# successivo e si aggiornano da soli. Vive qui e solo qui.
+VERSIONE_PULSANTE = 6
 
-_TEMPLATE = r'''# wf-tray.ps1  --  il pulsante magico di PharmaTrack, versione 1
+_TEMPLATE = r'''# wf-tray.ps1  --  Consegna veloce di PharmaTrack, versione 1
 # Farmacia: @@PHARMACY@@
 # Generato: @@GENERATED@@
 #
@@ -183,15 +181,15 @@ function Leggi-Config {
 function Chiedi-Config {
     $url = [Microsoft.VisualBasic.Interaction]::InputBox(
         "Indirizzo di PharmaTrack (lo vedi nella barra del browser):",
-        'PharmaTrack - pulsante magico', 'https://pharmatrack-zeta.vercel.app')
+        'PharmaTrack - Consegna veloce', 'https://pharmatrack-zeta.vercel.app')
     if (-not $url) { return $null }
     $api = [Microsoft.VisualBasic.Interaction]::InputBox(
         "Indirizzo del server (quello che finisce in .onrender.com):",
-        'PharmaTrack - pulsante magico', 'https://pharmatrack-api.onrender.com')
+        'PharmaTrack - Consegna veloce', 'https://pharmatrack-api.onrender.com')
     if (-not $api) { return $null }
     $token = [Microsoft.VisualBasic.Interaction]::InputBox(
         "Token del bridge. Lo trovi in PharmaTrack > Integrazioni > Winfarm.",
-        'PharmaTrack - pulsante magico', '')
+        'PharmaTrack - Consegna veloce', '')
     if (-not $token) { return $null }
     $config = [pscustomobject]@{
         base_url = $url.TrimEnd('/')
@@ -226,8 +224,11 @@ function Leggi-Vendita {
                 try { if ($nodo.Current.Name) { $testi.Add($nodo.Current.Name) } } catch { }
             }
         } catch { }
+        $rettangolo = $null
+        try { $rettangolo = $finestra.Current.BoundingRectangle } catch { }
         $migliori += [pscustomobject]@{
             Testi = $testi
+            Rettangolo = $rettangolo
             Vendita = ($testi -contains 'Vendita Aperta')
         }
     }
@@ -235,7 +236,61 @@ function Leggi-Vendita {
     $scelta = $migliori | Sort-Object -Property @{ Expression = { $_.Vendita }; Descending = $true },
                                             @{ Expression = { $_.Testi.Count }; Descending = $true } |
         Select-Object -First 1
+    $script:rettangoloVendita = $scelta.Rettangolo
     return $scelta.Testi
+}
+
+function Attendi-WinRT($operazione, [Type]$tipo) {
+    $metodo = [System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object {
+        $_.Name -eq 'AsTask' -and $_.GetParameters().Count -eq 1 -and
+        $_.GetParameters()[0].ParameterType.Name -eq 'IAsyncOperation`1' } | Select-Object -First 1
+    $compito = $metodo.MakeGenericMethod($tipo).Invoke($null, @($operazione))
+    if (-not $compito.Wait(8000)) { throw 'Lettura dello schermo troppo lenta' }
+    return $compito.Result
+}
+
+function Leggi-Parole {
+    <#
+      I nomi dei prodotti stanno in una griglia che Winfarm disegna da se' e
+      che Windows non sa leggere come testo. Qui si fotografa la finestra della
+      vendita e la si fa leggere al riconoscimento del testo di Windows 10/11
+      (gia' nel sistema, niente da installare). Al server vanno le parole con
+      la loro posizione: e' lui a capire quali sono i prodotti.
+      Se qualcosa non va non si blocca niente: la scheda si apre senza prodotti.
+    #>
+    $parole = New-Object System.Collections.Generic.List[object]
+    try {
+        $r = $script:rettangoloVendita
+        if (-not $r -or $r.Width -lt 200 -or $r.Height -lt 200) { return $parole }
+        Add-Type -AssemblyName System.Runtime.WindowsRuntime
+        $null = [Windows.Media.Ocr.OcrEngine, Windows.Foundation, ContentType = WindowsRuntime]
+        $null = [Windows.Graphics.Imaging.BitmapDecoder, Windows.Foundation, ContentType = WindowsRuntime]
+        $null = [Windows.Graphics.Imaging.SoftwareBitmap, Windows.Foundation, ContentType = WindowsRuntime]
+        $motore = [Windows.Media.Ocr.OcrEngine]::TryCreateFromUserProfileLanguages()
+        if (-not $motore) { Scrivi-Log 'Prodotti non letti: riconoscimento del testo non disponibile'; return $parole }
+        $immagine = New-Object System.Drawing.Bitmap ([int]$r.Width), ([int]$r.Height)
+        $grafica = [System.Drawing.Graphics]::FromImage($immagine)
+        $grafica.CopyFromScreen([int]$r.Left, [int]$r.Top, 0, 0, $immagine.Size)
+        $grafica.Dispose()
+        $memoria = New-Object System.IO.MemoryStream
+        $immagine.Save($memoria, [System.Drawing.Imaging.ImageFormat]::Bmp)
+        $immagine.Dispose()
+        $memoria.Position = 0
+        $flusso = [System.IO.WindowsRuntimeStreamExtensions]::AsRandomAccessStream($memoria)
+        $decodifica = Attendi-WinRT ([Windows.Graphics.Imaging.BitmapDecoder]::CreateAsync($flusso)) ([Windows.Graphics.Imaging.BitmapDecoder])
+        $bitmap = Attendi-WinRT ($decodifica.GetSoftwareBitmapAsync()) ([Windows.Graphics.Imaging.SoftwareBitmap])
+        $esito = Attendi-WinRT ($motore.RecognizeAsync($bitmap)) ([Windows.Media.Ocr.OcrResult])
+        foreach ($riga in $esito.Lines) {
+            foreach ($parola in $riga.Words) {
+                $b = $parola.BoundingRect
+                $parole.Add(@{ t = $parola.Text; x = [int]$b.X; y = [int]$b.Y; w = [int]$b.Width; h = [int]$b.Height })
+            }
+        }
+        Scrivi-Log ('Parole lette dallo schermo: ' + $parole.Count)
+    } catch {
+        Scrivi-Log ('Prodotti non letti: ' + $_.Exception.Message)
+    }
+    return $parole
 }
 
 # --- Chiamate al server -----------------------------------------------------
@@ -302,7 +357,7 @@ function Scarica-Aggiornamento($config) {
             return
         }
         Mostra ([System.Windows.Forms.ToolTipIcon]::Info) 'Aggiornamento pronto' `
-            'Al prossimo avvio il pulsante magico si aggiorna da solo.'
+            'Al prossimo avvio Consegna veloce si aggiorna da sola.'
     } catch {
         Scrivi-Log ('Aggiornamento non scaricato: ' + $_.Exception.Message)
     }
@@ -357,7 +412,7 @@ function Prendi-Vendita {
         return
     }
     try {
-        $letto = Chiama-Api $config '/api/integrations/winfarm/parse' @{ controlli = @($testi) }
+        $letto = Chiama-Api $config '/api/integrations/winfarm/parse' @{ controlli = @($testi); parole = @(Leggi-Parole) }
     } catch {
         Mostra ([System.Windows.Forms.ToolTipIcon]::Error) 'Server non raggiungibile' $_.Exception.Message
         return
@@ -371,6 +426,7 @@ function Prendi-Vendita {
     if ($letto.campi.codice_fiscale) { $parametri.fiscal_code = $letto.campi.codice_fiscale }
     if ($letto.intestazione.riferimento) { $parametri.external_ref = $letto.intestazione.riferimento }
     if ($letto.intestazione.totale_pezzi) { $parametri.pezzi = $letto.intestazione.totale_pezzi }
+    if ($letto.prodotti_testo) { $parametri.prodotti = $letto.prodotti_testo }
     Apri-Dock -Parametri $parametri
 }
 
@@ -497,7 +553,7 @@ $menu.Items.Add('Cambia tasto...').Add_Click({
         $script:config | Add-Member -NotePropertyName tasto -NotePropertyValue $nuovo -Force
         $script:config | ConvertTo-Json | Out-File -FilePath $percorsoConfig -Encoding UTF8
         Mostra ([System.Windows.Forms.ToolTipIcon]::Info) 'Tasto salvato' `
-            ('Riavvia il pulsante magico per usare ' + $nuovo + '.')
+            ('Riavvia Consegna veloce per usare ' + $nuovo + '.')
     })
 $menu.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator)) | Out-Null
 $voceAvvio = $menu.Items.Add('Avvio automatico con Windows')
