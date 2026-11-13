@@ -522,3 +522,68 @@ def estrai_vendita_da_controlli(nomi: list[str] | None) -> dict:
         "righe_lette": len(elenco),
         "caratteri_letti": sum(len(n) for n in elenco),
     }
+
+
+def prodotti_da_parole(parole: list | None) -> list[dict]:
+    """I prodotti della vendita, dalle parole lette sullo schermo con la loro posizione.
+
+    La griglia di Winfarm e' disegnata a mano e non espone i testi a Windows:
+    i nomi si leggono dalla fotografia della finestra. Qui arrivano le parole
+    con le coordinate; si tengono quelle sotto l'intestazione "Descrizione",
+    dentro la sua colonna, una riga per prodotto. Le righe di riepilogo
+    ("In Corso [Vendita Libera]") non sono prodotti.
+    """
+    pulite = []
+    for parola in parole or []:
+        try:
+            testo = str(parola["t"]).strip()
+            x, y, w, h = (float(parola[k]) for k in ("x", "y", "w", "h"))
+        except (KeyError, TypeError, ValueError):
+            continue
+        if testo and h > 0:
+            pulite.append({"t": testo, "x": x, "y": y, "w": w, "h": h, "yc": y + h / 2})
+
+    testata = next((p for p in pulite if normalizza(p["t"]).startswith("descrizion")), None)
+    if not testata:
+        return []
+    stessa_riga = [p for p in pulite if abs(p["yc"] - testata["yc"]) < testata["h"] and p["x"] > testata["x"] + testata["w"]]
+    if not stessa_riga:
+        return []
+    # La colonna finisce poco prima della testata successiva ("Cl.").
+    prossima = min(stessa_riga, key=lambda p: p["x"])
+    x_fine = prossima["x"] - testata["h"] * 0.6
+    quantita_col = next((p for p in stessa_riga if re.match(r"^q\.?\s*t", normalizza(p["t"]))), None)
+    fondo = min(
+        (p["y"] for p in pulite if p["y"] > testata["y"] + testata["h"] and normalizza(p["t"]).startswith("segnalazion")),
+        default=float("inf"),
+    )
+
+    righe: list[list[dict]] = []
+    sotto = sorted((p for p in pulite if testata["y"] + testata["h"] <= p["yc"] < fondo), key=lambda p: p["yc"])
+    for parola in sotto:
+        if righe and abs(parola["yc"] - righe[-1][0]["yc"]) < max(parola["h"], righe[-1][0]["h"]) * 0.6:
+            righe[-1].append(parola)
+        else:
+            righe.append([parola])
+
+    prodotti = []
+    for riga in righe:
+        nome = " ".join(p["t"] for p in sorted(riga, key=lambda p: p["x"]) if p["x"] + p["w"] / 2 < x_fine).strip()
+        if len(nome) < 3 or not re.search(r"[A-Za-z]{2}", nome):
+            continue
+        if "[" in nome or normalizza(nome).startswith("in corso"):
+            continue
+        quantita = None
+        if quantita_col:
+            centro = quantita_col["x"] + quantita_col["w"] / 2
+            for p in riga:
+                if p["t"].isdigit() and abs(p["x"] + p["w"] / 2 - centro) < max(quantita_col["w"], 30):
+                    quantita = int(p["t"])
+        prodotti.append({"nome": nome[:80], "quantita": quantita})
+    return prodotti[:30]
+
+
+def testo_prodotti(prodotti: list[dict]) -> str:
+    """I prodotti in una riga sola, come finiscono nelle note per il fattorino."""
+    voci = [f"{p['quantita']}x {p['nome']}" if (p.get("quantita") or 0) > 1 else p["nome"] for p in prodotti]
+    return "; ".join(voci)[:400]

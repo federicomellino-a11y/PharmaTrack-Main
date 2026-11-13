@@ -1,7 +1,7 @@
-/* Gli extra della scheda del pulsante magico. Tutti spenti finche' la farmacia
+/* Gli extra della scheda del Consegna veloce. Tutti spenti finche' la farmacia
    non li accende da Impostazioni: vivono in user.settings.pulsante. */
 export const OPZIONI_PULSANTE = [
-  { chiave: 'farmaci', nome: 'Contenuto del sacchetto', dove: 'Nella scheda: pezzi letti da Winfarm e farmaci da annotare' },
+  { chiave: 'farmaci', nome: 'Farmaci nel sacchetto', dove: 'Nomi e pezzi letti da Winfarm, nelle note per il fattorino' },
   { chiave: 'etichetta', nome: 'Stampa etichetta alla creazione', dove: 'Si apre la stampa appena confermi' },
   { chiave: 'fattorino', nome: 'Scelta del fattorino', dove: 'Nella scheda: assegni subito la consegna' },
   { chiave: 'vendite_oggi', nome: 'Vendite di oggi', dove: 'Elenco nella pagina Integrazioni' },

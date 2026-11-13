@@ -28,7 +28,7 @@ Coordina fattorini, traccia ogni ordine, gestisci cassa e turni, integrazione co
 | **Chat real-time** | Farmacia ↔ fattorino via WebSocket. |
 | **Tracking live** | Posizione fattorino aggiornata sulla mappa farmacia. |
 | **Notifiche push** | WebPush con VAPID anche con browser chiuso. |
-| **Integrazione Winfarm** | Copia e incolla della vendita o pulsante magico sul PC, senza API. |
+| **Integrazione Winfarm** | Consegna veloce: un tasto sul PC del banco, senza API. |
 | **Auth multi-portale** | Farmacia, Fattorino, Admin (path nascosto `/console-federico`). |
 | **PWA installabile** | Funziona offline-ready su mobile e desktop. |
 | **Report & archivio** | Statistiche, KPI fatturato, export. |
@@ -145,7 +145,7 @@ Winfarm non espone API. Due strade, dalla pagina **Integrazioni**:
 
 1. **Incolla la vendita** (niente da installare): in Winfarm selezioni la vendita, Ctrl+C,
    la incolli in PharmaTrack e si apre la consegna già compilata.
-2. **Pulsante magico** (programma PowerShell per il PC del banco): Ctrl+Shift+C in Winfarm
+2. **Consegna veloce** (programma PowerShell per il PC del banco): Ctrl+Shift+C in Winfarm
    e la vendita arriva da sola.
 
 Endpoint REST anche disponibile: `POST /api/integrations/winfarm/import` (dettagli nella pagina `/integrations`).

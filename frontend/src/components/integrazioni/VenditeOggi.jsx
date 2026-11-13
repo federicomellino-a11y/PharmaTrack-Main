@@ -9,7 +9,7 @@ import { etichettaStato } from '@/lib/deliveryDisplay';
 
 const ora = (iso) => (iso ? new Date(iso).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) : '');
 
-/** Le vendite arrivate oggi dal pulsante magico, con stato e fascia. */
+/** Le vendite arrivate oggi da Consegna veloce, con stato e fascia. */
 export default function VenditeOggi() {
   const { data: vendite = [] } = useWinfarmOggiQuery({ refetchInterval: 60000 });
 
