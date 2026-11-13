@@ -1,8 +1,12 @@
+import io
+import json
 import os
 import re
 import uuid
 import secrets
+import zipfile
 import logging
+from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, HTTPException, Depends, Request, Response
 
@@ -268,6 +272,40 @@ async def _winfarm_create_delivery(pharmacy_id: str, body: dict) -> dict:
     }
 
 
+# Dove vive l'eseguibile che il PC del banco scarica. Sta nel repository, non su
+# un servizio esterno: una farmacia che installa da qui non dipende da nessun
+# altro servizio, e il file si aggiorna con il ramo main come tutto il resto.
+ESEGUIBILE_DESKTOP = Path(__file__).resolve().parent.parent / "desktop" / "consegna-veloce.exe"
+
+
+def _token_o_nuovo(user: dict) -> str:
+    """Il token del PC, creandolo se questa farmacia non ne ha ancora uno."""
+    token = user.get("bridge_token")
+    if token:
+        return token
+    token = f"wf_{secrets.token_urlsafe(24)}"
+    return token
+
+
+async def _assicura_token(user: dict) -> str:
+    token = _token_o_nuovo(user)
+    if not user.get("bridge_token"):
+        await db.users.update_one({"user_id": user["user_id"]}, {"$set": {"bridge_token": token}})
+    return token
+
+
+def anteprima_token(token: str | None) -> str | None:
+    """La chiave si mostra tagliata: serve a riconoscerla, non a copiarla."""
+    if not token:
+        return None
+    return f"{token[:5]}...{token[-4:]}"
+
+
+def _indirizzo_pubblico(request: Request) -> str:
+    return (request.query_params.get("base") or request.headers.get("origin")
+            or os.environ.get("APP_BASE_URL") or "https://pharmatrack-zeta.vercel.app").rstrip("/")
+
+
 async def _bridge_pharmacy(request: Request) -> dict:
     """Autentica il bridge desktop con il token della farmacia."""
     token = request.headers.get("X-Bridge-Token") or request.query_params.get("t") or ""
@@ -297,7 +335,9 @@ async def winfarm_status(request: Request, user: dict = Depends(get_current_user
     return {
         "configured": True,
         "token_configurato": bool(token),
-        "token_preview": f"{token[:5]}...{token[-4:]}" if token else None,
+        "token_preview": anteprima_token(token),
+        "versione_programma": VERSIONE_PULSANTE,
+        "app_disponibile": ESEGUIBILE_DESKTOP.exists(),
         "last_import": last.get("created_at") if last else None,
         "last_import_customer": last.get("customer_name") if last else None,
         "imports_today": imports_today,
@@ -325,12 +365,8 @@ async def winfarm_tray_download(request: Request):
     else:
         user = await get_current_user(request)
         _blocca_se_integrazioni_chiuse(user)
-    token = user.get("bridge_token")
-    if not token:
-        token = f"wf_{secrets.token_urlsafe(24)}"
-        await db.users.update_one({"user_id": user["user_id"]}, {"$set": {"bridge_token": token}})
-    base_url = (request.query_params.get("base") or request.headers.get("origin")
-                or os.environ.get("APP_BASE_URL") or "https://pharmatrack-zeta.vercel.app")
+    token = await _assicura_token(user)
+    base_url = _indirizzo_pubblico(request)
     script = render_tray_script(
         base_url,
         token,
@@ -342,6 +378,74 @@ async def winfarm_tray_download(request: Request):
         media_type="application/octet-stream",
         headers={"Content-Disposition": 'attachment; filename="pharmatrack-consegna-veloce.ps1"'},
     )
+
+
+@router.get("/integrations/winfarm/app/download")
+async def winfarm_app_download(request: Request):
+    """Consegna veloce per Windows: lo zip con l'eseguibile e la sua chiave.
+
+    Perche' uno zip e non solo l'exe: il programma deve sapere a quale farmacia
+    e a quale indirizzo parlare. Invece di far copiare un codice a mano (la
+    prima cosa che si sbaglia), il file di configurazione viaggia accanto
+    all'eseguibile: doppio clic, la croce verde compare vicino all'orologio.
+
+    `?formato=exe` restituisce solo l'eseguibile: e' la strada che usa il
+    programma per aggiornarsi da solo, autenticandosi con il token del PC.
+    """
+    if (request.headers.get("X-Bridge-Token") or "").strip():
+        user = await _bridge_pharmacy(request)
+    else:
+        user = await get_current_user(request)
+        _blocca_se_integrazioni_chiuse(user)
+    if not ESEGUIBILE_DESKTOP.exists():
+        raise HTTPException(status_code=503, detail="Programma non disponibile: riprova più tardi")
+    eseguibile = ESEGUIBILE_DESKTOP.read_bytes()
+    if (request.query_params.get("formato") or "").lower() == "exe":
+        return Response(
+            content=eseguibile,
+            media_type="application/octet-stream",
+            headers={"Content-Disposition": 'attachment; filename="consegna-veloce.exe"'},
+        )
+    token = await _assicura_token(user)
+    configurazione = {
+        "base_url": _indirizzo_pubblico(request),
+        "bridge_token": token,
+        "farmacia": user.get("pharmacy_name") or user.get("name") or "",
+        "versione": VERSIONE_PULSANTE,
+    }
+    archivio = io.BytesIO()
+    with zipfile.ZipFile(archivio, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr("consegna-veloce.exe", eseguibile)
+        z.writestr("consegna-veloce.json", json.dumps(configurazione, ensure_ascii=False, indent=2))
+    return Response(
+        content=archivio.getvalue(),
+        media_type="application/zip",
+        headers={"Content-Disposition": 'attachment; filename="pharmatrack-consegna-veloce.zip"'},
+    )
+
+
+@router.post("/integrations/winfarm/token/rotate")
+async def winfarm_token_rotate(request: Request, user: dict = Depends(get_current_user)):
+    """Revoca la chiave del PC e ne emette una nuova.
+
+    Serve quando il PC viene dismesso, quando il file di configurazione e'
+    finito dove non doveva, o quando la farmacia cambia computer. Dalla
+    rotazione in poi il vecchio token non apre piu' niente: /bridge, /parse,
+    /heartbeat e il download del programma rispondono 401, quindi il PC che lo
+    aveva resta fuori. Il programma nuovo si riscarica da Integrazioni.
+    """
+    pharmacy_id = user["user_id"]
+    nuovo = f"wf_{secrets.token_urlsafe(24)}"
+    await db.users.update_one(
+        {"user_id": pharmacy_id},
+        {"$set": {"bridge_token": nuovo, "bridge_last_seen": None, "bridge_version": None, "bridge_host": None}},
+    )
+    logger.info("chiave del PC rigenerata per la farmacia %s", pharmacy_id)
+    return {
+        "ok": True,
+        "token_preview": anteprima_token(nuovo),
+        "messaggio": "Chiave rigenerata: il programma sul PC va scaricato di nuovo.",
+    }
 
 
 @router.post("/integrations/winfarm/heartbeat")
@@ -370,7 +474,7 @@ async def winfarm_heartbeat(request: Request):
         "ok": True,
         "versione_ultima": VERSIONE_PULSANTE,
         "aggiorna": serve_aggiornamento(body.get("versione")),
-        "scaricabile": "/api/integrations/winfarm/tray/download",
+        "scaricabile": "/api/integrations/winfarm/app/download?formato=exe",
     }
 
 

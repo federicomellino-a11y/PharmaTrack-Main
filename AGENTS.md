@@ -139,6 +139,23 @@ run_skill("pharmatrack_health", "--full")
 4. Sentry: filtrare per `release:pharmatrack@<sha>`. Le issue senza release
    corrente vengono da bundle vecchi rimasti aperti in un browser, non da un bug.
 
+## Il programma per il PC del banco (Consegna veloce)
+
+- Sorgente: `desktop/consegna-veloce/` (Go, solo libreria standard, nessun
+  AutoHotkey). Si compila con `desktop/build.sh`, che scrive
+  `backend/app/desktop/consegna-veloce.exe`: è quel file che le farmacie
+  scaricano, quindi va committato insieme al codice.
+- CI dedicata: `.github/workflows/desktop.yml` compila su `windows-latest` ed
+  esegue `--self-test` (apre la finestra di messaggi, carica l'icona, legge i
+  tasti). Un rosso lì significa che l'eseguibile non funziona.
+- La chiave del PC è `bridge_token` sulla farmacia, viaggia in `X-Bridge-Token`
+  e si rigenera (revocando quella vecchia) con
+  `POST /api/integrations/winfarm/token/rotate`, che è il pulsante "Rigenera"
+  in Integrazioni. Il PC vecchio prende 401 e lo dice.
+- Download: `GET /api/integrations/winfarm/app/download` restituisce uno zip con
+  eseguibile + `consegna-veloce.json` già compilato; `?formato=exe` restituisce
+  solo l'eseguibile ed è la via dell'aggiornamento automatico.
+
 ## Cosa non si tocca senza Federico
 
 - **La demo non si rimette.** Il 13/11 sono stati tolti i due pulsanti di

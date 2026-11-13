@@ -48,7 +48,9 @@ function Metrica({ etichetta, valore, sotto }) {
 export default function IntegrationsPage() {
   const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [downloadingTray, setDownloadingTray] = useState(false);
+  const [downloadingApp, setDownloadingApp] = useState(false);
+  const [downloadingScript, setDownloadingScript] = useState(false);
+  const [revoking, setRevoking] = useState(false);
 
   const queryClient = useQueryClient();
   const { data: winfarmData, isLoading: winfarmLoading } = useWinfarmStatusQuery();
@@ -59,17 +61,58 @@ export default function IntegrationsPage() {
 
   const loadStatus = () => queryClient.invalidateQueries({ queryKey: ['winfarm-status'] });
 
-  const downloadTray = async () => {
-    setDownloadingTray(true);
+  // Il programma per il PC: zip con l'eseguibile e la sua chiave gia' dentro.
+  const downloadApp = async () => {
+    setDownloadingApp(true);
+    try {
+      const base = encodeURIComponent(window.location.origin);
+      await scaricaFile(`/integrations/winfarm/app/download?base=${base}`,
+        'pharmatrack-consegna-veloce.zip', 'application/zip');
+      toast.success('Scaricato: apri lo zip e fai doppio clic su consegna-veloce.exe');
+    } catch {
+      toast.error('Download non riuscito, riprova');
+    } finally {
+      setDownloadingApp(false);
+    }
+  };
+
+  // Resta per chi vuole la lettura automatica della finestra: lo script non ha
+  // bisogno di selezionare niente, ma va avviato con PowerShell.
+  const downloadScript = async () => {
+    setDownloadingScript(true);
     try {
       const base = encodeURIComponent(window.location.origin);
       await scaricaFile(`/integrations/winfarm/tray/download?base=${base}`,
         'pharmatrack-consegna-veloce.ps1', 'application/octet-stream');
-      toast.success('Consegna veloce scaricata: metti il file in una cartella fissa e avvialo');
+      toast.success('Script scaricato: tasto destro sul file, Esegui con PowerShell');
     } catch {
       toast.error('Download non riuscito, riprova');
     } finally {
-      setDownloadingTray(false);
+      setDownloadingScript(false);
+    }
+  };
+
+  // Rigenerare la chiave stacca il PC che ce l'ha: e' la via per quando il
+  // computer cambia o quando il file di configurazione finisce dove non doveva.
+  const rigeneraChiave = async () => {
+    const conferma = window.confirm(
+      'Rigenerare la chiave? Il programma su quel PC smette di funzionare finché non lo scarichi di nuovo.');
+    if (!conferma) return;
+    setRevoking(true);
+    try {
+      const risposta = await axios.post(`${API}/integrations/winfarm/token/rotate`, {}, { withCredentials: true });
+      setStatus((precedente) => ({
+        ...(precedente || {}),
+        token_configurato: true,
+        token_preview: risposta.data?.token_preview,
+        bridge_online: false,
+      }));
+      loadStatus();
+      toast.success('Chiave rigenerata: riscarica il programma sul PC');
+    } catch {
+      toast.error('Non sono riuscito a rigenerare la chiave, riprova');
+    } finally {
+      setRevoking(false);
     }
   };
 
@@ -149,11 +192,11 @@ export default function IntegrationsPage() {
                 </div>
                 <div>
                   <p className="font-semibold text-sm">Consegna veloce Winfarm</p>
-                  <p className="text-xs text-muted-foreground">Programma per il PC del banco, Windows 10 o 11.</p>
+                  <p className="text-xs text-muted-foreground">Programma per il PC del banco, Windows 10 o 11. Niente da installare prima.</p>
                 </div>
               </div>
-              <Button size="sm" className="gap-2" onClick={downloadTray} disabled={downloadingTray} data-testid="scarica-pulsante-magico">
-                {downloadingTray ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+              <Button size="sm" className="gap-2" onClick={downloadApp} disabled={downloadingApp} data-testid="scarica-pulsante-magico">
+                {downloadingApp ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
                 Scarica
               </Button>
             </div>
@@ -162,8 +205,8 @@ export default function IntegrationsPage() {
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">Si installa una volta</p>
                 <ol className="space-y-1.5 text-sm list-decimal pl-4 marker:text-muted-foreground">
-                  <li>Scarica il file e mettilo in una cartella fissa, per esempio Documenti.</li>
-                  <li>Tasto destro sul file → <b>Esegui con PowerShell</b>. Vicino all’orologio compare la croce verde.</li>
+                  <li>Scarica lo zip e aprilo: dentro ci sono il programma e la sua chiave.</li>
+                  <li>Doppio clic su <b>consegna-veloce.exe</b>. Vicino all’orologio compare la croce verde.</li>
                   <li>Tasto destro sulla croce → <b>Avvio automatico con Windows</b>.</li>
                   <li>Su quel PC resta collegato a PharmaTrack in Chrome o Edge.</li>
                 </ol>
@@ -171,10 +214,10 @@ export default function IntegrationsPage() {
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">Si usa così</p>
                 <ol className="space-y-1.5 text-sm list-decimal pl-4 marker:text-muted-foreground">
-                  <li>In Winfarm tieni aperta la vendita, con il cliente selezionato.</li>
+                  <li>In Winfarm tieni aperta la vendita e <b>seleziona le righe</b>, cliente compreso.</li>
                   <li>Premi <kbd className="px-1 rounded bg-secondary text-[11px] font-mono">Ctrl+Shift+C</kbd>.</li>
-                  <li>Si apre una scheda piccola con cliente, importo e farmaci già scritti.</li>
-                  <li>Scegli orario e pagamento, premi <kbd className="px-1 rounded bg-secondary text-[11px] font-mono">Invio</kbd>: la consegna è in lista.</li>
+                  <li>Compare l’avviso “Consegna creata”: in PharmaTrack resta da mettere pagamento e indirizzo.</li>
+                  <li>Se il cliente non è in anagrafica, il programma apre la scheda per aggiungerlo con l’indirizzo.</li>
                 </ol>
               </div>
             </div>
@@ -183,8 +226,41 @@ export default function IntegrationsPage() {
               <li>Cliente non in anagrafica: lo aggiungi dalla scheda, con l’indirizzo.</li>
               <li>La stessa vendita non entra due volte: lo scontrino viene riconosciuto.</li>
               <li>Per cambiare tasto: tasto destro sulla croce → Cambia tasto.</li>
-              <li>Il programma si aggiorna da solo.</li>
+              <li>Il programma si aggiorna da solo, senza reinstallare niente.</li>
             </ul>
+
+            {/* La chiave del PC: si vede tagliata e si puo' revocare. */}
+            <div className="border-t pt-3 space-y-2" data-testid="chiave-del-pc">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="text-xs font-semibold">Chiave di questo PC</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {status?.token_preview
+                      ? `${status.token_preview} · ${status.bridge_online ? 'collegato adesso' : 'in attesa di collegarsi'}`
+                      : 'Nasce al primo download del programma.'}
+                  </p>
+                </div>
+                <Button size="sm" variant="outline" className="gap-2" onClick={rigeneraChiave}
+                  disabled={revoking || !status?.token_configurato} data-testid="rigenera-chiave">
+                  {revoking ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                  Rigenera
+                </Button>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Rigenerandola, il programma su quel PC smette di funzionare finché non lo scarichi di nuovo.
+                Serve quando il computer cambia o quando il file è finito dove non doveva.
+              </p>
+            </div>
+
+            <p className="text-[11px] text-muted-foreground">
+              C’è anche la versione che legge la finestra da sola, senza selezionare niente:{' '}
+              <button type="button" onClick={downloadScript} disabled={downloadingScript}
+                className="underline underline-offset-2 hover:text-foreground disabled:opacity-60"
+                data-testid="scarica-script-finestra">
+                {downloadingScript ? 'scarico…' : 'scarica lo script (.ps1)'}
+              </button>
+              , va avviata con PowerShell.
+            </p>
           </CardContent>
         </Card>
       </div>

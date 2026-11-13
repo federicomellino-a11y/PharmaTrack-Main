@@ -1,0 +1,62 @@
+name: Consegna veloce (programma Windows)
+
+# Il programma che gira sul PC del banco: un solo .exe, compilato da qui.
+# Qui si compila E si prova: `--self-test` apre la finestra di messaggi di
+# Windows, carica l'icona e legge la combinazione di tasti, poi esce con 0. Se
+# quel controllo è rosso, il file che le farmacie scaricano non funziona.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'desktop/**'
+      - 'backend/app/desktop/**'
+      - '.github/workflows/desktop.yml'
+  pull_request:
+    paths:
+      - 'desktop/**'
+      - 'backend/app/desktop/**'
+      - '.github/workflows/desktop.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compila:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+          cache: false
+      - name: Compila l'eseguibile
+        working-directory: desktop/consegna-veloce
+        run: |
+          go vet ./...
+          go build -trimpath -ldflags "-s -w -H windowsgui" -o consegna-veloce.exe .
+          Get-Item consegna-veloce.exe | Select-Object Name, Length
+      - name: Fa partire il programma (self-test)
+        working-directory: desktop/consegna-veloce
+        run: |
+          .\consegna-veloce.exe --self-test
+          $esito = $LASTEXITCODE
+          $rapporto = Join-Path $env:TEMP 'consegna-veloce-selftest.txt'
+          if (Test-Path $rapporto) { Get-Content $rapporto }
+          if ($esito -ne 0) { Write-Error "self-test fallito (codice $esito)"; exit 1 }
+      - name: L'eseguibile scaricato è quello compilato adesso?
+        shell: bash
+        run: |
+          nuovo=$(sha256sum desktop/consegna-veloce/consegna-veloce.exe | cut -d' ' -f1)
+          vecchio=$(sha256sum backend/app/desktop/consegna-veloce.exe | cut -d' ' -f1)
+          echo "nuovo:    $nuovo"
+          echo "in repo:  $vecchio"
+          if [ "$nuovo" != "$vecchio" ]; then
+            echo "::warning::l'eseguibile nel repository non è quello compilato adesso: rilanciare desktop/build.sh e committare"
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: consegna-veloce-exe
+          path: desktop/consegna-veloce/consegna-veloce.exe
+          if-no-files-found: error
