@@ -32,6 +32,7 @@ import {
   PRIORITY_LABELS,
   STATUS_ICONS,
   STATUS_LABELS,
+  chiusaIl,
 } from '@/lib/deliveryDisplay';
 
 /* Una riga della lista consegne.
@@ -127,9 +128,14 @@ export default function DeliveryRow({ d, drivers, inRitardo, handlers }) {
                               in ritardo
                             </span>
                           )}
-                          <span className="flex items-center gap-1">
-                            <Clock className="w-3 h-3" />{formatDateTime(d.created_at)}
+                          <span className="flex items-center gap-1" data-testid={`creata-${d.delivery_id}`}>
+                            <Clock className="w-3 h-3" />Creata {formatDateTime(d.created_at)}
                           </span>
+                          {chiusaIl(d) && (
+                            <span className="flex items-center gap-1" data-testid={`chiusa-${d.delivery_id}`}>
+                              <CheckCircle2 className="w-3 h-3" />Chiusa {formatDateTime(chiusaIl(d))}
+                            </span>
+                          )}
                         </div>
                         {d.notes && (
                           <p className="text-xs text-muted-foreground mt-1.5 bg-secondary/40 rounded-lg px-2.5 py-1.5 italic">

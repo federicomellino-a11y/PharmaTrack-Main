@@ -9,6 +9,7 @@ vi.mock('react-router-dom', () => ({
 vi.mock('@/hooks/queries', () => ({
   useCustomersQuery: vi.fn(),
   useDeliveriesQuery: vi.fn(),
+  useDriversQuery: () => ({ data: [] }),
 }));
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: vi.fn() }) }));
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ user: { full_name: 'Farmacia Test' } }) }));

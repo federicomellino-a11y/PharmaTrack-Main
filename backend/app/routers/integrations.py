@@ -37,7 +37,7 @@ PAGAMENTI = {
 # Versione del pulsante magico che il server considera corrente. La stessa
 # cifra finisce dentro lo script scaricato: quando la alzo, i PC in farmacia la
 # leggono al giro successivo e si aggiornano da soli.
-VERSIONE_PULSANTE = 4
+VERSIONE_PULSANTE = 5
 
 def _api_pubblico(request: Request) -> str:
     """L'indirizzo dell'API, che non e' quello del sito.
@@ -295,6 +295,17 @@ async def winfarm_status(request: Request, user: dict = Depends(get_current_user
         "pharmacy_name": user.get("pharmacy_name") or user.get("name"),
         "base_url": (request.headers.get("origin") or "").rstrip("/"),
     }
+
+
+@router.get("/integrations/winfarm/oggi")
+async def winfarm_oggi(user: dict = Depends(get_current_user)):
+    """Le vendite arrivate oggi dal pulsante magico, dalla piu' recente."""
+    oggi = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    campi = {"_id": 0, "delivery_id": 1, "customer_name": 1, "amount": 1, "status": 1, "created_at": 1,
+             "scheduled_date": 1, "scheduled_time": 1, "slot_to": 1, "external_ref": 1}
+    return await db.deliveries.find(
+        {"pharmacy_id": user["user_id"], "imported_from": "winfarm", "created_at": {"$gte": oggi}}, campi,
+    ).sort("created_at", -1).to_list(100)
 
 
 @router.get("/integrations/winfarm/tray/download")

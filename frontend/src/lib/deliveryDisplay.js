@@ -102,3 +102,10 @@ export function consegnaInRitardo(consegna, adesso = new Date()) {
   const [ore, min] = fine.split(':').map(Number);
   return Number.isFinite(ore) && minuti > ore * 60 + min;
 }
+
+/** Quando una consegna si e' chiusa: consegnata, annullata o non consegnata. Null se e' ancora aperta. */
+export function chiusaIl(consegna) {
+  if (!consegna) return null;
+  if (consegna.actual_delivery) return consegna.actual_delivery;
+  return ['delivered', 'cancelled', 'not_delivered'].includes(consegna.status) ? consegna.updated_at || null : null;
+}

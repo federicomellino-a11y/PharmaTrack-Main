@@ -1,3 +1,4 @@
+from typing import Literal
 import re
 from pydantic import BaseModel, Field, EmailStr, field_validator
 from typing import List, Optional
@@ -109,6 +110,8 @@ class DeliveryCreate(BaseModel):
     # la consegna dal modulo (cliente non selezionato in Winfarm) il riferimento
     # viaggia con lei e la stessa vendita non entra due volte.
     external_ref: Optional[str] = None
+    # La scheda del pulsante magico dichiara da dove arriva la vendita.
+    imported_from: Optional[Literal["winfarm"]] = None
 
 class DeliveryUpdate(BaseModel):
     driver_id: Optional[str] = None
