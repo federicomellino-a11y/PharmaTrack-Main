@@ -9,6 +9,8 @@ from fastapi import APIRouter, HTTPException, Depends, Request, Response
 from app.core.database import db
 from app.core.websocket import manager
 from app.core.delivery_creation import costruisci_consegna
+from app.core.funzioni_pro import richiedi_pro, verifica_funzione
+from app.core.piani import piano_corrente
 from app.core.security import (
     get_current_user,
 )
@@ -32,6 +34,22 @@ PAGAMENTI = {
     "carta di credito": "pos", "elettronico": "pos", "elettronica": "pos",
     "other": "other", "altro": "other",
 }
+
+
+def _blocca_se_integrazioni_chiuse(pharmacy: dict) -> None:
+    """Il Professional chiude l'import; stato e battito restano aperti.
+
+    Le due porte del bridge (token del PC, sessione del browser) devono dare lo
+    stesso verdetto, quindi il controllo sta in una funzione sola. Chi ha gia'
+    il programma installato continua a farsi sentire: si chiude il lavoro, non
+    la spia.
+    """
+    motivo = verifica_funzione(piano_corrente(pharmacy), "integrazioni")
+    if motivo:
+        raise HTTPException(
+            status_code=402,
+            detail={"codice": "funzione_pro", "funzione": "integrazioni", "motivo": motivo},
+        )
 
 
 def _api_pubblico(request: Request) -> str:
@@ -300,9 +318,13 @@ async def winfarm_tray_download(request: Request):
     programma si riscarica da solo quando c'e' una versione nuova.
     """
     if (request.headers.get("X-Bridge-Token") or "").strip():
+        # Il programma si riscarica da solo per aggiornarsi: questa porta resta
+        # aperta, altrimenti chi ce l'ha installato resta fermo a una versione
+        # vecchia. Il download dal browser invece passa dal piano.
         user = await _bridge_pharmacy(request)
     else:
         user = await get_current_user(request)
+        _blocca_se_integrazioni_chiuse(user)
     token = user.get("bridge_token")
     if not token:
         token = f"wf_{secrets.token_urlsafe(24)}"
@@ -374,9 +396,9 @@ async def winfarm_parse(request: Request):
     tenere aperto un browser solo per farsi leggere una schermata.
     """
     if (request.headers.get("X-Bridge-Token") or "").strip():
-        await _bridge_pharmacy(request)
+        _blocca_se_integrazioni_chiuse(await _bridge_pharmacy(request))
     else:
-        await get_current_user(request)
+        _blocca_se_integrazioni_chiuse(await get_current_user(request))
     if len(await request.body()) > 200000:
         raise HTTPException(status_code=413, detail="Testo troppo lungo")
     try:
@@ -403,6 +425,7 @@ async def winfarm_parse(request: Request):
 async def winfarm_bridge_import(request: Request):
     """Endpoint chiamato dallo script desktop: token della farmacia nell'header."""
     pharmacy = await _bridge_pharmacy(request)
+    _blocca_se_integrazioni_chiuse(pharmacy)
     body = dict(request.query_params)
     if not body.get("cliente") and not body.get("telefono"):
         try:
@@ -418,7 +441,7 @@ async def winfarm_bridge_import(request: Request):
 
 
 @router.post("/integrations/winfarm/import")
-async def winfarm_import(request: Request, user: dict = Depends(get_current_user)):
+async def winfarm_import(request: Request, user: dict = Depends(richiedi_pro("integrazioni"))):
     """Endpoint REST (sessione farmacia). Accetta JSON con alias italiani."""
     body = await request.json()
     return await _winfarm_create_delivery(user["user_id"], body or {})

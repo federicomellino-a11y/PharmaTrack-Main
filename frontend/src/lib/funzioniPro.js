@@ -33,6 +33,12 @@ export const FUNZIONI_PRO = [
     dove: 'Pagina Tracking Live',
   },
   {
+    chiave: 'integrazioni',
+    nome: 'Integrazioni',
+    descrizione: 'La vendita del banco diventa una consegna: lettura da Winfarm, consegna veloce dal PC, nessun dato riscritto a mano',
+    dove: 'Pagina Integrazioni',
+  },
+  {
     chiave: 'turni_cassa',
     nome: 'Turni e cassa',
     descrizione: 'Turni dei fattorini, incasso atteso contro ricevuto, quadratura di fine giornata',

@@ -490,6 +490,59 @@
   background-size: 48px 48px;
 }
 
+/* ===== SCHEDE (TABS) =====
+   Una scheda deve sembrare una cosa su cui si clicca: pillola con bordo,
+   icona e nome, ombra leggera. Quella aperta si riempie di verde e alza
+   l'ombra, cosi' si capisce al primo sguardo dove si e' (segnalazione di
+   Federico del 13/11: "non sembrano vere e proprie schede"). */
+.scheda-barra {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.4rem;
+  width: 100%;
+  height: auto;
+  padding: 0;
+  background: transparent;
+}
+.scheda-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  height: 2.4rem;
+  padding: 0 0.85rem;
+  border: 1px solid hsl(var(--border));
+  border-radius: 999px;
+  background: hsl(var(--card));
+  color: hsl(var(--muted-foreground));
+  font-size: 0.8125rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: 0 1px 2px hsl(222 45% 18% / 0.06);
+  transition: color 0.18s ease, background-color 0.18s ease, border-color 0.18s ease,
+    box-shadow 0.18s ease, transform 0.18s ease;
+}
+.dark .scheda-pill { box-shadow: 0 1px 2px hsl(0 0% 0% / 0.35); }
+.scheda-pill svg { width: 1rem; height: 1rem; opacity: 0.65; }
+.scheda-pill:hover {
+  color: hsl(var(--foreground));
+  border-color: hsl(var(--primary) / 0.45);
+  transform: translateY(-1px);
+}
+.scheda-pill[data-state="active"] {
+  background: hsl(var(--primary));
+  border-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  box-shadow: 0 8px 18px -10px hsl(var(--primary) / 0.8);
+}
+.scheda-pill[data-state="active"] svg { opacity: 1; }
+.scheda-pill:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
+@media (max-width: 640px) {
+  .scheda-pill { height: 2.25rem; padding: 0 0.7rem; font-size: 0.78125rem; }
+}
+
 /* ===== ANIMATIONS ===== */
 @keyframes cardRise {
   from { opacity: 0; transform: translateY(8px); }
@@ -660,6 +713,7 @@ textarea:not([class*="bg-"]) {
   .card-interactive:hover,
   .quick-action:hover,
   .hover-lift:hover,
+  .scheda-pill:hover,
   .btn-primary:hover {
     transform: none !important;
   }
