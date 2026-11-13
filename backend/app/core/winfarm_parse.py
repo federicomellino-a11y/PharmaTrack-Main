@@ -524,15 +524,8 @@ def estrai_vendita_da_controlli(nomi: list[str] | None) -> dict:
     }
 
 
-def prodotti_da_parole(parole: list | None) -> list[dict]:
-    """I prodotti della vendita, dalle parole lette sullo schermo con la loro posizione.
-
-    La griglia di Winfarm e' disegnata a mano e non espone i testi a Windows:
-    i nomi si leggono dalla fotografia della finestra. Qui arrivano le parole
-    con le coordinate; si tengono quelle sotto l'intestazione "Descrizione",
-    dentro la sua colonna, una riga per prodotto. Le righe di riepilogo
-    ("In Corso [Vendita Libera]") non sono prodotti.
-    """
+def _parole_pulite(parole: list | None) -> list[dict]:
+    """Le parole lette, con il centro verticale: scarta quelle senza coordinate."""
     pulite = []
     for parola in parole or []:
         try:
@@ -542,38 +535,130 @@ def prodotti_da_parole(parole: list | None) -> list[dict]:
             continue
         if testo and h > 0:
             pulite.append({"t": testo, "x": x, "y": y, "w": w, "h": h, "yc": y + h / 2})
+    return pulite
+
+
+# Righe della griglia che non sono prodotti: intestazioni e riepiloghi. Sono
+# parole singole, non nomi di farmaci, e senza questo filtro entravano nel
+# sacchetto insieme a quello che il cliente ha comprato.
+_RUMORE = (
+    "descrizion", "codice", "q.t", "q.ta", "cat.", "totale", "subtotale",
+    "segnalazion", "in corso", "sconto", "iva", "importo",
+)
+
+
+def _riga_di_rumore(nome: str) -> bool:
+    basso = normalizza(nome)
+    if not basso:
+        return True
+    if basso in _RUMORE:
+        return True
+    if any(basso.startswith(r) for r in ("descrizion", "segnalazion", "in corso")):
+        return True
+    return False
+
+
+def _e_colonna(testo: str) -> bool:
+    """Vero se la parola e' una colonna della griglia, non un pezzo del nome.
+
+    Dopo il nome del farmaco Winfarm scrive il codice ("A"), la categoria
+    ("Rip"), la quantita' ("2") e il totale ("2,58"): sono tutte parole corte,
+    e sono il segnale che la colonna dei nomi e' finita.
+    """
+    t = testo.strip()
+    if not t:
+        return True
+    if re.fullmatch(r"[A-Za-z]{1,2}\.?", t):
+        return True
+    if re.fullmatch(r"[\d.,:/-]+", t):
+        return True
+    return normalizza(t) in ("rip", "cat.", "cl.", "codice", "pezzi")
+
+
+def _nome_e_quantita(riga: list[dict], x_fine: float) -> tuple[str, int | None]:
+    """Il nome del prodotto in una riga e, se si legge, la quantita'."""
+    nome: list[str] = []
+    resto: list[dict] = []
+    for parola in sorted(riga, key=lambda p: p["x"]):
+        if not resto and (nome and (parola["x"] + parola["w"] / 2 >= x_fine or _e_colonna(parola["t"]))):
+            resto = [parola]
+            continue
+        if resto:
+            resto.append(parola)
+        else:
+            nome.append(parola["t"])
+    quantita = None
+    for parola in resto:
+        t = parola["t"].strip()
+        if t.isdigit() and 0 < int(t) <= 200:
+            quantita = int(t)
+            break
+    return " ".join(nome).strip(), quantita
+
+
+def prodotti_da_parole(parole: list | None) -> list[dict]:
+    """I prodotti della vendita, dalle parole lette sullo schermo con la loro posizione.
+
+    La griglia di Winfarm e' disegnata a mano e non espone i testi a Windows:
+    i nomi si leggono dalla fotografia della finestra. Qui arrivano le parole
+    con le coordinate; si tengono quelle sotto l'intestazione "Descrizione",
+    una riga per prodotto. Le righe di riepilogo ("In Corso [Vendita Libera]")
+    non sono prodotti.
+
+    Legge tutte le righe, non solo la prima: una vendita con tre farmaci deve
+    arrivare con tre voci. Se la fotografia non contiene l'intestazione (finestra
+    spostata, testata tagliata, OCR che salta la riga) si leggono lo stesso tutte
+    le righe partendo dall'alto: meglio i nomi senza le colonne che niente.
+    """
+    pulite = _parole_pulite(parole)
+    if not pulite:
+        return []
 
     testata = next((p for p in pulite if normalizza(p["t"]).startswith("descrizion")), None)
-    if not testata:
-        return []
-    stessa_riga = [p for p in pulite if abs(p["yc"] - testata["yc"]) < testata["h"] and p["x"] > testata["x"] + testata["w"]]
-    if not stessa_riga:
-        return []
-    # La colonna finisce poco prima della testata successiva ("Cl.").
-    prossima = min(stessa_riga, key=lambda p: p["x"])
-    x_fine = prossima["x"] - testata["h"] * 0.6
-    quantita_col = next((p for p in stessa_riga if re.match(r"^q\.?\s*t", normalizza(p["t"]))), None)
+    larghezza = max((p["x"] + p["w"] for p in pulite), default=0.0)
+
+    if testata:
+        # La colonna dei nomi finisce prima della testata successiva ("Cl."),
+        # che apre la colonna del codice.
+        vicini = [p for p in pulite
+                  if abs(p["yc"] - testata["yc"]) < testata["h"] and p["x"] > testata["x"] + testata["w"]]
+        successiva = min(vicini, key=lambda p: p["x"]) if vicini else None
+        x_fine = (successiva["x"] - testata["h"] * 0.6) if successiva else larghezza
+        quantita_col = next((p for p in vicini if re.match(r"^q\.?\s*t", normalizza(p["t"]))), None)
+        sopra = testata["y"] + testata["h"]
+    else:
+        x_fine = larghezza
+        quantita_col = None
+        sopra = min(p["y"] for p in pulite)
+
+    # Il fondo della griglia: la riga "Segnalazioni" o i totali, quando ci sono.
     fondo = min(
-        (p["y"] for p in pulite if p["y"] > testata["y"] + testata["h"] and normalizza(p["t"]).startswith("segnalazion")),
+        (p["y"] for p in pulite if p["y"] > sopra and normalizza(p["t"]).startswith(("segnalazion", "totale", "subtotale"))),
         default=float("inf"),
     )
 
     righe: list[list[dict]] = []
-    sotto = sorted((p for p in pulite if testata["y"] + testata["h"] <= p["yc"] < fondo), key=lambda p: p["yc"])
+    sotto = sorted((p for p in pulite if p["y"] + p["h"] > sopra and p["yc"] < fondo), key=lambda p: p["yc"])
     for parola in sotto:
-        if righe and abs(parola["yc"] - righe[-1][0]["yc"]) < max(parola["h"], righe[-1][0]["h"]) * 0.6:
-            righe[-1].append(parola)
-        else:
-            righe.append([parola])
+        if righe:
+            alta = max(parola["h"], righe[-1][0]["h"])
+            if abs(parola["yc"] - righe[-1][0]["yc"]) < alta * 0.6:
+                righe[-1].append(parola)
+                continue
+        righe.append([parola])
 
-    prodotti = []
+    prodotti: list[dict] = []
     for riga in righe:
-        nome = " ".join(p["t"] for p in sorted(riga, key=lambda p: p["x"]) if p["x"] + p["w"] / 2 < x_fine).strip()
+        nome, quantita = _nome_e_quantita(riga, x_fine)
         if len(nome) < 3 or not re.search(r"[A-Za-z]{2}", nome):
             continue
-        if "[" in nome or normalizza(nome).startswith("in corso"):
+        if "[" in nome or _riga_di_rumore(nome):
             continue
-        quantita = None
+        # Una riga fatta solo di intestazioni ("Cl. Cat.") non e' un prodotto.
+        if all(_e_colonna(pezzo) for pezzo in nome.split()):
+            continue
+        if prodotti and prodotti[-1]["nome"].lower() == nome[:80].lower():
+            continue
         if quantita_col:
             centro = quantita_col["x"] + quantita_col["w"] / 2
             for p in riga:
@@ -584,6 +669,21 @@ def prodotti_da_parole(parole: list | None) -> list[dict]:
 
 
 def testo_prodotti(prodotti: list[dict]) -> str:
-    """I prodotti in una riga sola, come finiscono nelle note per il fattorino."""
+    """I prodotti in una riga sola, come finiscono nelle note per il fattorino.
+
+    Taglia a 400 caratteri ma solo fra un prodotto e l'altro: un nome a meta'
+    ("CARDIOASP") fa credere che la lettura abbia sbagliato.
+    """
     voci = [f"{p['quantita']}x {p['nome']}" if (p.get("quantita") or 0) > 1 else p["nome"] for p in prodotti]
-    return "; ".join(voci)[:400]
+    tenute: list[str] = []
+    lunghezza = 0
+    for voce in voci:
+        aggiunta = len(voce) + (2 if tenute else 0)
+        if tenute and lunghezza + aggiunta > 400:
+            break
+        tenute.append(voce)
+        lunghezza += aggiunta
+    if not tenute:
+        return ""
+    testo = "; ".join(tenute)
+    return testo if len(testo) <= 400 else testo[:400]

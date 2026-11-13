@@ -72,8 +72,6 @@ export const useConversationMessagesQuery = (driverId, options = {}) =>
 export const useWinfarmStatusQuery = (options = {}) =>
   useQuery({ queryKey: chiavi.winfarm, queryFn: letture.winfarm, ...options });
 
-export const useWinfarmOggiQuery = (options = {}) =>
-  useQuery({ queryKey: chiavi.winfarmOggi, queryFn: letture.winfarmOggi, ...options });
 
 export const useAdminOverviewQuery = (options = {}) =>
   useQuery({ queryKey: chiavi.adminOverview, queryFn: letture.adminOverview, ...options });

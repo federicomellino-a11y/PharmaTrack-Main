@@ -292,17 +292,6 @@ async def winfarm_status(request: Request, user: dict = Depends(get_current_user
     }
 
 
-@router.get("/integrations/winfarm/oggi")
-async def winfarm_oggi(user: dict = Depends(get_current_user)):
-    """Le vendite arrivate oggi dal pulsante magico, dalla piu' recente."""
-    oggi = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    campi = {"_id": 0, "delivery_id": 1, "customer_name": 1, "amount": 1, "status": 1, "created_at": 1,
-             "scheduled_date": 1, "scheduled_time": 1, "slot_to": 1, "external_ref": 1}
-    return await db.deliveries.find(
-        {"pharmacy_id": user["user_id"], "imported_from": "winfarm", "created_at": {"$gte": oggi}}, campi,
-    ).sort("created_at", -1).to_list(100)
-
-
 @router.get("/integrations/winfarm/tray/download")
 async def winfarm_tray_download(request: Request):
     """Consegna veloce (icona + tasto) gia' configurato con indirizzo e token.

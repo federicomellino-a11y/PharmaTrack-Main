@@ -259,7 +259,48 @@ def test_prodotti_letti_dalla_griglia():
     assert testo_prodotti(prodotti) == "CARDIOASPIRIN*30CPR GAST 100MG; 2x TACHIPIRINA*20CPR 1000MG"
 
 
-def test_prodotti_senza_griglia_o_con_dati_rotti():
+def test_prodotti_con_dati_rotti_non_esplodono():
     from app.core.winfarm_parse import prodotti_da_parole
     assert prodotti_da_parole(None) == []
-    assert prodotti_da_parole([{"t": "ciao"}, "x", _p("CARDIOASPIRIN", 20, 160)]) == []
+    assert prodotti_da_parole(["x", {"t": "ciao"}, {"t": "y", "x": 1}]) == []
+    # Una parola sola con le coordinate buone e' comunque un prodotto letto:
+    # meglio un nome senza quantita' che una vendita senza niente.
+    assert prodotti_da_parole([_p("CARDIOASPIRIN", 20, 160)]) == [{"nome": "CARDIOASPIRIN", "quantita": None}]
+
+
+def test_prodotti_tutte_le_righe_della_vendita():
+    """Una vendita con cinque farmaci deve arrivare con cinque voci, non con una."""
+    from app.core.winfarm_parse import prodotti_da_parole
+    nomi = ["TAVEGIL*20CPR", "OKI*30CPR", "AULIN*30CPR 100MG", "MOMENT*24CPR 200MG", "ENTEROGERMINA*10FL"]
+    parole = [_p("Descrizione", 213, 128, 92, 18), _p("Cl.", 527, 128, 22, 18),
+              _p("Q.tà", 694, 128, 34, 18), _p("Totale", 1354, 128, 50, 18)]
+    for indice, nome in enumerate(nomi):
+        y = 160 + indice * 40
+        parole += [_p(nome, 20, y, 240), _p("A", 528, y, 16), _p("1", 724, y, 10), _p("5,90", 1395, y, 48)]
+    parole.append(_p("Segnalazioni", 470, 486, 120))
+    letti = prodotti_da_parole(parole)
+    assert [p["nome"] for p in letti] == nomi
+    assert all(p["quantita"] == 1 for p in letti)
+
+
+def test_prodotti_senza_intestazione_leggono_lo_stesso_le_righe():
+    """Se l'OCR si mangia la testata "Descrizione" i nomi non devono sparire."""
+    from app.core.winfarm_parse import prodotti_da_parole
+    prodotti = prodotti_da_parole([p for p in PAROLE_VENDITA if p["t"] != "Descrizione"])
+    assert [p["nome"] for p in prodotti] == ["CARDIOASPIRIN*30CPR GAST 100MG", "TACHIPIRINA*20CPR 1000MG"]
+
+
+def test_prodotti_righe_ripetute_e_intestazioni_non_contano():
+    from app.core.winfarm_parse import prodotti_da_parole
+    righe = [_p("Descrizione", 213, 128, 92, 18), _p("Cl.", 527, 128, 22, 18), _p("Cat.", 588, 128, 30, 18)]
+    for y in (160, 200):  # lo stesso prodotto letto due volte dall'OCR
+        righe += [_p("TAVEGIL*20CPR", 20, y, 240), _p("A", 528, y, 16), _p("1", 724, y, 10)]
+    assert prodotti_da_parole(righe) == [{"nome": "TAVEGIL*20CPR", "quantita": 1}]
+
+
+def test_testo_prodotti_non_taglia_un_nome_a_meta():
+    from app.core.winfarm_parse import testo_prodotti
+    prodotti = [{"nome": "FARMACO" + str(i) + "*" + "X" * 40, "quantita": 1} for i in range(20)]
+    testo = testo_prodotti(prodotti)
+    assert len(testo) <= 400
+    assert testo.endswith(prodotti[len(testo.split("; ")) - 1]["nome"])
