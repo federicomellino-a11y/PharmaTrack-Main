@@ -23,7 +23,7 @@ lavoro è la perdita di tempo più frequente.
 | **Render** — servizio `pharmatrack-api` (Francoforte, piano free) | backend, variabili d'ambiente, log | non sai perché il backend non parte |
 | **MongoDB Atlas** — cluster del progetto (di norma in sola lettura) | database vero, `MONGO_URL` per il locale | lavori alla cieca sui dati |
 | **Sentry** — progetto `pharmatrack` | errori di produzione, filtrati per release | non vedi gli errori che vedono le farmacie |
-| **Brevo** — relay SMTP, mittente `noreply@pharmatrack.app` | email transazionali (reset password, inviti) | solo se lavori sulle email |
+| **Brevo** — relay SMTP, mittente `federicomellino@gmail.com` (unico validato: `noreply@pharmatrack.app` richiede il dominio autenticato) | email transazionali (reset password, codici di accesso, inviti) | solo se lavori sulle email |
 | **Cloudinary** — foto delle consegne | le foto dei POD in produzione | solo se lavori sulle foto |
 
 I segreti dei workflow (`.github/workflows/`) li gestisce Federico: a te non

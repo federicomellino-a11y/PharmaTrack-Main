@@ -30,7 +30,12 @@ logger = logging.getLogger(__name__)
 
 # Ultimo esito di invio, per non lasciare che un provider morto passi in silenzio:
 # prima l'unica traccia era una riga di log che nessuno leggeva.
-STATO_EMAIL = {"ultimo_errore": None, "ultimo_successo": None}
+# "mittente" e' l'esito del controllo sull'elenco dei mittenti validati: Brevo
+# accetta l'invio (201) anche con un mittente non validato e poi lo scarta, quindi
+# senza questo controllo l'applicazione diceva "email inviata" mentre non partiva
+# niente (successo il 13/11 con SMTP_FROM=noreply@pharmatrack.app, non validato).
+STATO_EMAIL = {"ultimo_errore": None, "ultimo_successo": None, "mittente": None}
+MINUTI_CACHE_MITTENTE = 10
 
 
 def email_provider() -> str:
@@ -59,6 +64,75 @@ def brevo_verdict(status_code: Optional[int], body: Optional[str]) -> dict:
     if status_code is None:
         return {"ok": False, "stato": None, "errore": "Brevo non raggiungibile" + (": " + testo if testo else "")}
     return {"ok": False, "stato": status_code, "errore": f"Brevo ha risposto {status_code}" + (": " + testo if testo else "")}
+
+
+def mittente_verdetto(status_code: Optional[int], body: Optional[str], mittente: str) -> dict:
+    """Il mittente configurato e' tra quelli che Brevo accetta?
+
+    Serve perche' Brevo risponde 201 anche quando il mittente non e' validato:
+    il rifiuto arriva dopo, in fase di consegna, e l'unica traccia e' nel suo
+    pannello. Cosi' invece l'errore si vede da /api/health e dalla verifica di
+    produzione. ``ok`` vale None quando non si puo' sapere (chiave rifiutata,
+    rete giu'): in quel caso non si blocca l'invio, si segnala soltanto.
+    """
+    if status_code != 200:
+        dettaglio = (body or "").strip()[:200]
+        if status_code == 401:
+            motivo = "Brevo rifiuta la chiave API (401)"
+        elif status_code is None:
+            motivo = "Brevo non raggiungibile"
+        else:
+            motivo = f"Brevo ha risposto {status_code}"
+        return {"ok": None, "errore": motivo + (": " + dettaglio if dettaglio else ""), "mittenti": []}
+    try:
+        elenco = json.loads(body or "{}").get("senders") or []
+    except (TypeError, ValueError):
+        return {"ok": None, "errore": "Risposta di Brevo illeggibile", "mittenti": []}
+    validi = [
+        (m.get("email") or "").strip().lower()
+        for m in elenco
+        if m.get("email") and m.get("active", True)
+    ]
+    if (mittente or "").strip().lower() in validi:
+        return {"ok": True, "errore": None, "mittenti": validi}
+    return {
+        "ok": False,
+        "errore": (
+            f"Brevo non ha validato il mittente {mittente}: accetta l'invio e poi lo scarta. "
+            "Valida l'indirizzo in Brevo oppure autentica il dominio, altrimenti nessuna email parte."
+        ),
+        "mittenti": validi,
+    }
+
+
+async def verifica_mittente(forza: bool = False) -> Optional[dict]:
+    """Controllo del mittente, in cache per non chiamare Brevo a ogni email."""
+    if email_provider() != "brevo-api":
+        return None
+    adesso = datetime.now(timezone.utc)
+    precedente = STATO_EMAIL.get("mittente") or {}
+    quando = precedente.get("controllato")
+    if not forza and quando:
+        try:
+            eta = (adesso - datetime.fromisoformat(quando)).total_seconds()
+        except (TypeError, ValueError):
+            eta = None
+        if eta is not None and 0 <= eta < MINUTI_CACHE_MITTENTE * 60:
+            return precedente
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(
+                "https://api.brevo.com/v3/senders", headers={"api-key": SMTP_PASSWORD}
+            )
+        esito = mittente_verdetto(resp.status_code, resp.text, SMTP_FROM)
+    except Exception as exc:  # pragma: no cover - dipende dalla rete
+        esito = mittente_verdetto(None, str(exc), SMTP_FROM)
+    esito["controllato"] = adesso.isoformat()
+    esito["mittente"] = SMTP_FROM
+    STATO_EMAIL["mittente"] = esito
+    if esito.get("ok") is False:
+        logger.error("Mittente email non valido: %s", esito["errore"])
+    return esito
 
 
 def registra_esito_email(ok: bool, dettaglio: Optional[str] = None) -> None:
@@ -100,6 +174,15 @@ async def check_email_provider() -> dict:
         except Exception as exc:
             esito = brevo_verdict(None, str(exc))
         esito["provider"] = provider
+        # La chiave puo' essere buona e il mittente no: sono due guasti diversi e
+        # solo il secondo fa sparire le email senza errori.
+        mittente = await verifica_mittente(forza=True)
+        if mittente is not None:
+            esito["mittente"] = mittente.get("mittente")
+            esito["mittente_validato"] = mittente.get("ok")
+            if mittente.get("ok") is False:
+                esito["ok"] = False
+                esito["errore"] = mittente.get("errore")
         return esito
     if provider in ("brevo-smtp", "smtp"):
         ok = await asyncio.to_thread(_smtp_login_ok)
@@ -357,6 +440,13 @@ async def send_transactional_email(to_address: str, subject: str, text_body: str
 
     # Use Brevo REST API when the password is an API key (xkeysib-...)
     if SMTP_PASSWORD.startswith("xkeysib-") or SMTP_PASSWORD.startswith("xsmtpsib-"):
+        # Un mittente non validato fa accettare l'invio e poi scartare il messaggio:
+        # meglio dirlo subito che far credere di aver mandato un codice che non arriva.
+        mittente = await verifica_mittente()
+        if mittente is not None and mittente.get("ok") is False:
+            registra_esito_email(False, mittente["errore"])
+            logger.error("Email '%s' non inviata a %s: %s", subject, to_address, mittente["errore"])
+            return False
         payload = {
             "sender": {"name": "PharmaTrack", "email": SMTP_FROM},
             "to": [{"email": to_address}],

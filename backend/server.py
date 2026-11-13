@@ -14,6 +14,7 @@ from app.core.database import db, client
 from app.core.legacy_deliveries import allinea_testi_consegne
 from app.core.websocket import identita_websocket, manager, sorveglia_canali
 from app.core.security import normalize_session_expiry
+from app.core.notifications import verifica_mittente
 from app.core.config import ADMIN_EMAIL, ADMIN_PASSWORD, IS_PRODUCTION
 from app.core.logging_config import setup_logging
 from app.core.errors import register_exception_handlers
@@ -44,6 +45,9 @@ async def lifespan(_app: FastAPI):
     chiusura del client Mongo allo spegnimento.
     """
     await setup_indexes()
+    # All'avvio si controlla che il mittente email sia tra quelli validati: e' il
+    # guasto silenzioso per eccellenza (Brevo accetta l'invio e poi lo scarta).
+    asyncio.create_task(verifica_mittente(forza=True))
     sorveglianza = asyncio.create_task(sorveglia_canali())
     try:
         yield

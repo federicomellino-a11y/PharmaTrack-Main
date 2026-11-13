@@ -30,8 +30,11 @@ services:
         sync: false
       - key: SMTP_PASSWORD
         sync: false
+      # Deve essere un mittente VALIDATO in Brevo. noreply@pharmatrack.app non lo e':
+      # Brevo lo accetta in invio e lo scarta dopo, senza errori (13/11/2026).
+      # Si torna a noreply@ solo dopo aver autenticato il dominio in Brevo.
       - key: SMTP_FROM
-        value: noreply@pharmatrack.app
+        value: federicomellino@gmail.com
       - key: GOOGLE_CLIENT_ID
         sync: false
       - key: VAPID_PUBLIC_KEY

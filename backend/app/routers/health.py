@@ -30,6 +30,10 @@ async def public_health():
         "email_provider": email_provider(),
         "email_ultimo_errore": STATO_EMAIL["ultimo_errore"],
         "email_ultimo_successo": STATO_EMAIL["ultimo_successo"],
+        # Brevo accetta (201) anche un mittente non validato e scarta il messaggio
+        # dopo: senza questo campo "ultimo_successo" puo' mentire.
+        "email_mittente": SMTP_FROM,
+        "email_mittente_validato": (STATO_EMAIL["mittente"] or {}).get("ok"),
         "google_auth_configured": bool(os.getenv("GOOGLE_CLIENT_ID") or os.getenv("VITE_GOOGLE_CLIENT_ID")),
         "sentry_configured": bool(os.getenv("SENTRY_DSN")),
         "sentry_environment": (os.getenv("SENTRY_ENVIRONMENT") or os.getenv("ENVIRONMENT") or "") or None,

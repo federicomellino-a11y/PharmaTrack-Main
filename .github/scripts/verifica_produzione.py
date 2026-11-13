@@ -5,7 +5,8 @@ una pagina bianca: un chunk che non si caricava piu', un asset che Vercel non
 trovava. Nessuno se ne accorgeva finche' non lo diceva un farmacista. Questo
 script guarda la produzione come la guarda un browser, un minuto dopo il merge:
 
-  1. `/api/health` risponde 200 e dice `status: ok`;
+  1. `/api/health` risponde 200 e dice `status: ok`, con il mittente email
+     validato dal provider (un mittente non validato accetta l'invio e lo scarta);
   2. l'`index.html` servito dal sito cita chunk che esistono davvero e tornano
      come `application/javascript` (o `text/css`);
   3. il login demo apre una sessione per la farmacia e per il fattorino;
@@ -76,6 +77,17 @@ def controlla_salute() -> None:
         return
     spenti = [chiave for chiave in ("admin_configured", "push_configured", "smtp_configured", "sentry_configured")
               if dati.get(chiave) is False]
+    mittente_valido = dati.get("email_mittente_validato")
+    if mittente_valido is True:
+        fatti.append("mittente email validato dal provider")
+    elif mittente_valido is False:
+        # Il 13/11 e' successo esattamente questo: health verde, mittente non
+        # validato, ogni email accettata e poi scartata. Il codice di accesso
+        # all'admin non arrivava e niente lo diceva.
+        problemi.append(
+            f"health 200 ma il mittente email {dati.get('email_mittente')!r} non e' validato dal "
+            "provider: gli invii vengono accettati e poi scartati, quindi nessuna email arriva"
+        )
     fatti.append(f"health 200, database {dati.get('database')}, provider email {dati.get('email_provider')}")
     if spenti:
         # Non e' un guasto del sito, ma e' la cosa che si scopre tre giorni dopo.
