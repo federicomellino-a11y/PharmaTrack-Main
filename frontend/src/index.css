@@ -37,6 +37,8 @@
   --color-chart-4: hsl(var(--chart-4));
   --color-chart-5: hsl(var(--chart-5));
 
+  --color-sidebar: hsl(var(--sidebar));
+
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 
   --radius-sm: calc(var(--radius) - 4px);
@@ -46,25 +48,32 @@
 }
 
 :root {
-  --background: 210 33% 98%;
-  --foreground: 222 47% 11%;
+  /* Sfondo leggermente azzurrato e testo quasi nero: prima lo schermo era
+     bianco carta e le card bianche ci si perdevano dentro. */
+  --background: 213 30% 96%;
+  --foreground: 222 47% 8%;
   --card: 0 0% 100%;
-  --card-foreground: 222 47% 11%;
+  --card-foreground: 222 47% 8%;
   --popover: 0 0% 100%;
-  --popover-foreground: 222 47% 11%;
+  --popover-foreground: 222 47% 8%;
   --primary: 172 66% 28%;
   --primary-foreground: 0 0% 100%;
-  --secondary: 210 20% 95%;
+  --secondary: 210 22% 94%;
   --secondary-foreground: 222 47% 20%;
-  --muted: 210 20% 95%;
-  --muted-foreground: 220 14% 50%;
+  --muted: 210 22% 94%;
+  --muted-foreground: 220 16% 42%;
   --accent: 172 66% 93%;
   --accent-foreground: 172 66% 20%;
   --destructive: 0 84% 60%;
   --destructive-foreground: 0 0% 100%;
-  --border: 220 14% 90%;
-  --input: 220 14% 90%;
+  --border: 220 16% 88%;
+  --input: 220 16% 88%;
   --ring: 172 66% 28%;
+  --sidebar: 210 30% 98%;
+  /* Due livelli di ombra: uno corto che stacca il bordo, uno largo che da'
+     profondita' senza sporcare. */
+  --shadow-card: 0 1px 2px hsl(222 45% 18% / 0.05), 0 8px 20px -12px hsl(222 45% 18% / 0.16);
+  --shadow-card-hover: 0 2px 5px hsl(222 45% 18% / 0.07), 0 16px 30px -14px hsl(222 45% 18% / 0.24);
   --radius: 0.75rem;
   --chart-1: 172 66% 38%;
   --chart-2: 199 89% 48%;
@@ -75,25 +84,28 @@
 }
 
 .dark {
-  --background: 222 47% 6%;
-  --foreground: 210 40% 96%;
-  --card: 222 47% 9%;
-  --card-foreground: 210 40% 96%;
-  --popover: 222 47% 9%;
-  --popover-foreground: 210 40% 96%;
+  --background: 222 45% 7%;
+  --foreground: 210 40% 97%;
+  --card: 222 42% 10%;
+  --card-foreground: 210 40% 97%;
+  --popover: 222 42% 10%;
+  --popover-foreground: 210 40% 97%;
   --primary: 172 66% 42%;
   --primary-foreground: 222 47% 6%;
-  --secondary: 217 33% 14%;
+  --secondary: 217 33% 15%;
   --secondary-foreground: 210 40% 96%;
-  --muted: 217 33% 14%;
-  --muted-foreground: 215 20% 58%;
-  --accent: 217 33% 14%;
+  --muted: 217 33% 15%;
+  --muted-foreground: 215 20% 64%;
+  --accent: 217 33% 15%;
   --accent-foreground: 210 40% 96%;
   --destructive: 0 62% 50%;
   --destructive-foreground: 210 40% 96%;
-  --border: 217 33% 16%;
-  --input: 217 33% 16%;
+  --border: 217 33% 19%;
+  --input: 217 33% 19%;
   --ring: 172 66% 42%;
+  --sidebar: 222 42% 9%;
+  --shadow-card: 0 1px 2px hsl(0 0% 0% / 0.35), 0 10px 22px -14px hsl(0 0% 0% / 0.6);
+  --shadow-card-hover: 0 2px 6px hsl(0 0% 0% / 0.45), 0 18px 32px -16px hsl(0 0% 0% / 0.7);
 }
 
 @layer base {
@@ -137,9 +149,9 @@
 /* ===== GRADIENT MESH ===== */
 .gradient-mesh {
   background:
-    radial-gradient(at 20% 5%,  hsl(172 66% 38% / 0.06) 0, transparent 50%),
-    radial-gradient(at 85% 15%, hsl(199 89% 48% / 0.04) 0, transparent 50%),
-    radial-gradient(at 5%  80%, hsl(280 65% 60% / 0.03) 0, transparent 50%);
+    radial-gradient(at 20% 5%,  hsl(172 66% 38% / 0.10) 0, transparent 50%),
+    radial-gradient(at 85% 15%, hsl(199 89% 48% / 0.07) 0, transparent 50%),
+    radial-gradient(at 5%  80%, hsl(280 65% 60% / 0.05) 0, transparent 50%);
 }
 .dark .gradient-mesh {
   background:
@@ -191,29 +203,58 @@
   box-shadow: 0 0 20px hsl(var(--primary) / 0.3);
 }
 
-/* ===== CARDS ===== */
+/* ===== CARDS =====
+   Ogni card entra con un movimento breve (8px dal basso, 0,34s) e porta
+   un'ombra a due livelli: una corta che stacca il bordo dallo sfondo, una
+   larga e morbida che da' profondita'. Al passaggio del mouse l'ombra sale
+   di un gradino, ma la card si muove solo se e' cliccabile: le superfici
+   ferme (report, mappa) restano ferme. */
+.card-base {
+  box-shadow: var(--shadow-card);
+  transition: box-shadow 0.25s ease, transform 0.25s ease, border-color 0.25s ease;
+  animation: cardRise 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.card-base:hover {
+  box-shadow: var(--shadow-card-hover);
+}
 .card-interactive {
-  transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+  transition: box-shadow 0.25s ease, transform 0.25s ease, border-color 0.25s ease;
 }
 .card-interactive:hover {
-  box-shadow: 0 4px 24px hsl(var(--foreground) / 0.06);
-  border-color: hsl(var(--primary) / 0.25);
-  transform: translateY(-1px);
+  box-shadow: var(--shadow-card-hover);
+  border-color: hsl(var(--primary) / 0.28);
+  transform: translateY(-2px);
 }
 .card-exclusive {
   background: hsl(var(--card));
   border: 1px solid hsl(var(--border));
   border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
 }
 .stat-modern {
+  position: relative;
+  overflow: hidden;
   background: hsl(var(--card));
   border: 1px solid hsl(var(--border));
   border-radius: var(--radius);
-  transition: all 0.2s ease;
+  box-shadow: var(--shadow-card);
+  transition: box-shadow 0.25s ease, transform 0.25s ease, border-color 0.25s ease;
+}
+/* Alone colorato nell'angolo: da' colore al numero senza aggiungere righe. */
+.stat-modern::before {
+  content: '';
+  position: absolute;
+  top: -46px;
+  right: -46px;
+  width: 120px;
+  height: 120px;
+  border-radius: 9999px;
+  background: radial-gradient(circle, hsl(var(--primary) / 0.12), transparent 68%);
+  pointer-events: none;
 }
 .stat-modern:hover {
   border-color: hsl(var(--primary) / 0.3);
-  box-shadow: 0 0 0 3px hsl(var(--primary) / 0.06);
+  box-shadow: var(--shadow-card-hover);
 }
 
 /* ===== QUICK ACTIONS ===== */
@@ -234,10 +275,13 @@
   text-decoration: none;
   font-weight: 500;
 }
+.quick-action {
+  box-shadow: var(--shadow-card);
+}
 .quick-action:hover {
   border-color: hsl(var(--primary) / 0.3);
-  box-shadow: 0 2px 12px hsl(var(--primary) / 0.08);
-  transform: translateY(-1px);
+  box-shadow: var(--shadow-card-hover);
+  transform: translateY(-2px);
 }
 
 /* ===== STATUS BADGES ===== */
@@ -342,7 +386,7 @@
 .pharmacy-bottom-nav {
   display: flex;
   border-top: 1px solid hsl(var(--border));
-  background: hsl(var(--card));
+  background: hsl(var(--sidebar));
   /* Sempre in sovraimpressione: la barra segue lo schermo invece di stare in
      fondo alla pagina. Con sticky spariva scorrendo, e per aggiungere una
      consegna restava solo il pulsante flottante, che copriva i campi. */
@@ -352,7 +396,7 @@
   bottom: 0;
   z-index: 30;
   padding-bottom: env(safe-area-inset-bottom);
-  box-shadow: 0 -6px 20px -12px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 -8px 24px -14px hsl(222 45% 18% / 0.45);
 }
 @media (min-width: 1024px) { .pharmacy-bottom-nav { display: none; } }
 .pharmacy-bottom-nav a {
@@ -447,6 +491,10 @@
 }
 
 /* ===== ANIMATIONS ===== */
+@keyframes cardRise {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
 @keyframes slideUp {
   from { opacity: 0; transform: translateY(16px); }
   to   { opacity: 1; transform: translateY(0); }
@@ -598,4 +646,21 @@ textarea:not([class*="bg-"]) {
   margin-top: -16px;
   box-shadow: 0 6px 18px hsl(var(--primary) / 0.35);
   border: 3px solid hsl(var(--card));
+}
+
+/* ===== MOVIMENTO RIDOTTO =====
+   Chi ha chiesto al sistema meno animazioni non deve vedere card che
+   scivolano o si sollevano. Le ombre restano: sono profondita', non moto. */
+@media (prefers-reduced-motion: reduce) {
+  .card-base,
+  .animate-slide-up, .animate-fade-in-up, .animate-fade-in, .animate-scale-in,
+  .animate-float, .animate-marquee {
+    animation: none !important;
+  }
+  .card-interactive:hover,
+  .quick-action:hover,
+  .hover-lift:hover,
+  .btn-primary:hover {
+    transform: none !important;
+  }
 }
