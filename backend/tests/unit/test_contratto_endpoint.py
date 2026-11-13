@@ -156,7 +156,7 @@ def test_il_confronto_vede_le_rotte_vere(rotte):
     """Se l'introspezione si rompesse, il test passerebbe sempre: non deve."""
     assert len(rotte) > 50, "nessuna rotta letta dal backend: il test non controllerebbe niente"
     assert ("", "api", "deliveries") in rotte
-    assert ("", "api", "auth", "demo") in rotte
+    assert ("", "api", "auth", "login") in rotte
 
 
 def test_ogni_chiamata_del_frontend_esiste_nel_backend(rotte):

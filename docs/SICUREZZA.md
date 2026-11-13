@@ -55,7 +55,7 @@ console admin, bundle senza chiavi server (`AIza`, `sk-`, `mongodb+srv`, `ghp_`)
 | `CLOUDINARY_*` | Render | foto delle consegne | senza, le foto vanno su disco e si perdono al riavvio |
 | `GOOGLE_CLIENT_ID` | Render / Vercel | accesso con Google | Google Cloud → Credentials |
 | `VITE_*` | Vercel → Environment | finiscono **nel bundle pubblico**: solo URL e chiavi da browser | si cambiano e si ridistribuisce |
-| `PT_TEST_EMAIL` / `PT_TEST_PASSWORD` | GitHub → Secrets | farmacia di prova dei test notturni (`federicomellino+pharmatrack-qa@`), **non** l'account demo | si ricrea la farmacia e si aggiornano i due secret |
+| `PT_TEST_EMAIL` / `PT_TEST_PASSWORD` | GitHub → Secrets | farmacia di prova dei test notturni **e** della verifica di produzione (`federicomellino+pharmatrack-qa@`) | si ricrea la farmacia e si aggiornano i due secret |
 | `MONGO_URL_BACKUP` | GitHub → Secrets | dump notturno con utente *sola lettura* | si ricrea l'utente in Atlas |
 | `MONGO_URL_ADMIN` | GitHub → Secrets | operazioni straordinarie sul database | — (potere distruttivo: serve l'ok di Federico) |
 | `BACKUP_PASSPHRASE` | GitHub → Secrets + gestore password | cifratura dei dump | **senza, i backup sono rumore** |
@@ -69,36 +69,38 @@ rimosso il 4/11 dopo settimane, con la password admin dentro).
 
 ## 3. Buchi noti, dichiarati
 
+Prima di questo elenco, una cosa chiusa: **la demo non esiste più.** Il 13
+novembre sono stati tolti i due pulsanti della pagina iniziale, `POST
+/api/auth/demo`, le variabili `DEMO_*` e i due account (`test@farmaciaprova.it` e
+`luca@fattorino.it`). Non era solo una vetrina: chiunque poteva entrare in quel
+tenant senza credenziali e sporcarlo. Al posto del login demo la verifica di
+produzione fa un login vero sulla farmacia di prova (`PT_TEST_EMAIL` /
+`PT_TEST_PASSWORD`) e pretende **404** su `/api/auth/demo`, così la demo non può
+tornare per distrazione; il bundle lo controlla `scripts/controlla-segreti.sh
+--dist` e i sorgenti `backend/tests/unit/test_senza_demo.py` più
+`frontend/src/__tests__/demo-senza-credenziali.test.js`.
+
 Nell'ordine in cui fanno male.
 
-1. **La demo è aperta per scelta, non per errore.** ~~Credenziali dentro il
-   bundle pubblico~~: chiuso l'11/11. Il bundle conteneva
-   `test@farmaciaprova.it` / `Test1234!` e `luca@fattorino.it` / `Driver123!`;
-   ora la sessione demo la apre il server (`POST /api/auth/demo`) e nel
-   JavaScript pubblico non c'è più nessuna credenziale né le variabili
-   `VITE_DEMO_*`. La difesa è automatica: `scripts/controlla-segreti.sh --dist`
-   controlla il bundle appena costruito e fa fallire la CI se le stringhe
-   ricompaiono. Resta aperto, e va bene così, il fatto che chiunque possa
-   cliccare "Demo farmacia": quel tenant può essere sporcato. Non è più un
-   rischio per le misure, perché dall'11/11 i test di integrazione notturni
-   girano su un account dedicato (farmacia `federicomellino+pharmatrack-qa@`,
-   secret `PT_TEST_EMAIL` / `PT_TEST_PASSWORD`), non sul tenant demo. Manca solo
-   il reset periodico della demo: [`PIANO-FINALE.md`](PIANO-FINALE.md), punto 1.4.
-2. **Nessun secret scanning della piattaforma.** GitHub Advanced Security non è
+1. **Nessun secret scanning della piattaforma.** GitHub Advanced Security non è
    disponibile su un repo privato personale: la copertura è il nostro script in
    CI, che è volutamente approssimativo (cerca forme note, non entropia).
-3. **Nessuna revisione obbligatoria sulle PR.** La branch protection impone i
+2. **Nessuna revisione obbligatoria sulle PR.** La branch protection impone i
    check della CI, ma non un revisore: Federico è solo. Una PR può essere
    mergiata da chi l'ha scritta appena i check sono verdi.
-4. **Un solo amministratore.** Non esiste un secondo account admin né un
+3. **Un solo amministratore.** Non esiste un secondo account admin né un
    percorso di recupero: se la password si perde, si rigenera su Render.
-5. **Rate limit in memoria.** Con più istanze di Render i contatori non si
+4. **Rate limit in memoria.** Con più istanze di Render i contatori non si
    sommano; oggi l'istanza è una sola, quindi regge.
-6. **`'unsafe-inline'` nella CSP** resta su `script-src` e `style-src` perché
+5. **`'unsafe-inline'` nella CSP** resta su `script-src` e `style-src` perché
    Google Sign-In inietta script inline. Analisi e due strade possibili in
    [`SICUREZZA-CSP.md`](SICUREZZA-CSP.md).
-7. **La passphrase dei backup è in un solo posto** oltre al gestore password di
+6. **La passphrase dei backup è in un solo posto** oltre al gestore password di
    Federico: se sparisce, i dump restano cifrati per sempre.
+7. **Il dump notturno non usa ancora un utente Mongo di sola lettura** finché
+   quell'utente non viene creato in Atlas e il secret `MONGO_URL_BACKUP`
+   sostituito: oggi la stringa è quella dell'utente applicativo, che può
+   scrivere.
 
 ---
 

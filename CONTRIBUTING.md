@@ -163,7 +163,7 @@ curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
 ```
 
 Il workflow **Verifica produzione** lo fa già da solo a ogni merge su `main`:
-guarda `/api/health`, i chunk del sito, il login demo dei due ruoli e lo stato
+guarda `/api/health`, i chunk del sito, un login vero sulla farmacia di prova, il 404 di `/api/auth/demo` e lo stato
 del deploy Render, e diventa rosso se qualcosa non torna (con un secondo
 tentativo 90 secondi dopo, perché il deploy parte insieme). Nota: `/api/health`
 **non** riporta la release, quindi da solo non conferma un deploy.

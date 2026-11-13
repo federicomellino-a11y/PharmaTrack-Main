@@ -117,10 +117,9 @@ core) sta in [`AGENTS.md`](../AGENTS.md#dove-mettere-le-mani).
 1. **Login** `POST /api/auth/login` → password bcrypt (costo 10, ri-hash
    trasparente dal 12) → riga in `sessions` + cookie `HttpOnly; Secure;
    SameSite=None; Max-Age=7 giorni`.
-   La **demo** non fa eccezione: `POST /api/auth/demo` con
-   `{"ruolo":"pharmacy"|"driver"}` trova l'account demo per email
-   (`DEMO_PHARMACY_EMAIL` / `DEMO_DRIVER_EMAIL`) e apre la stessa sessione, senza
-   che il browser conosca una password. Il fattorino e la farmacia condividono
+   La **demo non esiste più** (rimossa il 13/11: pulsanti, `POST /api/auth/demo`,
+   variabili `DEMO_*` e i due account). La verifica di produzione pretende che la
+   rotta risponda 404. Il fattorino e la farmacia condividono
    `apri_sessione_fattorino()` / `_apri_sessione()` con il login normale.
 2. **Ogni chiamata** passa da `SecurityHeadersMiddleware` (header), dal
    controllo di origine (CSRF), dal rate limit, poi da `get_current_user`, che

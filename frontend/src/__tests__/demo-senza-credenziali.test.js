@@ -1,11 +1,12 @@
-// La demo non deve tornare a portare credenziali nel browser.
+// La demo non deve tornare.
 //
 // Fino all'11/11 `LandingPage.jsx` conteneva test@farmaciaprova.it / Test1234!
 // e luca@fattorino.it / Driver123!, quindi chiunque poteva leggerle nel bundle.
-// Ora il pulsante chiede al server di aprire la sessione demo: qui controlliamo
-// che nei sorgenti non ricompaiano ne' le password ne' le variabili d'ambiente
-// che le contenevano. Il controllo sul file costruito sta in
-// scripts/controlla-segreti.sh, che gira in CI dopo il build.
+// Dall'11 all'13/11 la sessione demo la apriva il server; il 13/11 la demo e'
+// stata tolta del tutto (pulsanti, endpoint, account). Qui si controlla che nei
+// sorgenti non ricompaiano ne' le credenziali ne' la rotta demo. Il bundle e'
+// coperto da scripts/controlla-segreti.sh, la produzione da
+// .github/scripts/verifica_produzione.py.
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -26,11 +27,11 @@ function fileSorgente(cartella) {
 const VIETATI = [
   ['Test1234!', 'la vecchia password della farmacia demo'],
   ['Driver123!', 'la vecchia password del fattorino demo'],
-  ['VITE_DEMO_PHARMACY_PASSWORD', 'la variabile che portava la password nel bundle'],
-  ['VITE_DEMO_DRIVER_PASSWORD', 'la variabile che portava la password nel bundle'],
+  ['VITE_DEMO_', 'le variabili che portavano la demo nel bundle'],
+  ['/auth/demo', 'la rotta della demo, rimossa il 13/11'],
 ];
 
-describe('credenziali demo', () => {
+describe('la demo non esiste piu', () => {
   const file = fileSorgente(RADICE);
 
   it.each(VIETATI)('nessun sorgente contiene %s (%s)', (testo) => {
@@ -38,13 +39,10 @@ describe('credenziali demo', () => {
     expect(colpevoli.map((f) => path.relative(RADICE, f))).toEqual([]);
   });
 
-  it('il gestore dei pulsanti demo chiama il server, non il login con la password', () => {
+  it('la pagina iniziale non ha piu i pulsanti demo', () => {
     const landing = fs.readFileSync(path.join(RADICE, 'pages/LandingPage.jsx'), 'utf8');
-    const inizio = landing.indexOf('const handleDemoLogin');
-    expect(inizio).toBeGreaterThan(-1);
-    const gestore = landing.slice(inizio, landing.indexOf('toast.error', inizio));
-    expect(gestore).toContain('/auth/demo');
-    expect(gestore).not.toContain('/driver/login');
-    expect(gestore).not.toContain('password');
+    expect(landing).not.toContain('demo-pharmacy-btn');
+    expect(landing).not.toContain('demo-driver-btn');
+    expect(landing).not.toContain('Demo Farmacia');
   });
 });

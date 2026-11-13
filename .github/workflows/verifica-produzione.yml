@@ -1,7 +1,7 @@
 name: Verifica produzione
 
 # Dopo ogni merge su main guarda la produzione come la guarda un browser:
-# health, chunk del sito, login demo, stato del deploy Render. Il caso "deploy
+# health, chunk del sito, login vero, 404 della demo, stato del deploy Render. Il caso "deploy
 # verde ma sito bianco" e' gia' successo due volte: cosi' lo vede GitHub un
 # minuto dopo, non il farmacista al banco.
 on:
@@ -31,6 +31,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           COMMIT_SHA: ${{ github.sha }}
+          # La demo non esiste piu' (13/11): il login si prova sulla farmacia di
+          # prova della suite notturna, cosi' il controllo resta vero.
+          PT_TEST_EMAIL: ${{ secrets.PT_TEST_EMAIL }}
+          PT_TEST_PASSWORD: ${{ secrets.PT_TEST_PASSWORD }}
         run: |
           # Il deploy parte insieme a questo job: se il primo giro e' rosso
           # quasi sempre e' perche' stiamo guardando la versione precedente,

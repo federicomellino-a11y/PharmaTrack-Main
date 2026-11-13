@@ -3,7 +3,7 @@
 **Gestionale consegne a domicilio per farmacie italiane.**
 Coordina fattorini, traccia ogni ordine, gestisci cassa e turni, integrazione con Winfarm (Pharmaservice).
 
-🌐 Demo live: [pharmatrack-zeta.vercel.app](https://pharmatrack-zeta.vercel.app)
+🌐 Sito live: [pharmatrack-zeta.vercel.app](https://pharmatrack-zeta.vercel.app)
 
 > **Stai per modificare il codice?** Tre letture, in quest'ordine:
 > [`AGENTS.md`](AGENTS.md) (regole e perché), [`docs/ARCHITETTURA.md`](docs/ARCHITETTURA.md)
