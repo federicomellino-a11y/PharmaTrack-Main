@@ -5,9 +5,11 @@ PharmaTrack senza rischiare di rompere qualcosa**, con uno schema chiaro e tutto
 pronto. Questo file è il programma: cosa si fa, in che ordine, come si verifica
 che sia fatto, e cosa serve da lui.
 
-Stato al 12 novembre 2026. **Blocchi 0, 1 (tranne 1.4), 2, 3, 4 e 5 in
-produzione.** Restano 1.4 (reset periodico della demo: serve il via di Federico)
-e il blocco 6 (tre decisioni che spettano a lui).
+Stato al 13 novembre 2026. **Blocchi da 0 a 5 tutti in produzione.** Il 13/11 la
+demo è stata rimossa del tutto (pulsanti, endpoint, variabili e account), quindi
+il punto 1.4 (reset periodico della demo) non ha più ragione di esistere: non c'è
+nessun tenant demo da ripulire. Resta il blocco 6, tre decisioni che spettano a
+Federico.
 
 ---
 
@@ -52,7 +54,7 @@ un account proprio.
 | 1.1 | Login demo lato server | `POST /api/auth/demo` che accetta `{"ruolo":"pharmacy"|"driver"}`, legge le credenziali da `DEMO_PHARMACY_*` / `DEMO_DRIVER_*` su Render e restituisce il cookie come un login normale. La landing chiama solo quello | basso | i pulsanti Demo entrano; nel bundle non c'è più nessuna password |
 | 1.2 | Test che chiude la porta | nel job frontend: dopo il build, fallisce se `dist/` contiene `farmaciaprova`, `Test1234!`, `Driver123!` o il pattern `password:"..."`. Sostituisce la fiducia con una guardia | nullo | provato piantando le stringhe |
 | 1.3 | Tenant di test dedicato | farmacia `test-suite@...` creata con un workflow usa e getta via `MONGO_URL_ADMIN` (gli utenti non si creano da codice con le chiavi Atlas), secret `PT_TEST_EMAIL` / `PT_TEST_PASSWORD` aggiornati, una notte di test verdi | medio: tocca la suite notturna | il run delle 03:00 passa su 17 test |
-| 1.4 | Demo libera di sporcarsi | con il test su un altro account, il tenant demo può essere usato da chiunque senza conseguenze; aggiungere un reset settimanale facoltativo (svuota consegne e clienti creati dalla demo) | basso | login demo → crea consegna → la demo altrui non si rompe |
+| 1.4 | ~~Reset periodico della demo~~ **annullato il 13/11** | non serve più: la demo è stata tolta del tutto (pulsanti in `LandingPage`, `POST /api/auth/demo`, `DEMO_*`, i due account), quindi non esiste un tenant demo da ripulire | — | `/api/auth/demo` risponde 404; lo controlla `verifica_produzione.py` a ogni merge |
 
 **Stato, verificato in produzione l'11-12 novembre:**
 
@@ -72,10 +74,17 @@ un account proprio.
   `PT_TEST_PASSWORD` aggiornati con l'API di GitHub. Prova: 10 test notturni
   verdi in locale sul nuovo account, poi `test-integrazione.yml` lanciato a mano
   → run 43008864168 **success** con tutti e tre gli step.
-- **1.4 resta aperto**: reset periodico del tenant demo.
+- **1.4 chiuso per rimozione (13/11)**: invece di ripulire periodicamente il
+  tenant demo, la demo è stata eliminata. Tolti: i due pulsanti e `handleDemoLogin`
+  da `LandingPage.jsx`, `backend/app/routers/demo.py` e la voce in `server.py`,
+  `DEMO_PHARMACY_EMAIL` / `DEMO_DRIVER_EMAIL` da `config.py` e dagli `env.example`,
+  i due account. Guardie: `backend/tests/unit/test_senza_demo.py`,
+  `frontend/src/__tests__/demo-senza-credenziali.test.js`,
+  `scripts/controlla-segreti.sh --dist` (cerca anche `auth/demo`) e
+  `verifica_produzione.py`, che ora fa un login vero con `PT_TEST_EMAIL` /
+  `PT_TEST_PASSWORD` e pretende 404 sulla rotta demo.
 
-**Serve da Federico:** niente per chiudere il blocco 1; solo la conferma se
-vuole il reset automatico della demo (1.4).
+**Serve da Federico:** niente, il blocco 1 è chiuso.
 
 ---
 
@@ -161,7 +170,7 @@ Tutti e quattro girano in `tests/unit`, quindi costano secondi.
 
 | # | Intervento | Cosa risolve |
 | --- | --- | --- |
-| 4.1 | `verifica-produzione.yml`: dopo ogni push su `main`, pinga `/api/health`, scarica l'entry `index-*.js`, controlla che ogni `assets/*.js` referenziato risponda `application/javascript`, e fa un login demo | il caso "deploy verde ma sito bianco" (già successo due volte) lo vede GitHub, non l'utente |
+| 4.1 | `verifica-produzione.yml`: dopo ogni push su `main`, pinga `/api/health`, scarica l'entry `index-*.js`, controlla che ogni `assets/*.js` referenziato risponda `application/javascript`, fa un login vero e pretende 404 su `/api/auth/demo` | il caso "deploy verde ma sito bianco" (già successo due volte) lo vede GitHub, non l'utente |
 | 4.2 | Verifica Render senza `RENDER_API_KEY` | è già possibile: Render registra il deploy come GitHub Deployment sul commit, quindi `GET /deployments?ref=main` + `/statuses` dicono se il backend è su. Va scritto in `CONTRIBUTING.md` e usato dalla skill di salute, così non serve un token che non c'è |
 | 4.3 | Allarmi | `allarmi.yml` esiste e manda email a `ALERT_EMAIL`: verificare che copra anche "deploy fallito", non solo "API giù" |
 
@@ -170,7 +179,7 @@ Tutti e quattro girano in `tests/unit`, quindi costano secondi.
 - **4.1 fatto**: `.github/workflows/verifica-produzione.yml` con
   `.github/scripts/verifica_produzione.py`, gira a ogni push su `main` (e a mano).
   Guarda `/api/health`, scarica la home e **ogni** asset che cita controllando il
-  tipo (`application/javascript`, `text/css`), apre il login demo dei due ruoli e
+  tipo (`application/javascript`, `text/css`), fa un login vero sulla farmacia di prova,
   legge lo stato del deploy Render. Se il primo giro è rosso aspetta 90 secondi e
   riprova, perché il deploy parte insieme al controllo. Provato in due modi
   contro la produzione: sul sito vero esce 0 e stampa cinque righe `ok`;
@@ -247,7 +256,7 @@ fatto   blocco 4 (4.1-4.3)      verifica automatica del deploy e allarmi
   ▼
 fatto   blocco 5 (5.1-5.3)      chi arriva domani: PRIMO-GIORNO, template PR, rimandi
   ▼
-1.4     blocco 1 (coda)         reset periodico della demo   ← serve il via di Federico
+13/11   1.4                     annullato: la demo è stata tolta del tutto
   ▼
 6.x                        le tre decisioni
 ```

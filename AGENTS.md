@@ -141,10 +141,10 @@ run_skill("pharmatrack_health", "--full")
 
 ## Cosa non si tocca senza Federico
 
-- **Gli account demo** (`test@farmaciaprova.it` e il fattorino) e i due pulsanti
-  demo in `LandingPage.jsx`: sono la vetrina del prodotto. La sessione la apre
-  il server (`POST /api/auth/demo`), mai il browser: non reintrodurre credenziali
-  nel frontend, la CI le blocca comunque sul bundle.
+- **La demo non si rimette.** Il 13/11 sono stati tolti i due pulsanti di
+  `LandingPage.jsx`, `POST /api/auth/demo`, le variabili `DEMO_*` e i due account
+  demo. Non reintrodurre credenziali nel frontend (la CI le blocca sul bundle) e
+  non rimettere la rotta: `verifica_produzione.py` pretende 404.
 - **La farmacia di prova dei test notturni** (`federicomellino+pharmatrack-qa@`,
   secret `PT_TEST_EMAIL` / `PT_TEST_PASSWORD`): è un tenant vero, con una
   consegna di prova. Non cancellarla e non cambiarle la password a mano: la

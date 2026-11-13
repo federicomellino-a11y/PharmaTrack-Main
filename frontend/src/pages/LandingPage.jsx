@@ -1,9 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import axios from 'axios';
-import { API } from '@/lib/config';
+import { Link } from 'react-router-dom';
 import { Button } from '../components/ui/button';
-import { MapPin, MessageSquare, BarChart3, Users, Package, Shield, ArrowRight, CheckCircle2, Truck, Download, HeartPulse, Route, TrendingUp, Bell, Smartphone, Sparkles } from 'lucide-react';
+import { MapPin, MessageSquare, BarChart3, Users, Package, Shield, ArrowRight, CheckCircle2, Truck, Download, HeartPulse, Route, TrendingUp, Bell, Smartphone } from 'lucide-react';
 import { usePWAInstall } from '@/hooks/usePWAInstall';
 import { toast } from 'sonner';
 
@@ -66,47 +64,11 @@ function RevealSection({ children, className = '', delay = 0 }) {
 export default function LandingPage() {
   const { isInstallable, install } = usePWAInstall();
   const [photo, setPhoto] = useState(0);
-  const [demoLoading, setDemoLoading] = useState(null);
-  const [attesaLunga, setAttesaLunga] = useState(false);
-  const navigate = useNavigate();
-
-  // Se la demo ci mette piu' di qualche secondo, il motivo va detto: il server
-  // si sta accendendo, non e' l'app piantata.
-  useEffect(() => {
-    if (!demoLoading) {
-      setAttesaLunga(false);
-      return undefined;
-    }
-    const timer = setTimeout(() => setAttesaLunga(true), 4000);
-    return () => clearTimeout(timer);
-  }, [demoLoading]);
 
   useEffect(() => {
     const t = setInterval(() => setPhoto((p) => (p + 1) % PHOTOS.length), 3500);
     return () => clearInterval(t);
   }, []);
-
-  // La demo la apre il server: qui non c'e' nessuna credenziale, quindi niente
-  // password nel JavaScript pubblico. Il server sceglie l'account demo e apre
-  // la sessione; se gli account demo non ci sono risponde 503 e lo diciamo.
-  const handleDemoLogin = async (kind) => {
-    setDemoLoading(kind);
-    try {
-      await axios.post(`${API}/auth/demo`, { ruolo: kind }, { withCredentials: true });
-      if (kind === 'pharmacy') {
-        toast.success('Demo farmacia attiva — buona esplorazione!');
-        navigate('/dashboard');
-      } else {
-        toast.success('Demo fattorino attiva');
-        navigate('/driver');
-      }
-    } catch (err) {
-      console.error('Demo login failed:', err?.response?.status, err?.response?.data);
-      toast.error('Demo temporaneamente non disponibile, riprova tra un minuto');
-    } finally {
-      setDemoLoading(null);
-    }
-  };
 
   return (
     <div className="min-h-screen bg-background overflow-x-hidden">
@@ -169,35 +131,6 @@ export default function LandingPage() {
                   <Truck className="w-4 h-4" />Area Fattorini
                 </Link>
               </Button>
-            </div>
-
-            {/* Demo buttons */}
-            <div className="mb-9 p-3.5 rounded-xl border border-amber-500/25 bg-amber-500/5">
-              <div className="flex items-center gap-2 mb-2">
-                <Sparkles className="w-4 h-4 text-amber-600" />
-                <span className="text-sm font-semibold text-amber-700 dark:text-amber-300">Provala ora con un account demo</span>
-              </div>
-              <div className="flex flex-col sm:flex-row gap-2">
-                <Button size="sm" variant="outline" className="border-amber-500/40 hover:bg-amber-500/10 text-foreground gap-2"
-                  onClick={() => handleDemoLogin('pharmacy')}
-                  disabled={demoLoading === 'pharmacy'}
-                  data-testid="demo-pharmacy-btn">
-                  <HeartPulse className="w-4 h-4 text-teal-600" />
-                  {demoLoading === 'pharmacy' ? 'Apro la demo…' : 'Demo Farmacia'}
-                </Button>
-                <Button size="sm" variant="outline" className="border-amber-500/40 hover:bg-amber-500/10 text-foreground gap-2"
-                  onClick={() => handleDemoLogin('driver')}
-                  disabled={demoLoading === 'driver'}
-                  data-testid="demo-driver-btn">
-                  <Truck className="w-4 h-4 text-blue-600" />
-                  {demoLoading === 'driver' ? 'Apro la demo…' : 'Demo Fattorino'}
-                </Button>
-              </div>
-              {attesaLunga && (
-                <p className="text-xs text-muted-foreground mt-2" data-testid="demo-attesa">
-                  Sto accendendo il server della demo: la prima apertura della giornata può richiedere fino a un minuto.
-                </p>
-              )}
             </div>
 
             <div className="flex flex-wrap gap-5 text-sm text-muted-foreground">

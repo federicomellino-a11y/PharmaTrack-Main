@@ -71,9 +71,8 @@ vero, che sta su Render → `pharmatrack-api` → Environment.
 
 Per vedere l'app: `cd backend && uvicorn server:app --reload` in un terminale e
 `cd frontend && npm run dev` nell'altro. Il frontend parla con
-`http://localhost:8000` (`VITE_BACKEND_URL`). Il login demo funziona anche in
-locale: i due pulsanti della pagina iniziale chiamano `POST /api/auth/demo` e
-la sessione la apre il server.
+`http://localhost:8000` (`VITE_BACKEND_URL`). Per entrare serve un utente vero:
+si registra una farmacia da `/register` (la demo è stata rimossa il 13/11).
 
 ---
 
@@ -128,9 +127,9 @@ le farmacie.
 
 ## 5. Cinque cose da non toccare senza Federico
 
-1. **Gli account demo** (`test@farmaciaprova.it` e il fattorino) e i due
-   pulsanti demo della pagina iniziale: sono la vetrina del prodotto. La
-   sessione la apre il server, mai il browser.
+1. **La demo non si rimette.** Account demo, pulsanti della pagina iniziale e
+   `POST /api/auth/demo` sono stati tolti di proposito il 13/11. Se ti serve una
+   vetrina, si costruisce su un tenant nuovo, non riattivando la porta aperta.
 2. **La farmacia di prova della suite notturna**
    (`federicomellino+pharmatrack-qa@…`): è un tenant vero con una consegna
    dentro. Non cancellarla, non cambiarle la password.

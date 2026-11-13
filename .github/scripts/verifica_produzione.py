@@ -9,7 +9,8 @@ script guarda la produzione come la guarda un browser, un minuto dopo il merge:
      validato dal provider (un mittente non validato accetta l'invio e lo scarta);
   2. l'`index.html` servito dal sito cita chunk che esistono davvero e tornano
      come `application/javascript` (o `text/css`);
-  3. il login demo apre una sessione per la farmacia e per il fattorino;
+  3. il login vero sulla farmacia di prova apre una sessione (la demo e' stata
+     tolta il 13/11, e qui si pretende che `/api/auth/demo` risponda 404);
   4. se il commit ha prodotto un deploy del backend, Render l'ha segnato verde
      (via GitHub Deployments: non serve nessuna chiave di Render).
 
@@ -118,17 +119,47 @@ def controlla_chunk() -> None:
     fatti.append(f"{len(riferimenti)} asset citati dalla home, tutti serviti con il tipo giusto")
 
 
-def controlla_login_demo() -> None:
-    for ruolo, atteso in (("pharmacy", "/auth/me"), ("driver", "/driver/me")):
-        stato, corpo, capi = chiama(f"{API}/api/auth/demo", metodo="POST", corpo={"ruolo": ruolo})
-        if stato != 200:
-            problemi.append(f"login demo {ruolo}: stato {stato} ({corpo[:150]})")
-            continue
-        biscotto = capi.get("set-cookie") or capi.get("Set-Cookie") or ""
-        if "session" not in biscotto.lower():
-            problemi.append(f"login demo {ruolo}: nessun biscotto di sessione nella risposta")
-            continue
-        fatti.append(f"login demo {ruolo} 200 con sessione")
+def controlla_login() -> None:
+    """Il login vero, sulla farmacia di prova della suite notturna.
+
+    Fino al 13/11 qui si apriva la demo: era comodo (nessuna credenziale nel
+    repo) ma la demo non esiste piu'. Il controllo che conta resta lo stesso,
+    cioe' che una password vera produca una sessione vera, e si fa sull'account
+    che serve gia' alla suite notturna (`PT_TEST_EMAIL` / `PT_TEST_PASSWORD`).
+    In piu' si pretende che la rotta demo risponda 404: se qualcuno la rimette,
+    questo job diventa rosso invece di lasciarla passare in silenzio.
+    """
+    stato_demo, _, _ = chiama(f"{API}/api/auth/demo", metodo="POST",
+                              corpo={"ruolo": "pharmacy"}, tentativi=1)
+    if stato_demo != 404:
+        problemi.append(f"/api/auth/demo dovrebbe essere spenta: risponde {stato_demo}")
+    else:
+        fatti.append("demo rimossa: /api/auth/demo risponde 404")
+
+    email = os.environ.get("PT_TEST_EMAIL", "").strip()
+    password = os.environ.get("PT_TEST_PASSWORD", "")
+    if not email or not password:
+        fatti.append("login: salto il controllo (mancano PT_TEST_EMAIL / PT_TEST_PASSWORD)")
+        return
+
+    stato, corpo, capi = chiama(f"{API}/api/auth/login", metodo="POST",
+                                corpo={"email": email, "password": password})
+    if stato != 200:
+        problemi.append(f"login con la farmacia di prova: stato {stato} ({corpo[:150]})")
+        return
+    biscotto = capi.get("set-cookie") or capi.get("Set-Cookie") or ""
+    valore = ""
+    for pezzo in biscotto.split(","):
+        if "=" in pezzo and "session" in pezzo.lower():
+            valore = pezzo.split(";")[0].strip()
+    if not valore:
+        problemi.append("login: nessun biscotto di sessione nella risposta")
+        return
+    stato_me, corpo_me, _ = chiama(f"{API}/api/auth/me", intestazioni={"Cookie": valore}, tentativi=1)
+    if stato_me != 200:
+        problemi.append(f"login: sessione aperta ma /auth/me risponde {stato_me} ({corpo_me[:150]})")
+        return
+    fatti.append("login farmacia di prova 200, sessione valida su /auth/me")
 
 
 def controlla_deploy_backend() -> None:
@@ -169,7 +200,7 @@ def controlla_deploy_backend() -> None:
 def main() -> int:
     controlla_salute()
     controlla_chunk()
-    controlla_login_demo()
+    controlla_login()
     controlla_deploy_backend()
 
     print("=== controllo ===")
@@ -180,7 +211,7 @@ def main() -> int:
         for riga in problemi:
             print(f"  KO   {riga}")
         return 1
-    print("Produzione sana: sito, chunk, login demo e backend rispondono.")
+    print("Produzione sana: sito, chunk, login vero e backend rispondono. Demo spenta.")
     return 0
 
 
