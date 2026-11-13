@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 # Versione del programma che il server considera corrente. Finisce dentro lo
 # script scaricato: quando si alza, i PC in farmacia la leggono al giro
 # successivo e si aggiornano da soli. Vive qui e solo qui.
-VERSIONE_PULSANTE = 6
+VERSIONE_PULSANTE = 7
 
 _TEMPLATE = r'''# wf-tray.ps1  --  Consegna veloce di PharmaTrack, versione 1
 # Farmacia: @@PHARMACY@@
