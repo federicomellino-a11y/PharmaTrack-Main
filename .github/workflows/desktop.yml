@@ -40,11 +40,14 @@ jobs:
       - name: Fa partire il programma (self-test)
         working-directory: desktop/consegna-veloce
         run: |
-          .\consegna-veloce.exe --self-test
-          $esito = $LASTEXITCODE
+          # L'eseguibile e' un programma grafico: PowerShell non ne aspetta la
+          # fine e $LASTEXITCODE resta vuoto. Si lancia con -Wait e si guarda il
+          # codice che restituisce.
+          $processo = Start-Process -FilePath .\consegna-veloce.exe -ArgumentList '--self-test' -Wait -PassThru
           $rapporto = Join-Path $env:TEMP 'consegna-veloce-selftest.txt'
-          if (Test-Path $rapporto) { Get-Content $rapporto }
-          if ($esito -ne 0) { Write-Error "self-test fallito (codice $esito)"; exit 1 }
+          if (Test-Path $rapporto) { Get-Content $rapporto } else { Write-Error 'nessun rapporto: il programma non e uscito'; exit 1 }
+          if ($processo.ExitCode -ne 0) { Write-Error "self-test fallito (codice $($processo.ExitCode))"; exit 1 }
+          if (-not (Select-String -Path $rapporto -Pattern '^ok$' -Quiet)) { Write-Error 'rapporto senza ok'; exit 1 }
       - name: L'eseguibile scaricato è quello compilato adesso?
         shell: bash
         run: |
