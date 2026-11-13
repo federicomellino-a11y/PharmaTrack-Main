@@ -86,3 +86,16 @@ def test_elenco_funzioni_racconta_cosa_e_aperto():
 
     aperto = elenco_funzioni(_piano(nuovo_profilo_piano(ADESSO)))
     assert all(voce["sbloccata"] is True for voce in aperto)
+
+
+def test_integrazioni_sono_pro_perche_fanno_risparmiare_tempo():
+    """Chiesto da Federico il 13/11: le Integrazioni salgono nel Professional."""
+    chiuso = _piano(nuovo_profilo_piano(ADESSO), GIORNI_PROVA + 1)
+    motivo = verifica_funzione(chiuso, "integrazioni")
+    assert motivo and "Professional" in motivo
+    assert verifica_funzione(_piano(nuovo_profilo_piano(ADESSO)), "integrazioni") is None
+    voce = [f for f in elenco_funzioni(chiuso) if f["chiave"] == "integrazioni"][0]
+    assert voce["sbloccata"] is False
+    assert voce["in_arrivo"] is False
+    # L'account nato prima dei piani continua a lavorare come prima.
+    assert verifica_funzione(_piano({"email": "vecchia@farmacia.it"}), "integrazioni") is None

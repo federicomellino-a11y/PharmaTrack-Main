@@ -27,7 +27,10 @@ import { Layout } from '../../components/Layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import { Button } from '../../components/ui/button';
-import { Plug, Save } from 'lucide-react';
+import {
+  Plug, Save, Store, Truck, Bell, Palette, UserRound, Crown, Download, Wrench,
+} from 'lucide-react';
+import ProGate from '../../components/ProGate';
 import { toast } from 'sonner';
 import { usePWAInstall } from '@/hooks/usePWAInstall';
 
@@ -40,6 +43,22 @@ import { usePWAInstall } from '@/hooks/usePWAInstall';
    "assegnazione automatica" sono state tolte perche' non comandavano nulla.
 */
 const SOGLIA_DEFAULT = 45;
+
+/* Le schede di Impostazioni, con il loro nome e la loro icona.
+   Prima erano parole dentro un rettangolo grigio: sembravano etichette, non
+   cose su cui si clicca (segnalazione di Federico del 13/11). Ora ognuna e' una
+   pillola con bordo e icona, e quella aperta si riempie di verde. */
+const SCHEDE = [
+  { valore: 'farmacia', etichetta: 'Farmacia', icona: Store },
+  { valore: 'consegne', etichetta: 'Consegne', icona: Truck },
+  { valore: 'notifiche', etichetta: 'Notifiche', icona: Bell },
+  { valore: 'aspetto', etichetta: 'Aspetto', icona: Palette },
+  { valore: 'account', etichetta: 'Account', icona: UserRound },
+  { valore: 'piano', etichetta: 'Piano', icona: Crown },
+  { valore: 'integrazioni', etichetta: 'Integrazioni', icona: Plug },
+  { valore: 'esporta', etichetta: 'Esporta', icona: Download },
+  { valore: 'altro', etichetta: 'Altro', icona: Wrench },
+];
 
 const buildFormData = (user) => ({
   pharmacy_name: user?.pharmacy_name || '',
@@ -283,16 +302,13 @@ export default function SettingsPage() {
     <Layout title="Impostazioni">
       <div className="max-w-2xl space-y-6" data-testid="settings-page">
         <Tabs value={scheda} onValueChange={setScheda}>
-          <TabsList className="h-auto w-full flex-wrap justify-start gap-1" data-testid="settings-tabs">
-            <TabsTrigger value="farmacia">Farmacia</TabsTrigger>
-            <TabsTrigger value="consegne">Consegne</TabsTrigger>
-            <TabsTrigger value="notifiche">Notifiche</TabsTrigger>
-            <TabsTrigger value="aspetto">Aspetto</TabsTrigger>
-            <TabsTrigger value="account">Account</TabsTrigger>
-            <TabsTrigger value="piano">Piano</TabsTrigger>
-            <TabsTrigger value="integrazioni">Integrazioni</TabsTrigger>
-            <TabsTrigger value="esporta">Esporta</TabsTrigger>
-            <TabsTrigger value="altro">Altro</TabsTrigger>
+          <TabsList className="scheda-barra" data-testid="settings-tabs">
+            {SCHEDE.map(({ valore, etichetta, icona: Icona }) => (
+              <TabsTrigger key={valore} value={valore} className="scheda-pill" data-testid={`scheda-${valore}`}>
+                <Icona aria-hidden="true" />
+                <span>{etichetta}</span>
+              </TabsTrigger>
+            ))}
           </TabsList>
 
           <TabsContent value="farmacia" className="space-y-6 mt-4">
@@ -366,6 +382,7 @@ export default function SettingsPage() {
           </TabsContent>
 
           <TabsContent value="integrazioni" className="space-y-6 mt-4">
+            <ProGate funzione="integrazioni">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2"><Plug className="w-5 h-5 text-primary" />Integrazioni</CardTitle>
@@ -378,6 +395,7 @@ export default function SettingsPage() {
               </CardContent>
             </Card>
             <PulsanteMagicoCard settings={settings} setSettings={setSettings} onSalva={handleSubmit} salvando={saving} />
+            </ProGate>
           </TabsContent>
 
           <TabsContent value="esporta" className="space-y-6 mt-4">

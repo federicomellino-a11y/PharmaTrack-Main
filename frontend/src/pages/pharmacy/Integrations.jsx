@@ -3,6 +3,7 @@ import axios from 'axios';
 import { useQueryClient } from '@tanstack/react-query';
 import { useWinfarmStatusQuery } from '@/hooks/queries';
 import { Layout } from '../../components/Layout';
+import ProGate from '../../components/ProGate';
 import { Card, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
@@ -97,6 +98,9 @@ export default function IntegrationsPage() {
 
   return (
     <Layout title="Integrazioni">
+      {/* Integrazioni e' una funzione Professional. Il lucchetto non e' solo
+          grafico: import e riconoscimento rispondono 402 dal backend. */}
+      <ProGate funzione="integrazioni">
       <div className="space-y-6 animate-fade-in-up max-w-3xl" data-testid="integrations-page">
         <div>
           <h1 className="text-xl font-bold">Integrazioni</h1>
@@ -184,6 +188,7 @@ export default function IntegrationsPage() {
           </CardContent>
         </Card>
       </div>
+      </ProGate>
     </Layout>
   );
 }

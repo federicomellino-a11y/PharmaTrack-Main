@@ -47,6 +47,16 @@ FUNZIONI = {
         "dove": "Pagina Tracking Live",
         "blocco": "interfaccia",
     },
+    # Chiesto da Federico il 13/11: le Integrazioni salgono nel Professional.
+    # Non e' un lucchetto finto: si chiudono l'import da Winfarm e il
+    # riconoscimento della vendita, cioe' le due cose che fanno risparmiare
+    # tempo. Stato e battito del programma restano aperti come letture, e cosi'
+    # chi ha gia' installato il pulsante non si trova un PC che non parla piu'.
+    "integrazioni": {
+        "nome": "Integrazioni",
+        "descrizione": "La vendita del banco diventa una consegna: lettura da Winfarm, consegna veloce dal PC, nessun dato riscritto a mano",
+        "dove": "Pagina Integrazioni",
+    },
     "turni_cassa": {
         "nome": "Turni e cassa",
         "descrizione": "Turni dei fattorini, incasso atteso contro ricevuto, quadratura di fine giornata",
