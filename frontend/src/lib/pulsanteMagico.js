@@ -4,7 +4,6 @@ export const OPZIONI_PULSANTE = [
   { chiave: 'farmaci', nome: 'Farmaci nel sacchetto', dove: 'Nomi e pezzi letti da Winfarm, nelle note per il fattorino' },
   { chiave: 'etichetta', nome: 'Stampa etichetta alla creazione', dove: 'Si apre la stampa appena confermi' },
   { chiave: 'fattorino', nome: 'Scelta del fattorino', dove: 'Nella scheda: assegni subito la consegna' },
-  { chiave: 'vendite_oggi', nome: 'Vendite di oggi', dove: 'Elenco nella pagina Integrazioni' },
 ];
 
 export const opzioniPulsante = (user) => {
@@ -31,3 +30,10 @@ export const noteConsegna = ({ note, contenuto, pezzi, conSacchetto }) => {
   }
   return parti.filter(Boolean).join(' — ');
 };
+
+/** I farmaci letti da Winfarm, uno per riga: nel campo arrivano uniti da ";" e
+    la scheda li mostra separati, cosi' una vendita da tre pezzi si vede tutta. */
+export const prodottiDaTesto = (testo) => (testo || '')
+  .split(';')
+  .map((voce) => voce.trim())
+  .filter(Boolean);

@@ -5,7 +5,7 @@ import { API } from '@/lib/config';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCustomersQuery, useDeliveriesQuery, useDriversQuery } from '@/hooks/queries';
 import { fasceDellaFarmacia, FASCIA_PRIMA } from '@/lib/fasce';
-import { opzioniPulsante, dataConsegna, noteConsegna } from '@/lib/pulsanteMagico';
+import { opzioniPulsante, dataConsegna, noteConsegna, prodottiDaTesto } from '@/lib/pulsanteMagico';
 import { printDeliveryLabel } from '@/lib/printLabel';
 import AddressAutocomplete from '../components/AddressAutocomplete';
 import { useAuth } from '../contexts/AuthContext';
@@ -14,7 +14,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { toast } from 'sonner';
 import { avvisoConsegnaAperta, consegneAperteDelCliente } from '@/lib/consegneAperte';
-import { Search, User, Plus, Package, CheckCircle2, Zap, Banknote, CreditCard, Clock } from 'lucide-react';
+import { Search, User, Plus, Package, CheckCircle2, Zap, Banknote, CreditCard, Clock, Printer } from 'lucide-react';
 
 const PRIORITIES = [
   { id: 'normal', label: 'Normale', dot: 'bg-emerald-500' },
@@ -68,6 +68,9 @@ export default function QuickAddPage() {
     || searchParams.get('fiscal_code')
     || searchParams.get('origine'));
   const [created, setCreated] = useState(null);
+  // L'etichetta e' un extra: chi ha fretta crea la consegna e va avanti, senza
+  // far partire la stampa.
+  const [stampa, setStampa] = useState(true);
 
   const queryClient = useQueryClient();
   const { data: customersCache } = useCustomersQuery();
@@ -80,6 +83,20 @@ export default function QuickAddPage() {
   useEffect(() => {
     if (activeDeliveriesCache) setDeliveries(ensureArrayLocal(activeDeliveriesCache));
   }, [activeDeliveriesCache]);
+
+  // Il fattorino di default del profilo (Impostazioni > Dati farmacia) e' gia'
+  // scelto: la consegna nasce assegnata, senza un passaggio in piu'. Se non c'e'
+  // un predefinito ma la farmacia ha un solo fattorino attivo, e' quello.
+  const [fattorinoProvato, setFattorinoProvato] = useState(false);
+  useEffect(() => {
+    if (fattorinoProvato || !opzioni.fattorino || form.driver_id) return;
+    const attivi = ensureArrayLocal(fattorini).filter((f) => f.is_active !== false);
+    if (!attivi.length) return;
+    setFattorinoProvato(true);
+    const predefinito = (user?.settings || {}).default_driver_id;
+    const scelto = attivi.find((f) => f.driver_id === predefinito) || (attivi.length === 1 ? attivi[0] : null);
+    if (scelto) setForm((precedente) => ({ ...precedente, driver_id: scelto.driver_id }));
+  }, [fattorinoProvato, opzioni.fattorino, fattorini, user, form.driver_id]);
 
   // Arrivo dai Richiami: il paziente e' gia' deciso, non si cerca nulla.
   const customerIdDaLink = searchParams.get('customer_id');
@@ -230,7 +247,7 @@ export default function QuickAddPage() {
         imported_from: daWinfarm ? 'winfarm' : null,
       };
       const { data } = await axios.post(`${API}/deliveries`, payload, { withCredentials: true });
-      if (opzioni.etichetta) printDeliveryLabel({ ...payload, ...data, customer_name: selectedCustomer.name, customer_address: selectedCustomer.address, customer_phone: selectedCustomer.phone });
+      if (opzioni.etichetta && stampa) printDeliveryLabel({ ...payload, ...data, customer_name: selectedCustomer.name, customer_address: selectedCustomer.address, customer_phone: selectedCustomer.phone });
       setCreated({
         name: selectedCustomer.name,
         amount: amount || null,
@@ -492,11 +509,31 @@ export default function QuickAddPage() {
               </select>
             )}
             {opzioni.farmaci && (
-              <div className="flex items-center gap-2">
-                <Input className="h-9" placeholder="Farmaci nel sacchetto" value={form.contenuto} data-testid="qa-contenuto"
-                  onChange={(e) => setForm({ ...form, contenuto: e.target.value })} />
-                {pezzi && <span className="shrink-0 rounded-md bg-secondary px-2 py-1 text-xs font-medium" data-testid="qa-pezzi">{pezzi} pz</span>}
+              <div className="space-y-1.5">
+                {/* Winfarm puo' mandare piu' farmaci: si vedono tutti, uno per
+                    riga. In un campo solo il secondo restava nascosto. */}
+                {prodottiDaTesto(form.contenuto).length > 0 && (
+                  <ul className="space-y-1 rounded-lg bg-secondary/40 px-2.5 py-1.5" data-testid="qa-prodotti">
+                    {prodottiDaTesto(form.contenuto).map((prodotto, indice) => (
+                      <li key={`${prodotto}-${indice}`} className="flex items-start gap-1.5 text-xs leading-snug">
+                        <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-primary" />
+                        <span className="min-w-0 break-words">{prodotto}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <div className="flex items-center gap-2">
+                  <Input className="h-9" placeholder="Farmaci nel sacchetto" value={form.contenuto} data-testid="qa-contenuto"
+                    onChange={(e) => setForm({ ...form, contenuto: e.target.value })} />
+                  {pezzi && <span className="shrink-0 rounded-md bg-secondary px-2 py-1 text-xs font-medium" data-testid="qa-pezzi">{pezzi} pz</span>}
+                </div>
               </div>
+            )}
+            {opzioni.etichetta && (
+              <label className="flex items-center justify-between rounded-lg border px-2.5 py-2 text-xs" data-testid="qa-stampa-riga">
+                <span className="flex items-center gap-1.5 font-medium"><Printer className="h-3.5 w-3.5" />Stampa etichetta</span>
+                <input type="checkbox" data-testid="qa-stampa" checked={stampa} onChange={(e) => setStampa(e.target.checked)} className="h-4 w-4 accent-primary" />
+              </label>
             )}
             <Input className="h-9" placeholder="Note per il fattorino (citofono, piano…)" value={form.notes} data-testid="qa-note"
               onChange={(e) => setForm({ ...form, notes: e.target.value })} />

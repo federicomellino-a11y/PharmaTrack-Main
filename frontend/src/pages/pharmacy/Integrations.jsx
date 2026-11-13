@@ -9,9 +9,6 @@ import { Badge } from '../../components/ui/badge';
 import { Download, Monitor, Loader2, RefreshCw, CircleDot } from 'lucide-react';
 import { toast } from 'sonner';
 import { API } from '@/lib/config';
-import VenditeOggi from '../../components/integrazioni/VenditeOggi';
-import { opzioniPulsante } from '@/lib/pulsanteMagico';
-import { useAuth } from '../../contexts/AuthContext';
 
 const formatWhen = (iso) => {
   if (!iso) return 'mai';
@@ -53,7 +50,6 @@ export default function IntegrationsPage() {
   const [downloadingTray, setDownloadingTray] = useState(false);
 
   const queryClient = useQueryClient();
-  const { user } = useAuth();
   const { data: winfarmData, isLoading: winfarmLoading } = useWinfarmStatusQuery();
   useEffect(() => {
     setStatus(winfarmData || null);
@@ -133,14 +129,9 @@ export default function IntegrationsPage() {
                 </Button>
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-3 pt-3 border-t border-border/60">
+            <div className="grid grid-cols-2 gap-3 pt-3 border-t border-border/60">
               <Metrica etichetta="Oggi" valore={status?.imports_today ?? 0} sotto="importate" />
               <Metrica etichetta="In totale" valore={status?.imports_total ?? 0} sotto="da sempre" />
-              <Metrica
-                etichetta="Programma"
-                valore={vivo ? 'vivo' : 'silenzioso'}
-                sotto={vivo ? `vers. ${status?.bridge_version || '—'}` : 'nessun battito'}
-              />
             </div>
           </CardContent>
         </Card>}
@@ -192,8 +183,6 @@ export default function IntegrationsPage() {
             </ul>
           </CardContent>
         </Card>
-
-        {opzioniPulsante(user).vendite_oggi && <VenditeOggi />}
       </div>
     </Layout>
   );

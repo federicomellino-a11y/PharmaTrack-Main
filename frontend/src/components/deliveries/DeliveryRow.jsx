@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { puoAnnullare, puoRipristinare } from '@/lib/deliveryActions';
 import { soldiConsegna } from '@/lib/deliveryDisplay';
 import { Badge } from '../ui/badge';
@@ -56,13 +57,23 @@ export default function DeliveryRow({ d, drivers, inRitardo, handlers }) {
     apriAssegna,
   } = handlers;
 
+  // I dettagli (i farmaci del sacchetto, le note) restano chiusi finche' non si
+  // tocca la riga: in una lista di venti consegne i testi aperti rendevano
+  // illeggibile il resto.
+  const [dettagliAperti, setDettagliAperti] = useState(false);
+  const haDettagli = Boolean(d.notes);
+
   const StatusIcon = STATUS_ICONS[d.status] || Package;
   const driver = drivers.find((dr) => dr.driver_id === d.driver_id);
   const PriorityIcon = d.priority && PRIORITY_ICONS[d.priority];
 
   return (
-                <Card key={d.delivery_id} className={`
-                  transition-all hover:shadow-md
+                <Card key={d.delivery_id}
+                onClick={haDettagli ? () => setDettagliAperti((aperto) => !aperto) : undefined}
+                aria-expanded={haDettagli ? dettagliAperti : undefined}
+                data-testid={`riga-consegna-${d.delivery_id}`}
+                className={`
+                  transition-all hover:shadow-md ${haDettagli ? 'cursor-pointer' : ''}
                   ${d.priority === 'urgent' ? 'border-l-4 border-l-destructive' : ''}
                   ${d.priority === 'high' ? 'border-l-4 border-l-amber-400' : ''}
                 `}>
@@ -137,15 +148,31 @@ export default function DeliveryRow({ d, drivers, inRitardo, handlers }) {
                             </span>
                           )}
                         </div>
-                        {d.notes && (
-                          <p className="text-xs text-muted-foreground mt-1.5 bg-secondary/40 rounded-lg px-2.5 py-1.5 italic">
-                            📝 {d.notes}
-                          </p>
+                        {haDettagli && (
+                          <button
+                            type="button"
+                            className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-primary"
+                            data-testid={`apri-dettagli-${d.delivery_id}`}
+                            onClick={(event) => { event.stopPropagation(); setDettagliAperti((aperto) => !aperto); }}
+                          >
+                            <ChevronRight className={`h-3 w-3 transition-transform ${dettagliAperti ? 'rotate-90' : ''}`} />
+                            {dettagliAperti ? 'Nascondi dettagli' : 'Dettagli'}
+                          </button>
+                        )}
+                        {haDettagli && dettagliAperti && (
+                          <div className="mt-1.5 space-y-1 rounded-lg bg-secondary/40 px-2.5 py-1.5" data-testid={`dettagli-${d.delivery_id}`}>
+                            {d.external_ref && (
+                              <p className="text-[11px] text-muted-foreground" data-testid={`scontrino-${d.delivery_id}`}>
+                                Scontrino {d.external_ref}
+                              </p>
+                            )}
+                            <p className="whitespace-pre-line text-xs text-muted-foreground italic">📝 {d.notes}</p>
+                          </div>
                         )}
                       </div>
 
                       {/* Amount + actions */}
-                      <div className="flex sm:flex-col items-center sm:items-end gap-2 sm:gap-1 shrink-0">
+                      <div className="flex sm:flex-col items-center sm:items-end gap-2 sm:gap-1 shrink-0" onClick={(event) => event.stopPropagation()}>
                         {d.amount && (
                           <div className="text-right">
                             {/* In grande l'incasso reale, cioe' quanto entra davvero:
