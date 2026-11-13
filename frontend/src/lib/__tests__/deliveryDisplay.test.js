@@ -48,3 +48,17 @@ describe('consegnaInRitardo', () => {
     expect(consegnaInRitardo({ status: 'pronta' }, oggi)).toBe(false);
   });
 });
+
+import { chiusaIl } from '../deliveryDisplay';
+
+describe('chiusaIl', () => {
+  it('una consegna aperta non ha chiusura', () => {
+    expect(chiusaIl({ status: 'assigned', updated_at: '2026-01-01T10:00:00Z' })).toBeNull();
+  });
+  it('consegnata: vale il momento della consegna', () => {
+    expect(chiusaIl({ status: 'delivered', actual_delivery: '2026-01-01T11:00:00Z', updated_at: '2026-01-02T09:00:00Z' })).toBe('2026-01-01T11:00:00Z');
+  });
+  it('annullata: vale l ultimo aggiornamento', () => {
+    expect(chiusaIl({ status: 'cancelled', updated_at: '2026-01-01T12:00:00Z' })).toBe('2026-01-01T12:00:00Z');
+  });
+});

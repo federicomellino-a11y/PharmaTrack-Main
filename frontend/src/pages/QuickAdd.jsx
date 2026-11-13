@@ -3,7 +3,10 @@ import { useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { API } from '@/lib/config';
 import { useQueryClient } from '@tanstack/react-query';
-import { useCustomersQuery, useDeliveriesQuery } from '@/hooks/queries';
+import { useCustomersQuery, useDeliveriesQuery, useDriversQuery } from '@/hooks/queries';
+import { fasceDellaFarmacia, FASCIA_PRIMA } from '@/lib/fasce';
+import { opzioniPulsante, dataConsegna, noteConsegna } from '@/lib/pulsanteMagico';
+import { printDeliveryLabel } from '@/lib/printLabel';
 import AddressAutocomplete from '../components/AddressAutocomplete';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/ui/button';
@@ -11,7 +14,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { toast } from 'sonner';
 import { avvisoConsegnaAperta, consegneAperteDelCliente } from '@/lib/consegneAperte';
-import { Search, User, Plus, Package, CheckCircle2, Zap, Banknote, CreditCard } from 'lucide-react';
+import { Search, User, Plus, Package, CheckCircle2, Zap, Banknote, CreditCard, Clock } from 'lucide-react';
 
 const PRIORITIES = [
   { id: 'normal', label: 'Normale', dot: 'bg-emerald-500' },
@@ -19,6 +22,7 @@ const PRIORITIES = [
   { id: 'urgent', label: 'Urgente', dot: 'bg-destructive' },
 ];
 
+const oraCorta = (ora) => (ora || '').replace(/^0/, '').replace(/:00$/, '');
 const ensureArrayLocal = (value) => (Array.isArray(value) ? value : []);
 
 export default function QuickAddPage() {
@@ -44,7 +48,17 @@ export default function QuickAddPage() {
     amount_given: '',
     payment_method: searchParams.get('payment_method') || 'cash',
     priority: 'normal',
+    fascia: FASCIA_PRIMA.valore,
+    giorno: 'oggi',
+    driver_id: '',
+    contenuto: '',
   });
+  const pezzi = searchParams.get('pezzi') || '';
+  const daWinfarm = searchParams.get('origine') === 'winfarm';
+  const opzioni = useMemo(() => opzioniPulsante(user), [user]);
+  // Solo fasce pronte: l'orario preciso resta nel modulo completo delle consegne.
+  const fasce = useMemo(() => fasceDellaFarmacia(user).filter((f) => f.da !== '__manuale__'), [user]);
+  const { data: fattorini } = useDriversQuery({ enabled: opzioni.fattorino });
   const [creating, setCreating] = useState(false);
   // Arrivo dal pulsante magico: il cliente va scelto in anagrafica, non inventato.
   // Due casi: il cliente e' stato letto (va cercato) oppure in Winfarm non c'era
@@ -103,6 +117,16 @@ export default function QuickAddPage() {
       setSearchTerm('');
     }
   }, [customers, selectedCustomer, searchParams]);
+
+  // Stesso nome, un solo cliente in anagrafica: e' lui, non serve cercarlo.
+  const nomeDaVendita = (searchParams.get('customer_name') || '').trim().toLowerCase();
+  const [nomeProvato, setNomeProvato] = useState(false);
+  useEffect(() => {
+    if (nomeProvato || !nomeDaVendita || selectedCustomer || !(customers || []).length) return;
+    setNomeProvato(true);
+    const uguali = customers.filter((c) => (c.name || '').trim().toLowerCase() === nomeDaVendita);
+    if (uguali.length === 1) { setSelectedCustomer(uguali[0]); setSearchTerm(''); }
+  }, [customers, nomeDaVendita, nomeProvato, selectedCustomer]);
 
   const recentCustomers = useMemo(() => {
     const seen = new Map();
@@ -190,34 +214,44 @@ export default function QuickAddPage() {
     if (form.payment_method === 'cash' && given > 0 && given < amount) { toast.error('Il pagato con è inferiore all\'importo'); return; }
     setCreating(true);
     try {
+      const fascia = fasce.find((f) => f.valore === form.fascia);
       const payload = {
         customer_id: selectedCustomer.customer_id,
-        notes: form.notes,
+        notes: noteConsegna({ note: form.notes, contenuto: form.contenuto, pezzi, conSacchetto: opzioni.farmaci }),
         amount: form.amount === '' ? null : amount,
         amount_given: form.amount_given === '' ? null : given,
         payment_method: form.payment_method,
         priority: form.priority,
+        scheduled_date: dataConsegna(form.giorno),
+        scheduled_time: fascia?.da || null,
+        slot_to: fascia?.a || null,
+        driver_id: (opzioni.fattorino && form.driver_id) || null,
         external_ref: externalRef || null,
+        imported_from: daWinfarm ? 'winfarm' : null,
       };
       const { data } = await axios.post(`${API}/deliveries`, payload, { withCredentials: true });
+      if (opzioni.etichetta) printDeliveryLabel({ ...payload, ...data, customer_name: selectedCustomer.name, customer_address: selectedCustomer.address, customer_phone: selectedCustomer.phone });
       setCreated({
         name: selectedCustomer.name,
         amount: amount || null,
         resto,
-        driver: data?.auto_assigned ? 'assegnata' : 'da smistare',
+        quando: `${form.giorno === 'domani' ? 'Domani' : 'Oggi'} · ${fascia?.da ? `${fascia.da}–${fascia.a}` : 'prima possibile'}`,
       });
       setTimeout(() => {
         try { window.close(); } catch { /* noop */ }
         setTimeout(() => { if (!window.closed) window.location.href = '/deliveries'; }, 150);
       }, 2500);
-    } catch { toast.error('Errore creazione consegna'); }
+    } catch (err) {
+      const dettaglio = err.response?.data?.detail;
+      toast.error(typeof dettaglio === 'string' ? dettaglio : dettaglio?.motivo || 'Errore creazione consegna');
+    }
     setCreating(false);
   };
 
   const reset = () => {
     setCreated(null);
     setSelectedCustomer(null);
-    setForm({ notes: '', amount: '', amount_given: '', payment_method: 'cash', priority: 'normal' });
+    setForm({ notes: '', amount: '', amount_given: '', payment_method: 'cash', priority: 'normal', fascia: FASCIA_PRIMA.valore, giorno: 'oggi', driver_id: '', contenuto: '' });
   };
 
   if (created) {
@@ -226,6 +260,7 @@ export default function QuickAddPage() {
         <CheckCircle2 className="w-16 h-16 text-primary" />
         <p className="text-lg font-semibold">Consegna creata</p>
         <p className="text-sm text-muted-foreground">{created.name}</p>
+        <p className="text-sm font-medium" data-testid="qa-creata-quando">{created.quando}</p>
         {created.amount != null && <p className="text-2xl font-bold tabular-nums">€ {created.amount.toFixed(2).replace('.', ',')}</p>}
         {created.resto != null && <p className="text-sm">Resto: <span className="font-bold text-primary">€ {created.resto.toFixed(2).replace('.', ',')}</span></p>}
         <p className="text-xs text-muted-foreground">Chiusura automatica…</p>
@@ -237,21 +272,20 @@ export default function QuickAddPage() {
   return (
     <div className="min-h-screen bg-background">
       <div className="mx-auto flex min-h-screen w-full max-w-md flex-col">
-        {/* Testata: cosa sto facendo, e per quale farmacia */}
-        <header className="flex items-center gap-3 px-4 pt-5 pb-4">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10">
-            <Zap className="h-4 w-4 text-primary" />
-          </div>
-          <div className="min-w-0">
-            <h1 className="text-base font-semibold leading-tight">Nuova consegna</h1>
-            <p className="truncate text-xs text-muted-foreground">{user?.pharmacy_name || 'PharmaTrack'}</p>
-          </div>
+        <header className="flex items-center gap-2 border-b px-3 py-2">
+          <Zap className="h-4 w-4 shrink-0 text-primary" />
+          <h1 className="text-sm font-semibold">Nuova consegna</h1>
+          {externalRef && (
+            <span className="ml-auto truncate rounded-md bg-secondary px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground" data-testid="qa-scontrino">
+              {externalRef}
+            </span>
+          )}
         </header>
 
-        <form onSubmit={handleCreate} className="flex flex-1 flex-col gap-3 px-4 pb-32">
+        <form onSubmit={handleCreate} className="flex flex-1 flex-col gap-2 px-3 pb-20 pt-2" data-testid="qa-form">
           {/* 1. Il cliente: e' la scelta che conta, quindi viene per prima */}
-          <section className="rounded-2xl border bg-card p-4">
-            <div className="mb-2.5 flex items-center justify-between">
+          <section className="rounded-xl border bg-card p-3">
+            <div className="mb-1.5 flex items-center justify-between">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Cliente</p>
               {selectedCustomer && (
                 <button type="button" className="text-xs font-medium text-primary" onClick={() => setSelectedCustomer(null)}>
@@ -287,7 +321,7 @@ export default function QuickAddPage() {
                 <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   autoFocus
-                  className="h-11 pl-9"
+                  className="h-9 pl-9" data-testid="qa-cerca-cliente"
                   placeholder="Cerca per nome, telefono o CF"
                   value={searchTerm}
                   onChange={(e) => { setSearchTerm(e.target.value); setDropdownOpen(true); setActiveIndex(-1); }}
@@ -343,16 +377,9 @@ export default function QuickAddPage() {
             )}
 
             {!selectedCustomer && arrivoDaVendita && !newCustomerOpen && (
-              <div className="mt-3 rounded-xl bg-amber-500/10 px-3 py-2.5">
-                <p className="text-xs font-semibold text-amber-700 dark:text-amber-400">
-                  {customerFromSale ? 'Cliente non in anagrafica' : 'Vendita letta da Winfarm'}
-                </p>
-                <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
-                  {customerFromSale
-                    ? 'Sceglilo dalla lista, oppure aggiungilo qui con il suo indirizzo: cosi resta in anagrafica.'
-                    : 'Scegli il cliente fra i tuoi. L\'indirizzo arriva dalla sua scheda, senza riscriverlo.'}
-                </p>
-              </div>
+              <p className="mt-2 rounded-lg bg-amber-500/10 px-2.5 py-1.5 text-[11px] leading-snug text-amber-700 dark:text-amber-400" data-testid="qa-avviso-cliente">
+                {customerFromSale ? 'Cliente non in anagrafica: sceglilo o aggiungilo.' : 'Nessun cliente in Winfarm: sceglilo qui.'}
+              </p>
             )}
 
             {newCustomerOpen && (
@@ -394,76 +421,93 @@ export default function QuickAddPage() {
             )}
           </section>
 
-          {/* 2. Il denaro: importo, contanti ricevuti, resto */}
-          <section className="rounded-2xl border bg-card p-4">
-            <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Pagamento</p>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">Da pagare</Label>
-                <div className="relative">
-                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">€</span>
-                  <Input type="number" step="0.01" inputMode="decimal" min="0" placeholder="0,00" value={form.amount}
-                    className="h-11 pl-7 text-base font-semibold tabular-nums"
-                    onChange={(e) => setForm({ ...form, amount: e.target.value })} />
-                </div>
+          {/* 2. Il denaro, su una riga */}
+          <section className="rounded-xl border bg-card p-3">
+            <div className="grid grid-cols-[1fr_1fr_auto] items-end gap-2">
+              <div className="space-y-1">
+                <Label className="text-[11px] text-muted-foreground">Da pagare €</Label>
+                <Input type="number" step="0.01" inputMode="decimal" min="0" placeholder="0,00" value={form.amount}
+                  className="h-9 text-base font-semibold tabular-nums" data-testid="qa-importo"
+                  onChange={(e) => setForm({ ...form, amount: e.target.value })} />
               </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">Ricevuto</Label>
-                <div className="relative">
-                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">€</span>
-                  <Input type="number" step="0.01" inputMode="decimal" min="0" placeholder="0,00" value={form.amount_given}
-                    className="h-11 pl-7 text-base tabular-nums"
-                    onChange={(e) => setForm({ ...form, amount_given: e.target.value })} />
-                </div>
+              <div className="space-y-1">
+                <Label className="text-[11px] text-muted-foreground">Ricevuto €</Label>
+                <Input type="number" step="0.01" inputMode="decimal" min="0" placeholder="0,00" value={form.amount_given}
+                  className="h-9 tabular-nums" data-testid="qa-ricevuto"
+                  onChange={(e) => setForm({ ...form, amount_given: e.target.value })} />
               </div>
-            </div>
-
-            {resto != null && (
-              <div className="mt-3 flex items-baseline justify-between rounded-xl bg-primary/5 px-3 py-2">
-                <span className="text-xs font-medium text-muted-foreground">Resto</span>
-                <span className="text-lg font-bold tabular-nums text-primary">€ {resto.toFixed(2).replace('.', ',')}</span>
-              </div>
-            )}
-
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setForm({ ...form, payment_method: 'cash' })}
-                className={`flex h-11 items-center justify-center gap-2 rounded-xl border text-sm font-medium transition-colors ${form.payment_method === 'cash' ? 'border-primary bg-primary/10 text-primary' : 'bg-background text-muted-foreground hover:bg-accent'}`}
-              >
-                <Banknote className="h-4 w-4" />Contanti
-              </button>
-              <button
-                type="button"
-                onClick={() => setForm({ ...form, payment_method: 'pos' })}
-                className={`flex h-11 items-center justify-center gap-2 rounded-xl border text-sm font-medium transition-colors ${form.payment_method === 'pos' ? 'border-primary bg-primary/10 text-primary' : 'bg-background text-muted-foreground hover:bg-accent'}`}
-              >
-                <CreditCard className="h-4 w-4" />POS
-              </button>
-            </div>
-          </section>
-
-          {/* 3. Il resto delle informazioni, in una riga sola */}
-          <section className="rounded-2xl border bg-card p-4 space-y-3">
-            <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">Note per il fattorino</Label>
-              <Input placeholder="Es: citofono, piano, orario" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">Priorità</Label>
-              <div className="grid grid-cols-3 gap-2">
-                {PRIORITIES.map((p) => (
-                  <button
-                    type="button"
-                    key={p.id}
-                    className={`flex h-9 items-center justify-center gap-1.5 rounded-lg border text-xs font-medium transition-colors ${form.priority === p.id ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:bg-accent'}`}
-                    onClick={() => setForm({ ...form, priority: p.id })}
-                  >
-                    <span className={`h-1.5 w-1.5 rounded-full ${p.dot}`} />
-                    {p.label}
+              <div className="flex overflow-hidden rounded-lg border">
+                {[{ id: 'cash', icona: Banknote, nome: 'Contanti' }, { id: 'pos', icona: CreditCard, nome: 'POS' }].map(({ id, icona: Icona, nome }) => (
+                  <button type="button" key={id} title={nome} aria-label={nome} data-testid={`qa-pagamento-${id}`}
+                    onClick={() => setForm({ ...form, payment_method: id })}
+                    className={`flex h-9 w-10 items-center justify-center transition-colors ${form.payment_method === id ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-accent'}`}>
+                    <Icona className="h-4 w-4" />
                   </button>
                 ))}
               </div>
+            </div>
+            {resto != null && (
+              <p className="mt-2 flex items-baseline justify-between rounded-lg bg-primary/5 px-2.5 py-1 text-xs text-muted-foreground" data-testid="qa-resto">
+                Resto <span className="text-base font-bold tabular-nums text-primary">€ {resto.toFixed(2).replace('.', ',')}</span>
+              </p>
+            )}
+          </section>
+
+          {/* 3. Quando: giorno e fascia, un tocco ciascuno */}
+          <section className="rounded-xl border bg-card p-3">
+            <div className="mb-1.5 flex items-center justify-between">
+              <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                <Clock className="h-3 w-3" />Consegna
+              </p>
+              <div className="flex overflow-hidden rounded-md border text-[11px] font-medium">
+                {['oggi', 'domani'].map((giorno) => (
+                  <button type="button" key={giorno} data-testid={`qa-giorno-${giorno}`}
+                    onClick={() => setForm({ ...form, giorno })}
+                    className={`px-2.5 py-1 capitalize transition-colors ${form.giorno === giorno ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-accent'}`}>
+                    {giorno}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {fasce.map((fascia) => (
+                <button type="button" key={fascia.valore} data-testid={`qa-fascia-${fascia.valore}`}
+                  onClick={() => setForm({ ...form, fascia: fascia.valore })}
+                  className={`flex h-8 items-center justify-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium transition-colors ${form.fascia === fascia.valore ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:bg-accent'}`}>
+                  {fascia.da ? `${fascia.etichetta || ''} ${oraCorta(fascia.da)}–${oraCorta(fascia.a)}`.trim() : 'Prima possibile'}
+                </button>
+              ))}
+            </div>
+          </section>
+
+          {/* 4. Il resto: note, priorita' e gli extra accesi da Impostazioni */}
+          <section className="space-y-2 rounded-xl border bg-card p-3">
+            {opzioni.fattorino && (
+              <select value={form.driver_id} onChange={(e) => setForm({ ...form, driver_id: e.target.value })}
+                className="h-9 w-full rounded-md border bg-background px-2 text-sm" data-testid="qa-fattorino" aria-label="Fattorino">
+                <option value="">Fattorino: da assegnare</option>
+                {ensureArrayLocal(fattorini).filter((f) => f.is_active !== false).map((f) => (
+                  <option key={f.driver_id} value={f.driver_id}>{f.name}</option>
+                ))}
+              </select>
+            )}
+            {opzioni.farmaci && (
+              <div className="flex items-center gap-2">
+                <Input className="h-9" placeholder="Contenuto del sacchetto" value={form.contenuto} data-testid="qa-contenuto"
+                  onChange={(e) => setForm({ ...form, contenuto: e.target.value })} />
+                {pezzi && <span className="shrink-0 rounded-md bg-secondary px-2 py-1 text-xs font-medium" data-testid="qa-pezzi">{pezzi} pz</span>}
+              </div>
+            )}
+            <Input className="h-9" placeholder="Note per il fattorino (citofono, piano…)" value={form.notes} data-testid="qa-note"
+              onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+            <div className="grid grid-cols-3 gap-1.5">
+              {PRIORITIES.map((p) => (
+                <button type="button" key={p.id} data-testid={`qa-priorita-${p.id}`}
+                  className={`flex h-8 items-center justify-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium transition-colors ${form.priority === p.id ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:bg-accent'}`}
+                  onClick={() => setForm({ ...form, priority: p.id })}>
+                  <span className={`h-1.5 w-1.5 rounded-full ${p.dot}`} />{p.label}
+                </button>
+              ))}
             </div>
           </section>
 
@@ -474,9 +518,9 @@ export default function QuickAddPage() {
           )}
 
           {/* Il pulsante resta sempre a portata di dito, anche in fondo alla pagina */}
-          <div className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 px-4 py-3 backdrop-blur">
+          <div className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 px-3 py-2 backdrop-blur">
             <div className="mx-auto w-full max-w-md">
-              <Button type="submit" disabled={creating || !selectedCustomer} className="h-12 w-full text-base font-semibold">
+              <Button type="submit" disabled={creating || !selectedCustomer} className="h-10 w-full text-sm font-semibold" data-testid="qa-crea">
                 <Package className="mr-1.5 h-4 w-4" />
                 {creating ? 'Creazione…' : 'Crea consegna'}
               </Button>

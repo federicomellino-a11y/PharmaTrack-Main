@@ -35,7 +35,8 @@ def test_token_vuoto_non_lascia_righe_rotte():
 def test_il_programma_parla_con_gli_endpoint_giusti():
     script = render_tray_script("https://x.test", "wf_a", "Farmacia")
     assert "/api/integrations/winfarm/parse" in script
-    assert "/api/integrations/winfarm/bridge" in script
+    # la consegna la crea la scheda, non il programma: niente creazione diretta
+    assert "/api/integrations/winfarm/bridge'" not in script
     assert "/api/auth/login" not in script  # il PC non usa la sessione del browser
 
 
@@ -97,11 +98,13 @@ def test_il_tasto_si_legge_dalla_tastiera_non_dai_messaggi():
     assert '$script:tastoEraGiu' in script
 
 
-def test_senza_cliente_il_modulo_si_apre_lo_stesso():
-    """Nessun cliente selezionato in Winfarm = la farmacia lo sceglie nel modulo,
-    non un vicolo cieco."""
+def test_la_scheda_si_apre_sempre_con_quello_che_si_e_letto():
+    """Cliente noto o no, la conferma passa dalla scheda: li' si sceglie l'orario."""
     from app.core.winfarm_tray import render_tray_script
     script = render_tray_script('https://a.test', 'wf_x', 'Farmacia')
-    assert "origine = 'winfarm'" in script
-    blocco = script[script.index('if (-not $letto.utilizzabile)'):]
-    assert 'Apri-Dock -Parametri $parametri' in blocco[:1200]
+    blocco = script[script.index('function Prendi-Vendita'):script.index('function Apri-Dock')]
+    assert "origine = 'winfarm'" in blocco
+    for campo in ('customer_name', 'amount', 'fiscal_code', 'external_ref', 'pezzi'):
+        assert '$parametri.' + campo in blocco
+    assert 'Apri-Dock -Parametri $parametri' in blocco
+    assert '--window-size=420,640' in script

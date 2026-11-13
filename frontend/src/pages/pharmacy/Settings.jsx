@@ -13,6 +13,8 @@ import OrariConsegnaCard from '../../components/settings/OrariConsegnaCard';
 import FunzioniCard from '../../components/settings/FunzioniCard';
 import MenuCard from '../../components/settings/MenuCard';
 import PreferenzeCard from '../../components/settings/PreferenzeCard';
+import PulsanteMagicoCard from '../../components/settings/PulsanteMagicoCard';
+import { opzioniPulsante } from '../../lib/pulsanteMagico';
 import { FASCE_PREDEFINITE, FASCIA_PRIMA, normalizzaFasce } from '../../lib/fasce';
 import { funzioniDellaFarmacia } from '../../lib/funzioniFarmacia';
 import { giorniConsegnati, taglioOrdini } from '../../lib/giorniConsegna';
@@ -80,6 +82,7 @@ const buildSettingsData = (user) => {
     taglio_ordini: taglioOrdini(salvate),
     pagina_iniziale: salvate.pagina_iniziale === 'deliveries' ? 'deliveries' : 'dashboard',
     funzioni: funzioniDellaFarmacia({ settings: salvate }),
+    pulsante: opzioniPulsante({ settings: salvate }),
     dimensione_testo: salvate.dimensione_testo || 'normale',
     ordine_menu: Array.isArray(salvate.ordine_menu) ? salvate.ordine_menu : [],
   };
@@ -374,6 +377,7 @@ export default function SettingsPage() {
                 </Button>
               </CardContent>
             </Card>
+            <PulsanteMagicoCard settings={settings} setSettings={setSettings} onSalva={handleSubmit} salvando={saving} />
           </TabsContent>
 
           <TabsContent value="esporta" className="space-y-6 mt-4">

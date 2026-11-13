@@ -362,62 +362,16 @@ function Prendi-Vendita {
         Mostra ([System.Windows.Forms.ToolTipIcon]::Error) 'Server non raggiungibile' $_.Exception.Message
         return
     }
-    if (-not $letto.utilizzabile) {
-        # Nessun cliente selezionato in Winfarm (o totale non letto) non e' un
-        # vicolo cieco: e' il momento in cui la farmacia sceglie il cliente.
-        # Il modulo si apre con quello che si e' letto, e l'indirizzo arriva
-        # dalla scheda del cliente, come sempre.
-        $parametri = @{ origine = 'winfarm' }
-        if ($letto.campi.importo) { $parametri.amount = $letto.campi.importo }
-        if ($letto.campi.codice_fiscale) { $parametri.fiscal_code = $letto.campi.codice_fiscale }
-        if ($letto.intestazione.riferimento) { $parametri.external_ref = $letto.intestazione.riferimento }
-        Apri-Dock -Parametri $parametri
-        $spiegazione = if (-not $letto.campi.cliente) {
-            'Non c e un cliente selezionato in Winfarm: nel modulo che ho aperto scegli il cliente, o aggiungilo se e nuovo.'
-        } else {
-            'Manca il totale: nel modulo che ho aperto scrivi l importo e scegli il cliente.'
-        }
-        Mostra ([System.Windows.Forms.ToolTipIcon]::Info) 'Consegna da completare' $spiegazione
-        return
-    }
-    $pezzi = if ($letto.intestazione.totale_pezzi) { $letto.intestazione.totale_pezzi } else { 1 }
-    # Il codice fiscale e' il primo dato su cui il server cerca il cliente:
-    # mandarlo sempre, quando c'e'. Il pagamento NON si manda: metodo e resto
-    # li sceglie la farmacia nel modulo, perche' la schermata non li dice.
-    $corpo = @{
-        cliente = $letto.campi.cliente
-        importo = $letto.campi.importo
-        note = 'Letta da Winfarm (' + $pezzi + ' pezzi)'
-    }
-    if ($letto.campi.codice_fiscale) { $corpo.codice_fiscale = $letto.campi.codice_fiscale }
-    # Il numero dello scontrino ("A 89 del 05/11/2026") vale per sempre: con
-    # quello il server riconosce la stessa vendita anche a distanza di ore,
-    # non solo nei dieci minuti della finestra.
-    if ($letto.intestazione.riferimento) { $corpo.external_ref = $letto.intestazione.riferimento }
-    try {
-        $creata = Chiama-Api $config '/api/integrations/winfarm/bridge' $corpo
-    } catch {
-        $stato = Stato-Errore $_
-        if ($stato -eq 422) {
-            # Cliente non in anagrafica: si apre il modulo gia' compilato.
-            # Nome e importo li sappiamo, l'indirizzo lo sa la farmacia.
-            Apri-Dock -Parametri @{
-                customer_name = $letto.campi.cliente
-                amount = $letto.campi.importo
-                fiscal_code = $letto.campi.codice_fiscale
-            }
-            Mostra ([System.Windows.Forms.ToolTipIcon]::Warning) 'Cliente non in anagrafica' `
-                ($letto.campi.cliente + ': scegli il cliente dalla lista o aggiungine uno nuovo nel modulo che ho aperto.')
-        } elseif ($stato -eq 409) {
-            Mostra ([System.Windows.Forms.ToolTipIcon]::Info) 'Gia importata' 'Questa vendita e gia su PharmaTrack.'
-        } else {
-            Mostra ([System.Windows.Forms.ToolTipIcon]::Error) 'Consegna non creata' $_.Exception.Message
-        }
-        return
-    }
-    $importo = ('{0:N2}' -f [double]$letto.campi.importo) + ' euro'
-    Mostra ([System.Windows.Forms.ToolTipIcon]::Info) 'Consegna pronta' `
-        ($letto.campi.cliente + ' - ' + $importo + '. Apri il Dock per completarla.')
+    # La scheda si apre sempre: quello che Winfarm sa (cliente, codice fiscale,
+    # importo, scontrino) arriva gia' scritto, quello che non sa (orario,
+    # pagamento) lo sceglie la farmacia prima di confermare.
+    $parametri = @{ origine = 'winfarm' }
+    if ($letto.campi.cliente) { $parametri.customer_name = $letto.campi.cliente }
+    if ($letto.campi.importo) { $parametri.amount = $letto.campi.importo }
+    if ($letto.campi.codice_fiscale) { $parametri.fiscal_code = $letto.campi.codice_fiscale }
+    if ($letto.intestazione.riferimento) { $parametri.external_ref = $letto.intestazione.riferimento }
+    if ($letto.intestazione.totale_pezzi) { $parametri.pezzi = $letto.intestazione.totale_pezzi }
+    Apri-Dock -Parametri $parametri
 }
 
 function Apri-Dock {
@@ -443,7 +397,7 @@ function Apri-Dock {
         "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe"
     ) | Where-Object { Test-Path $_ } | Select-Object -First 1
     if ($browser) {
-        Start-Process -FilePath $browser -ArgumentList "--app=$url", '--window-size=380,900'
+        Start-Process -FilePath $browser -ArgumentList "--app=$url", $(if ($Parametri.Count -gt 0) { '--window-size=420,640' } else { '--window-size=380,900' })
     } else {
         Start-Process $url
     }

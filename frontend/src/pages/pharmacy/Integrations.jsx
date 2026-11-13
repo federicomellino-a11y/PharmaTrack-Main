@@ -9,7 +9,9 @@ import { Badge } from '../../components/ui/badge';
 import { Download, Monitor, Loader2, RefreshCw, CircleDot } from 'lucide-react';
 import { toast } from 'sonner';
 import { API } from '@/lib/config';
-import IncollaVendita from '../../components/integrations/IncollaVendita';
+import VenditeOggi from '../../components/integrazioni/VenditeOggi';
+import { opzioniPulsante } from '@/lib/pulsanteMagico';
+import { useAuth } from '../../contexts/AuthContext';
 
 const formatWhen = (iso) => {
   if (!iso) return 'mai';
@@ -51,6 +53,7 @@ export default function IntegrationsPage() {
   const [downloadingTray, setDownloadingTray] = useState(false);
 
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const { data: winfarmData, isLoading: winfarmLoading } = useWinfarmStatusQuery();
   useEffect(() => {
     setStatus(winfarmData || null);
@@ -91,7 +94,7 @@ export default function IntegrationsPage() {
   const stato = vivo
     ? { testo: 'Programma collegato', sotto: `Ultimo giro ${ultimoBattito}`, badge: 'Attivo' }
     : giorni === null
-      ? { testo: 'Pronto da collegare', sotto: 'Incolla una vendita qui sotto per cominciare', badge: 'Da attivare' }
+      ? { testo: 'Pronto da collegare', sotto: 'Scarica il pulsante magico per cominciare', badge: 'Da attivare' }
       : giorni <= 1
         ? { testo: 'Collegato a Winfarm', sotto, badge: 'Attivo' }
         : { testo: `Fermo da ${giorni} giorni`, sotto, badge: 'Da controllare' };
@@ -142,28 +145,55 @@ export default function IntegrationsPage() {
           </CardContent>
         </Card>
 
-        <IncollaVendita />
+        <Card data-testid="pulsante-magico-card">
+          <CardContent className="p-4 space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                  <Monitor className="w-4 h-4" />
+                </div>
+                <div>
+                  <p className="font-semibold text-sm">Pulsante magico</p>
+                  <p className="text-xs text-muted-foreground">Programma per il PC del banco, Windows 10 o 11.</p>
+                </div>
+              </div>
+              <Button size="sm" className="gap-2" onClick={downloadTray} disabled={downloadingTray} data-testid="scarica-pulsante-magico">
+                {downloadingTray ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                Scarica
+              </Button>
+            </div>
 
-        <Card>
-          <CardContent className="p-4 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                <Monitor className="w-4 h-4" />
+            <div className="grid gap-4 sm:grid-cols-2" data-testid="pulsante-magico-istruzioni">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">Si installa una volta</p>
+                <ol className="space-y-1.5 text-sm list-decimal pl-4 marker:text-muted-foreground">
+                  <li>Scarica il file e mettilo in una cartella fissa, per esempio Documenti.</li>
+                  <li>Tasto destro sul file → <b>Esegui con PowerShell</b>. Vicino all’orologio compare la croce verde.</li>
+                  <li>Tasto destro sulla croce → <b>Avvio automatico con Windows</b>.</li>
+                  <li>Su quel PC resta collegato a PharmaTrack in Chrome o Edge.</li>
+                </ol>
               </div>
               <div>
-                <p className="font-semibold text-sm">Pulsante magico</p>
-                <p className="text-xs text-muted-foreground">
-                  Programma per il PC del banco: in Winfarm premi{' '}
-                  <kbd className="px-1 rounded bg-secondary text-[10px] font-mono">Ctrl+Shift+C</kbd> e la vendita arriva da sola.
-                </p>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">Si usa così</p>
+                <ol className="space-y-1.5 text-sm list-decimal pl-4 marker:text-muted-foreground">
+                  <li>In Winfarm tieni aperta la vendita, con il cliente selezionato.</li>
+                  <li>Premi <kbd className="px-1 rounded bg-secondary text-[11px] font-mono">Ctrl+Shift+C</kbd>.</li>
+                  <li>Si apre una scheda piccola con cliente e importo già scritti.</li>
+                  <li>Scegli orario e pagamento, premi <kbd className="px-1 rounded bg-secondary text-[11px] font-mono">Invio</kbd>: la consegna è in lista.</li>
+                </ol>
               </div>
             </div>
-            <Button size="sm" variant="outline" className="gap-2" onClick={downloadTray} disabled={downloadingTray} data-testid="scarica-pulsante-magico">
-              {downloadingTray ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-              Scarica
-            </Button>
+
+            <ul className="text-xs text-muted-foreground space-y-1 border-t pt-3">
+              <li>Cliente non in anagrafica: lo aggiungi dalla scheda, con l’indirizzo.</li>
+              <li>La stessa vendita non entra due volte: lo scontrino viene riconosciuto.</li>
+              <li>Per cambiare tasto: tasto destro sulla croce → Cambia tasto.</li>
+              <li>Il programma si aggiorna da solo.</li>
+            </ul>
           </CardContent>
         </Card>
+
+        {opzioniPulsante(user).vendite_oggi && <VenditeOggi />}
       </div>
     </Layout>
   );

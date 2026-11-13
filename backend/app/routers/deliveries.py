@@ -228,6 +228,7 @@ async def create_delivery(delivery: DeliveryCreate, user: dict = Depends(get_cur
         nre=getattr(delivery, "nre", None),
         client_meta=getattr(delivery, "client_meta", None),
         external_ref=delivery.external_ref,
+        imported_from=delivery.imported_from,
     )
     await db.deliveries.insert_one(delivery_data)
     await invalida_riepiloghi(user["user_id"])
