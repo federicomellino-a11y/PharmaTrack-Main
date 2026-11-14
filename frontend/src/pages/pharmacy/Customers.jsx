@@ -59,6 +59,21 @@ export default function CustomersPage() {
     }
   }, []);
 
+  // Arrivo dalla ricerca o dalla mappa (/customers?customer=<id>): si apre
+  // direttamente la scheda del cliente, non l'elenco.
+  useEffect(() => {
+    if (loading) return;
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get('customer');
+    if (!id) return;
+    const trovato = ensureArray(customers).find((cliente) => cliente.customer_id === id);
+    if (!trovato) return;
+    setSelectedCustomer(trovato);
+    params.delete('customer');
+    const resto = params.toString();
+    window.history.replaceState({}, '', `/customers${resto ? `?${resto}` : ''}`);
+  }, [loading, customers]);
+
   const fetchCustomerStats = async (customerId, customerSnapshot = null) => {
     setLoadingStats(true);
     if (customerSnapshot) {

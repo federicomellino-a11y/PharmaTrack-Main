@@ -42,7 +42,7 @@ const SCRITTURE_SENZA_CACHE = {
   'LandingPage.jsx': 'login demo dalla landing, poi si cambia pagina',
   'driver/Chat.jsx': 'stream di messaggi: lo stato arriva dal websocket',
   'driver/DeliveryDetail.jsx': 'stato locale in tempo reale, nessun elenco in cache',
-  'pharmacy/Dashboard.jsx': 'rinvio email di verifica e geocodifica in background, non tocca elenchi',
+  'pharmacy/Dashboard.jsx': 'rinvio email di verifica, non tocca elenchi (la geocodifica ora sta in components/customers/MappaClienti.jsx)',
   'pharmacy/Settings.jsx': 'eliminazione account: si esce e la cache sparisce',
 };
 
