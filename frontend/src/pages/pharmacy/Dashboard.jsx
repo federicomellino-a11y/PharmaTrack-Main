@@ -1,87 +1,36 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { API } from '@/lib/config';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
-import L from 'leaflet';
-import { safeInvalidateSize } from '@/lib/leafletSafe';
 import { Layout } from '../../components/Layout';
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
+import { Card, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
-import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Package, Users, Truck, Clock, CheckCircle2, Plus, UserPlus, MapPin, TrendingUp, ArrowRight, AlertCircle, BarChart3, Wallet } from 'lucide-react';
+import {
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+} from 'recharts';
+import {
+  Package, Users, Truck, Clock, CheckCircle2, Plus, MapPin, TrendingUp,
+  ArrowRight, AlertCircle, Wallet,
+} from 'lucide-react';
 import { toast } from 'sonner';
-import 'leaflet/dist/leaflet.css';
-import { geocodeAddress as geocodeWithRateLimit } from '../../lib/geocoding';
-import { ensureArray, ensureObject } from '@/lib/collections';
-import { useStatisticsQuery, useDeliveriesQuery, useCustomersQuery } from '@/hooks/queries';
+import { ensureArray } from '@/lib/collections';
+import {
+  useStatisticsQuery, useDeliveriesQuery, useCustomersQuery, useDriversQuery,
+  useShiftsQuery, usePlanQuery,
+} from '@/hooks/queries';
 import { DashboardSkeleton } from '../../components/Skeletons';
 import MeseInCorso from '../../components/dashboard/MeseInCorso';
-
-
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-});
+import DaGestireOra from '../../components/dashboard/DaGestireOra';
+import RiepilogoFattorini from '../../components/dashboard/RiepilogoFattorini';
+import ConsegneInCorso from '../../components/dashboard/ConsegneInCorso';
 
 import { STATUS_LABELS as statusLabels } from '@/lib/deliveryDisplay';
 import { formatCurrency } from '@/lib/format';
 import { funzioneAttiva } from '@/lib/funzioniFarmacia';
-const customerIcon = new L.DivIcon({
-  className: '',
-  html: `<div style="background:hsl(172,66%,33%);width:12px;height:12px;border-radius:50%;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.3);"></div>`,
-  iconSize: [12, 12], iconAnchor: [6, 6],
-});
-
-const pharmacyIcon = new L.DivIcon({
-  className: '',
-  html: `<div style="background:hsl(45,93%,47%);width:16px;height:16px;border-radius:50%;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.4);"></div>`,
-  iconSize: [16, 16], iconAnchor: [8, 8],
-});
-
-function MapResizer() {
-  const map = useMap();
-  useEffect(() => {
-    let alive = true;
-    const run = () => {
-      if (alive) safeInvalidateSize(map);
-    };
-    const t = setTimeout(run, 200);
-    const h = () => setTimeout(run, 100);
-    window.addEventListener('resize', h);
-    return () => {
-      alive = false;
-      clearTimeout(t);
-      window.removeEventListener('resize', h);
-    };
-  }, [map]);
-  return null;
-}
-
-
-const buildUrgentItems = (deliveries) => {
-  const now = new Date();
-  const items = [];
-  ensureArray(deliveries).forEach((delivery) => {
-    if (['delivered', 'cancelled'].includes(delivery.status)) return;
-    const unassigned = !delivery.driver_id && ['da_preparare', 'pronta', 'pending'].includes(delivery.status);
-    let late = false;
-    if (delivery.scheduled_date) {
-      const when = new Date(`${delivery.scheduled_date}T${delivery.scheduled_time || '23:59'}`);
-      late = !Number.isNaN(when.getTime()) && when < now;
-    }
-    if (unassigned) items.push({ delivery, reason: 'unassigned' });
-    else if (late) items.push({ delivery, reason: 'late' });
-  });
-  return items.sort((a, b) => (a.reason === b.reason ? 0 : a.reason === 'late' ? -1 : 1));
-};
-
-
+import { funzioneSbloccata } from '@/lib/funzioniPro';
+import { costruisciDaGestire, totaleDaGestire } from '@/lib/homeUrgenti';
 
 export default function PharmacyDashboard() {
   const navigate = useNavigate();
@@ -92,18 +41,21 @@ export default function PharmacyDashboard() {
     }
     navigate('/deliveries?new=true');
   };
-  const { isDark } = useTheme();
-  const { user, checkAuth } = useAuth();
-  const [customerCoords, setCustomerCoords] = useState({});
-  const [pharmacyCoords, setPharmacyCoords] = useState(null);
+  const { user } = useAuth();
   const [resending, setResending] = useState(false);
-  const mapKey = useRef(`dash-map-${Date.now()}`);
 
   const { data: stats } = useStatisticsQuery();
   const { data: activeDeliveries = [] } = useDeliveriesQuery('active');
   const { data: customers = [], isLoading: customersLoading } = useCustomersQuery();
+  const { data: drivers = [] } = useDriversQuery();
+  const { data: piano } = usePlanQuery();
+  // I turni sono una funzione Professional: se non c'e', non si chiede nulla
+  // al server (che risponderebbe 402) e la voce non compare.
+  const turniSbloccati = funzioneSbloccata(piano, 'turni_cassa');
+  const { data: turni = [] } = useShiftsQuery({ enabled: turniSbloccati });
+
   const loading = stats === undefined && customersLoading;
-  const recentDeliveries = ensureArray(activeDeliveries).slice(0, 6);
+  const consegne = ensureArray(activeDeliveries);
 
   const resendVerification = useCallback(async () => {
     setResending(true);
@@ -117,80 +69,18 @@ export default function PharmacyDashboard() {
     }
   }, []);
 
-  const loadCustomerCoordinates = useCallback(async (customer) => {
-    if (!customer?.customer_id) return;
-    if (customer.customer_lat != null && customer.customer_lng != null) {
-      setCustomerCoords(prev => ({
-        ...prev,
-        [customer.customer_id]: { lat: customer.customer_lat, lng: customer.customer_lng },
-      }));
-      return;
-    }
-    const coords = await geocodeWithRateLimit(customer?.address);
-    if (!coords) return;
-    setCustomerCoords(prev => ({ ...prev, [customer.customer_id]: coords }));
-    // Persist so the map never re-geocodes this customer again
-    axios.put(`${API}/customers/${customer.customer_id}`,
-      { customer_lat: coords.lat, customer_lng: coords.lng },
-      { withCredentials: true }).catch(() => null);
-  }, []);
-
-  useEffect(() => {
-    const safeCustomers = ensureArray(customers);
-    if (!safeCustomers.length) return;
-    setCustomerCoords({});
-    safeCustomers.slice(0, 20).forEach((customer) => {
-      loadCustomerCoordinates(customer).catch(() => null);
-    });
-  }, [customers, loadCustomerCoordinates]);
-
-  useEffect(() => {
-    let mounted = true;
-
-    const loadPharmacyCoordinates = async () => {
-      if (user?.pharmacy_lat != null && user?.pharmacy_lng != null) {
-        if (mounted) {
-          setPharmacyCoords({ lat: user.pharmacy_lat, lng: user.pharmacy_lng });
-        }
-        return;
-      }
-      const coords = await geocodeWithRateLimit(user?.pharmacy_address);
-      if (mounted && coords) {
-        setPharmacyCoords(coords);
-      }
-    };
-
-    if (user?.pharmacy_address || (user?.pharmacy_lat != null && user?.pharmacy_lng != null)) {
-      loadPharmacyCoordinates().catch(() => null);
-    }
-
-    return () => {
-      mounted = false;
-    };
-  }, [user]);
+  const vociDaGestire = useMemo(() => costruisciDaGestire({
+    consegne,
+    fattorini: ensureArray(drivers),
+    turni: ensureArray(turni),
+    turniDisponibili: turniSbloccati,
+  }), [consegne, drivers, turni, turniSbloccati]);
 
   if (loading) return (
     <Layout title="Dashboard">
       <DashboardSkeleton />
     </Layout>
   );
-
-  const safeRecentDeliveries = ensureArray(recentDeliveries);
-  const urgentDeliveries = buildUrgentItems(activeDeliveries);
-  const safeCustomers = ensureArray(customers);
-  const customerCoordEntries = Object.entries(ensureObject(customerCoords));
-  const firstCustomerCoord = customerCoordEntries[0]?.[1];
-
-  const mapCenter = pharmacyCoords
-    ? [pharmacyCoords.lat, pharmacyCoords.lng]
-    : firstCustomerCoord
-      ? [firstCustomerCoord.lat, firstCustomerCoord.lng]
-      : [40.8833, 14.4761];
-
-  const tileUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
-  const tileAttribution = '&copy; OpenStreetMap contributors';
-
-  const cassaInHome = funzioneAttiva(user, 'cassa_home');
 
   const kpis = [
     { to: '/deliveries', label: 'Consegne oggi', value: stats?.deliveries?.today || 0, sub: `${stats?.deliveries?.today_completed || 0} completate`, icon: Package, color: 'text-primary', bg: 'bg-primary/10' },
@@ -204,10 +94,25 @@ export default function PharmacyDashboard() {
     completed: Number(entry.completed || 0),
   }));
   const hasWeeklyActivity = weeklyChartData.some((entry) => entry.completed > 0);
+  const cassaInHome = funzioneAttiva(user, 'cassa_home');
 
   return (
     <Layout title="Dashboard">
       <div className="space-y-5 animate-fade-in-up" data-testid="pharmacy-dashboard">
+
+        {/* Intestazione: chi sei, che giorno e', e il gesto che si fa di piu' */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <h1 className="text-2xl font-bold tracking-tight">Ciao {user?.name?.split(' ')[0] || ''}</h1>
+            <p className="text-sm text-muted-foreground">
+              {new Date().toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })}
+              {' · '}{stats?.deliveries?.today || 0} consegne oggi
+            </p>
+          </div>
+          <Button className="btn-primary shrink-0" onClick={openNewDelivery} data-testid="nuova-consegna-home">
+            <Plus className="mr-1.5 h-4 w-4" />Nuova consegna
+          </Button>
+        </div>
 
         {/* Email verification banner */}
         {user?.email_verified === false && (
@@ -234,43 +139,8 @@ export default function PharmacyDashboard() {
           </div>
         )}
 
-        {/* Welcome banner */}
-        <div className="rounded-2xl bg-gradient-to-r from-primary/10 via-primary/5 to-transparent border border-primary/15 px-5 py-4 flex items-center justify-between gap-4">
-          <div>
-            <h1 className="text-lg font-bold">
-              {new Date().getHours() < 12 ? 'Buongiorno' : new Date().getHours() >= 18 ? 'Buonasera' : 'Buon pomeriggio'}{user?.name ? `, ${user.name.split(' ')[0]}` : ''}! 👋
-            </h1>
-            <p className="text-sm text-muted-foreground mt-0.5">
-              {user?.pharmacy_name || 'La tua farmacia'} · {new Date().toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })}
-            </p>
-          </div>
-          <Button className="btn-primary shrink-0" size="sm" onClick={openNewDelivery}>
-            <Plus className="w-4 h-4 mr-1.5" />Nuova
-          </Button>
-        </div>
-
-        {/* Il mese in un numero: la frase che il titolare ripete al telefono */}
-        {cassaInHome && <MeseInCorso mese={stats?.month} />}
-
-        {/* Quick actions */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {[
-            { to: '/deliveries?new=true', icon: Plus, label: 'Consegna', color: 'text-primary', bg: 'bg-primary/10' },
-            { to: '/customers?new=true', icon: UserPlus, label: 'Cliente', color: 'text-blue-600', bg: 'bg-blue-500/10' },
-            { to: '/drivers', icon: Truck, label: 'Fattorini', color: 'text-purple-600', bg: 'bg-purple-500/10' },
-            { to: '/reports', icon: BarChart3, label: 'Report', color: 'text-amber-600', bg: 'bg-amber-500/10' },
-          ].map(({ to, icon: Icon, label, color, bg }) => (
-            <Link key={to} to={to} className="quick-action">
-              <div className={`w-11 h-11 rounded-xl ${bg} flex items-center justify-center`}>
-                <Icon className={`w-5 h-5 ${color}`} />
-              </div>
-              <span className="text-xs font-medium text-muted-foreground">{label}</span>
-            </Link>
-          ))}
-        </div>
-
-        {/* KPIs */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {/* Indicatori della giornata */}
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           {kpis.map((kpi, i) => (
             <Link
               key={kpi.label}
@@ -278,217 +148,121 @@ export default function PharmacyDashboard() {
               className="block rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               data-testid={`kpi-${kpi.label.toLowerCase().replace(/\s+/g, '-')}`}
             >
-            <Card className={`stat-modern card-interactive animate-slide-up stagger-${i}`}>
-              <CardContent className="p-4">
-                <div className="flex items-start justify-between mb-2">
-                  <p className="text-xs text-muted-foreground font-medium">{kpi.label}</p>
-                  {kpi.alert && <AlertCircle className="w-3.5 h-3.5 text-amber-500" />}
-                </div>
-                <p className="text-3xl font-black tracking-tight">{kpi.value}</p>
-                <p className="text-xs text-muted-foreground mt-1">{kpi.sub}</p>
-                <div className={`w-8 h-8 rounded-lg ${kpi.bg} flex items-center justify-center mt-3`}>
-                  <kpi.icon className={`w-4 h-4 ${kpi.color}`} />
-                </div>
-              </CardContent>
-            </Card>
+              <Card className={`stat-modern card-interactive animate-slide-up stagger-${i}`}>
+                <CardContent className="p-4">
+                  <div className="mb-2 flex items-start justify-between">
+                    <p className="text-xs font-medium text-muted-foreground">{kpi.label}</p>
+                    {kpi.alert && <AlertCircle className="h-3.5 w-3.5 text-amber-500" />}
+                  </div>
+                  <p className="text-3xl font-black tracking-tight">{kpi.value}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{kpi.sub}</p>
+                  <div className={`mt-3 h-8 w-8 rounded-lg ${kpi.bg} flex items-center justify-center`}>
+                    <kpi.icon className={`w-4 h-4 ${kpi.color}`} />
+                  </div>
+                </CardContent>
+              </Card>
             </Link>
           ))}
         </div>
 
-        {/* Cassa di oggi: il numero che serve alla sera, senza ricostruirlo.
-            Si spegne da Impostazioni quando la home resta davanti ai clienti. */}
-        {cassaInHome && (
-          <Card className="card-exclusive" data-testid="cassa-oggi">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between gap-3 mb-3">
-                <div className="flex items-center gap-2">
-                  <Wallet className="w-4 h-4 text-primary" />
-                  <p className="text-sm font-semibold">Cassa di oggi</p>
-                </div>
-                <Link to="/shifts" className="text-xs text-primary hover:underline">Turni &amp; Cassa</Link>
-              </div>
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Totale</p>
-                  <p className="text-2xl font-black tabular-nums">€ {(stats?.today_money?.total || 0).toFixed(2).replace('.', ',')}</p>
-                  <p className="text-xs text-muted-foreground">{stats?.today_money?.count || 0} consegne incassate</p>
-                </div>
-                <div>
-                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Contanti</p>
-                  <p className="text-lg font-bold tabular-nums">€ {(stats?.today_money?.cash || 0).toFixed(2).replace('.', ',')}</p>
-                </div>
-                <div>
-                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">POS</p>
-                  <p className="text-lg font-bold tabular-nums">€ {(stats?.today_money?.pos || 0).toFixed(2).replace('.', ',')}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        {/* Le cinque cose da guardare, prima di tutto il resto */}
+        <DaGestireOra voci={vociDaGestire} totale={totaleDaGestire(vociDaGestire)} />
 
-        {/* Map + Chart */}
-        <div className="grid lg:grid-cols-2 gap-4">
-          <Card className="card-exclusive overflow-hidden">
-            <CardHeader className="pb-2 pt-4 px-4">
-              <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-primary" />
-                Mappa Clienti
-                <span className="text-xs text-muted-foreground font-normal ml-auto">
-                  {Object.keys(customerCoords).length} clienti
-                </span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="h-56 md:h-64">
-                <MapContainer key={mapKey.current} center={mapCenter} zoom={13} className="h-full w-full" zoomControl={false}>
-                  <TileLayer attribution={tileAttribution} url={tileUrl} />
-                  <MapResizer />
-                  {pharmacyCoords && (
-                    <Marker position={[pharmacyCoords.lat, pharmacyCoords.lng]} icon={pharmacyIcon}>
-                      <Popup><div className="text-center text-xs"><strong>📍 {user?.pharmacy_name || 'Farmacia'}</strong><br />{user?.pharmacy_address}</div></Popup>
-                    </Marker>
-                  )}
-                  {customerCoordEntries.map(([id, c]) => {
-                    const customer = safeCustomers.find(x => x.customer_id === id);
-                    return customer ? (
-                      <Marker key={id} position={[c.lat, c.lng]} icon={customerIcon}>
-                        <Popup><div className="text-xs"><strong>{customer.name}</strong><br />{customer.address}</div></Popup>
-                      </Marker>
-                    ) : null;
-                  })}
-                </MapContainer>
-              </div>
-              <div className="px-4 py-2.5 border-t border-border flex items-center gap-4 text-xs text-muted-foreground">
-                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block"></span>La tua farmacia</span>
-                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-primary inline-block"></span>Clienti</span>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="card-exclusive">
-            <CardHeader className="pb-2 pt-4 px-4">
-              <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-primary" />
-                Andamento Settimana
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="px-2">
-              <div className="h-56 md:h-[264px]">
-                {hasWeeklyActivity ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={weeklyChartData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
-                      <defs>
-                        <linearGradient id="gComp" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="hsl(221,83%,53%)" stopOpacity={0.32} />
-                          <stop offset="95%" stopColor="hsl(221,83%,53%)" stopOpacity={0.04} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                      <XAxis dataKey="day" stroke="hsl(var(--muted-foreground))" fontSize={11} tickLine={false} axisLine={false} />
-                      <YAxis allowDecimals={false} stroke="hsl(var(--muted-foreground))" fontSize={11} tickLine={false} axisLine={false} />
-                      <Tooltip
-                        contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px' }}
-                        labelStyle={{ fontWeight: 600 }}
-                      />
-                      <Area type="monotone" dataKey="completed" stroke="hsl(221,83%,53%)" strokeWidth={3} fill="url(#gComp)" name="Completate" />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="h-full flex flex-col items-center justify-center text-center text-muted-foreground px-6">
-                    <TrendingUp className="w-8 h-8 mb-3 opacity-40" />
-                    <p className="text-sm font-medium">Nessuna consegna completata questa settimana</p>
-                    <p className="text-xs mt-1">Il grafico apparirà appena saranno disponibili dati reali.</p>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+        {/* Consegne in corso e fattorini: il lavoro di adesso */}
+        <div className="grid gap-4 xl:grid-cols-3">
+          <div className="xl:col-span-2">
+            <ConsegneInCorso
+              consegne={consegne}
+              statusLabels={statusLabels}
+              formatCurrency={formatCurrency}
+              onNuova={openNewDelivery}
+            />
+          </div>
+          <RiepilogoFattorini fattorini={ensureArray(drivers)} consegne={consegne} />
         </div>
 
-        {/* Da gestire ora */}
-        {urgentDeliveries.length > 0 && (
-          <Card className="card-exclusive border-amber-500/40">
-            <CardHeader className="pb-2 pt-4 px-4">
-              <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-amber-500" />Da gestire ora
-                <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-300 text-[11px]">{urgentDeliveries.length}</Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="px-3 pb-3 space-y-1.5">
-              {urgentDeliveries.slice(0, 5).map(({ delivery, reason }) => (
-                <Link
-                  key={delivery.delivery_id}
-                  to={`/deliveries?delivery=${delivery.delivery_id}`}
-                  data-testid={`urgent-${delivery.delivery_id}`}
-                  className="flex items-center gap-3 rounded-xl p-2.5 transition-colors hover:bg-secondary/60"
-                >
-                  <span className={`h-2 w-2 shrink-0 rounded-full ${reason === 'late' ? 'bg-destructive' : 'bg-amber-500'}`} />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium">{delivery.customer_name}</span>
-                    <span className="block truncate text-[11px] text-muted-foreground">
-                      {reason === 'late' ? 'In ritardo' : 'Senza fattorino'} · {delivery.customer_address}
-                    </span>
-                  </span>
-                  <ArrowRight className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
-                </Link>
-              ))}
-            </CardContent>
-          </Card>
+        {/* Cassa e mese: il numero che serve alla sera */}
+        {cassaInHome && (
+          <>
+            <Card className="card-exclusive" data-testid="cassa-oggi">
+              <CardContent className="p-4">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <Wallet className="h-4 w-4 text-primary" />
+                    <p className="text-sm font-semibold">Cassa di oggi</p>
+                  </div>
+                  <Link to="/shifts" className="text-xs text-primary hover:underline">Turni e Cassa</Link>
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Totale</p>
+                    <p className="text-2xl font-black tabular-nums">€ {(stats?.today_money?.total || 0).toFixed(2).replace('.', ',')}</p>
+                    <p className="text-xs text-muted-foreground">{stats?.today_money?.count || 0} consegne incassate</p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Contanti</p>
+                    <p className="text-lg font-bold tabular-nums">€ {(stats?.today_money?.cash || 0).toFixed(2).replace('.', ',')}</p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">POS</p>
+                    <p className="text-lg font-bold tabular-nums">€ {(stats?.today_money?.pos || 0).toFixed(2).replace('.', ',')}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <MeseInCorso mese={stats?.month} />
+          </>
         )}
 
-        {/* Recent deliveries */}
+        {/* Andamento della settimana, in fondo: si guarda, non si gestisce */}
         <Card className="card-exclusive">
-          <CardHeader className="flex flex-row items-center justify-between pb-3 pt-4 px-4">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2">
-              <Package className="w-4 h-4 text-primary" />Consegne Attive
-            </CardTitle>
-            <Button variant="ghost" size="sm" asChild className="text-xs text-primary h-7">
-              <Link to="/deliveries">Vedi tutte <ArrowRight className="w-3 h-3 ml-1" /></Link>
-            </Button>
-          </CardHeader>
-          <CardContent className="px-4 pb-4">
-            {safeRecentDeliveries.length === 0 ? (
-              <div className="text-center py-10 text-muted-foreground">
-                <Package className="w-10 h-10 mx-auto mb-2 opacity-30" />
-                <p className="text-sm">Nessuna consegna attiva</p>
-                <Button size="sm" className="btn-primary mt-3" onClick={openNewDelivery}>
-                  <Plus className="w-3.5 h-3.5 mr-1.5" />Crea Consegna
-                </Button>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {safeRecentDeliveries.map(d => (
-                  <div key={d.delivery_id} className="flex items-center gap-3 p-3 rounded-xl bg-secondary/40 hover:bg-secondary/70 transition-colors">
-                    <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                      <Package className="w-4 h-4 text-primary" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-sm truncate">{d.customer_name}</p>
-                      <p className="text-xs text-muted-foreground truncate flex items-center gap-1">
-                        <MapPin className="w-3 h-3 shrink-0" />{d.customer_address}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      {d.amount && <span className="text-sm font-bold text-primary">{formatCurrency(d.amount)}</span>}
-                      <Badge className={`status-${d.status} text-xs`}>{statusLabels[d.status]}</Badge>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
+          <div className="flex items-center gap-2 px-4 pt-4">
+            <TrendingUp className="h-4 w-4 text-primary" />
+            <h2 className="text-sm font-semibold">Andamento settimana</h2>
+          </div>
+          <div className="px-2 pb-2">
+            <div className="h-52 md:h-60">
+              {hasWeeklyActivity ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={weeklyChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="gComp" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="hsl(221,83%,53%)" stopOpacity={0.32} />
+                        <stop offset="95%" stopColor="hsl(221,83%,53%)" stopOpacity={0.04} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                    <XAxis dataKey="day" stroke="hsl(var(--muted-foreground))" fontSize={11} tickLine={false} axisLine={false} />
+                    <YAxis allowDecimals={false} stroke="hsl(var(--muted-foreground))" fontSize={11} tickLine={false} axisLine={false} />
+                    <Tooltip
+                      contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px' }}
+                      labelStyle={{ fontWeight: 600 }}
+                    />
+                    <Area type="monotone" dataKey="completed" stroke="hsl(221,83%,53%)" strokeWidth={3} fill="url(#gComp)" name="Completate" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex h-full flex-col items-center justify-center px-6 text-center text-muted-foreground">
+                  <TrendingUp className="mb-3 h-8 w-8 opacity-40" />
+                  <p className="text-sm font-medium">Nessuna consegna completata questa settimana</p>
+                  <p className="mt-1 text-xs">Il grafico apparira appena ci saranno consegne.</p>
+                </div>
+              )}
+            </div>
+          </div>
         </Card>
 
-        {/* Quick stats */}
-        <div className="grid grid-cols-3 gap-3">
+        {/* Totali di sempre, in coda */}
+        <div className="grid grid-cols-3 gap-3" data-testid="totali-storici">
           {[
             { label: 'Clienti', value: stats?.customers?.total || 0, icon: Users, to: '/customers' },
             { label: 'Annullate', value: stats?.deliveries?.cancelled || 0, icon: AlertCircle, to: '/archive' },
-            { label: 'Tot. Consegne', value: stats?.deliveries?.total || 0, icon: Package, to: '/archive' },
+            { label: 'Tot. consegne', value: stats?.deliveries?.total || 0, icon: Package, to: '/archive' },
           ].map(({ label, value, icon: Icon, to }) => (
-            <Link key={label} to={to} className="card-exclusive card-interactive p-4 rounded-xl text-center block">
-              <p className="text-2xl font-black">{value}</p>
-              <p className="text-xs text-muted-foreground mt-1">{label}</p>
+            <Link key={label} to={to} className="card-exclusive card-interactive block rounded-xl p-4 text-center">
+              <Icon className="mx-auto mb-1 h-4 w-4 text-muted-foreground" />
+              <p className="text-2xl font-black tabular-nums">{value}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{label}</p>
             </Link>
           ))}
         </div>

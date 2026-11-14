@@ -14,21 +14,49 @@ import { ScrollArea } from './ui/scroll-area';
 import { Badge } from './ui/badge';
 import CommandPalette from './CommandPalette';
 import { ensureArray } from '@/lib/collections';
-import { funzioniDellaFarmacia } from '@/lib/funzioniFarmacia';
-import { VOCI_MENU, ordinaMenu } from '@/lib/vociMenu';
+import { navVisibili, raggruppaMenu } from '@/lib/vociMenu';
 import { useConversationsQuery } from '@/hooks/queries';
+import NavMenu from './menu/NavMenu';
 import {
   Settings, Bell, LogOut, Menu, X, ChevronRight,
   Sun, Moon, Plus, Home, Check, Trash2, RefreshCw, Search,
+  PanelLeftClose, PanelLeftOpen,
 } from 'lucide-react';
 
+// Il menu compresso e i gruppi chiusi sono scelte della persona, non della
+// sessione: restano nel browser finche' non le cambia.
+const CHIAVE_COMPRESSO = 'pt-menu-compresso';
+const CHIAVE_GRUPPI = 'pt-menu-gruppi';
 
-// Una funzione spenta dalla farmacia non compare nel menu, ne' sul computer
-// ne' sul telefono: il filtro e' lo stesso per entrambi.
-const navVisibili = (user) => {
-  const accese = funzioniDellaFarmacia(user);
-  const voci = ordinaMenu(VOCI_MENU, user?.settings?.ordine_menu);
-  return voci.filter((item) => item.divider || !item.funzione || accese[item.funzione] !== false);
+const leggiPreferenza = (chiave, ripiego) => {
+  try {
+    const salvato = window.localStorage.getItem(chiave);
+    return salvato === null ? ripiego : JSON.parse(salvato);
+  } catch {
+    return ripiego;
+  }
+};
+
+const salvaPreferenza = (chiave, valore) => {
+  try {
+    window.localStorage.setItem(chiave, JSON.stringify(valore));
+  } catch {
+    /* browser senza memoria locale: si riparte dal default */
+  }
+};
+
+// Su telefono il menu e' sempre largo: le icone da sole non si leggono.
+const useSchermoLargo = () => {
+  const [largo, setLargo] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches
+  );
+  useEffect(() => {
+    const query = window.matchMedia('(min-width: 1024px)');
+    const cambia = (evento) => setLargo(evento.matches);
+    query.addEventListener('change', cambia);
+    return () => query.removeEventListener('change', cambia);
+  }, []);
+  return largo;
 };
 const isArchivedDeliveryNotification = (notification) => (
   notification?.type === 'delivery' && ['delivered', 'cancelled'].includes(notification?.data?.status)
@@ -41,9 +69,43 @@ export const Layout = ({ children, title }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [compresso, setCompresso] = useState(() => leggiPreferenza(CHIAVE_COMPRESSO, false));
+  const [gruppiAperti, setGruppiAperti] = useState(() => leggiPreferenza(CHIAVE_GRUPPI, {}));
+  const schermoLargo = useSchermoLargo();
+  const compatta = schermoLargo && compresso;
 
   const voci = navVisibili(user);
+  const { gruppi, fondo } = raggruppaMenu(voci);
   const mobileNavItems = voci.filter(i => i.mobile);
+
+  const cambiaCompresso = () => {
+    setCompresso((prima) => {
+      salvaPreferenza(CHIAVE_COMPRESSO, !prima);
+      return !prima;
+    });
+  };
+
+  const cambiaGruppo = (chiave) => {
+    setGruppiAperti((prima) => {
+      const dopo = { ...prima, [chiave]: prima[chiave] === false };
+      salvaPreferenza(CHIAVE_GRUPPI, dopo);
+      return dopo;
+    });
+  };
+
+  // Se il gruppo della pagina aperta fosse chiuso, il menu sembrerebbe vuoto:
+  // lo si riapre da solo quando ci si arriva.
+  useEffect(() => {
+    const voceAttiva = voci.find((voce) => !voce.fondo && voce.gruppo
+      && (voce.path === '/dashboard' ? location.pathname === voce.path : location.pathname.startsWith(voce.path)));
+    if (voceAttiva && gruppiAperti[voceAttiva.gruppo] === false) {
+      setGruppiAperti((prima) => {
+        const dopo = { ...prima, [voceAttiva.gruppo]: true };
+        salvaPreferenza(CHIAVE_GRUPPI, dopo);
+        return dopo;
+      });
+    }
+  }, [location.pathname]);
 
   const safeNotifications = ensureArray(notifications);
   const unreadCount = safeNotifications.filter((notification) => !notification.is_read && !isArchivedDeliveryNotification(notification)).length;
@@ -126,84 +188,128 @@ export const Layout = ({ children, title }) => {
 
       {/* Sidebar */}
       <aside className={`
-        fixed lg:static inset-y-0 left-0 z-50 w-72
+        fixed lg:static inset-y-0 left-0 z-50
+        ${compatta ? 'w-72 lg:w-[76px]' : 'w-72'}
         bg-sidebar border-r border-border flex flex-col
-        transform transition-transform duration-300 ease-out
+        transform transition-[transform,width] duration-300 ease-out
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}>
-        {/* Logo */}
-        <div className="h-16 flex items-center justify-between px-5 border-b border-border shrink-0">
-          <Link to="/dashboard" onClick={() => setSidebarOpen(false)}>
-            <img src="/logo.webp" alt="PharmaTrack" width="400" height="153" className="h-9 w-auto" />
-          </Link>
-          <button className="lg:hidden p-1 rounded-lg hover:bg-secondary"
-            onClick={() => setSidebarOpen(false)}>
-            <X className="w-5 h-5 text-muted-foreground" />
-          </button>
+        {/* Logo e interruttore del menu */}
+        <div className={`h-16 flex items-center border-b border-border shrink-0 ${compatta ? 'justify-center px-2' : 'justify-between px-5'}`}>
+          {compatta ? (
+            <button
+              type="button"
+              onClick={cambiaCompresso}
+              title="Espandi menu"
+              aria-label="Espandi menu"
+              className="hidden lg:flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+              data-testid="sidebar-espandi"
+            >
+              <PanelLeftOpen className="h-5 w-5" />
+            </button>
+          ) : (
+            <>
+              <Link to="/dashboard" onClick={() => setSidebarOpen(false)} className="flex items-center gap-2">
+                <img src="/logo.webp" alt="PharmaTrack" width="400" height="153" className="h-9 w-auto" />
+              </Link>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={cambiaCompresso}
+                  title="Comprimi menu"
+                  aria-label="Comprimi menu"
+                  className="hidden lg:flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                  data-testid="sidebar-comprimi"
+                >
+                  <PanelLeftClose className="h-4 w-4" />
+                </button>
+                <button className="lg:hidden p-1 rounded-lg hover:bg-secondary"
+                  onClick={() => setSidebarOpen(false)}>
+                  <X className="w-5 h-5 text-muted-foreground" />
+                </button>
+              </div>
+            </>
+          )}
         </div>
 
-        {/* New delivery CTA */}
-        <div className="px-4 py-3 border-b border-border shrink-0">
-          <Link to="/deliveries?new=true"
-            className="flex items-center gap-2.5 w-full px-4 py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 transition-opacity shadow-sm"
-            onClick={() => setSidebarOpen(false)}>
-            <Plus className="w-4 h-4" />
-            Nuova Consegna
-          </Link>
+        {/* Nuova consegna */}
+        <div className={`border-b border-border shrink-0 ${compatta ? 'px-2 py-3' : 'px-4 py-3'}`}>
+          {compatta ? (
+            <Link to="/deliveries?new=true"
+              title="Nuova consegna"
+              aria-label="Nuova consegna"
+              className="flex h-10 w-full items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm transition-opacity hover:opacity-90"
+              onClick={() => setSidebarOpen(false)}>
+              <Plus className="w-4 h-4" />
+            </Link>
+          ) : (
+            <Link to="/deliveries?new=true"
+              className="flex items-center gap-2.5 w-full px-4 py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 transition-opacity shadow-sm"
+              onClick={() => setSidebarOpen(false)}>
+              <Plus className="w-4 h-4" />
+              Nuova Consegna
+            </Link>
+          )}
         </div>
 
-        {/* Nav */}
-        <ScrollArea className="flex-1 py-2">
-          <nav className="px-3 space-y-0.5">
-            {voci.map((item, i) => {
-              if (item.divider) return <div key={i} className="my-2 h-px bg-border/60 mx-2" />;
-              const active = isActive(item.path);
-              return (
-                <Link key={item.path} to={item.path}
-                  className={`sidebar-link ${active ? 'active' : ''}`}
-                  onClick={() => setSidebarOpen(false)}
-                  data-testid={`nav-${item.label.toLowerCase().replace(/\s/g, '-')}`}>
-                  <item.icon className="w-[18px] h-[18px] shrink-0" />
-                  <span>{item.label}</span>
-                  {item.badge && messaggiNonLetti > 0 && (
-                    <Badge
-                      className="ml-auto h-5 px-1.5 text-xs bg-destructive text-destructive-foreground"
-                      title={`${messaggiNonLetti} messaggi non letti`}
-                    >
-                      {messaggiNonLetti > 9 ? '9+' : messaggiNonLetti}
-                    </Badge>
-                  )}
-                </Link>
-              );
-            })}
-          </nav>
+        {/* Voci di menu, per gruppi */}
+        <ScrollArea className="flex-1 py-3">
+          <NavMenu
+            gruppi={gruppi}
+            fondo={fondo}
+            compatta={compatta}
+            isActive={isActive}
+            onNavigate={() => setSidebarOpen(false)}
+            badge={messaggiNonLetti}
+            gruppiAperti={gruppiAperti}
+            onToggleGruppo={cambiaGruppo}
+          />
         </ScrollArea>
 
-        {/* Footer */}
-        <div className="p-4 border-t border-border space-y-2 shrink-0">
-          <button onClick={toggleTheme}
-            className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl bg-secondary/60 hover:bg-secondary transition-colors text-sm">
-            <span className="text-muted-foreground font-medium">Tema</span>
-            <div className="flex items-center gap-1.5 text-foreground font-medium">
-              {isDark ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
-              {isDark ? 'Scuro' : 'Chiaro'}
-            </div>
-          </button>
-          <div className="flex items-center gap-3 px-2 py-1">
-            <Avatar className="w-9 h-9 shrink-0">
-              <AvatarImage src={user?.picture} />
-              <AvatarFallback className="bg-primary/10 text-primary font-semibold text-sm">
-                {user?.name?.charAt(0) || 'U'}
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold truncate">{user?.name}</p>
-              <p className="text-xs text-muted-foreground truncate">{user?.pharmacy_name || 'La mia farmacia'}</p>
-            </div>
-            <button type="button" onClick={handleLogout} className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors" title="Esci">
-              <LogOut className="w-4 h-4" />
-            </button>
-          </div>
+        {/* Footer: tema e persona collegata */}
+        <div className={`border-t border-border shrink-0 space-y-2 ${compatta ? 'p-2' : 'p-4'}`}>
+          {compatta ? (
+            <>
+              <button onClick={toggleTheme}
+                title={isDark ? 'Tema scuro: passa al chiaro' : 'Tema chiaro: passa allo scuro'}
+                aria-label="Cambia tema"
+                className="flex h-10 w-full items-center justify-center rounded-xl bg-secondary/60 text-foreground transition-colors hover:bg-secondary">
+                {isDark ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+              </button>
+              <button type="button" onClick={handleLogout}
+                title={`Esci (${user?.name || ''})`}
+                aria-label="Esci"
+                className="flex h-10 w-full items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive">
+                <LogOut className="w-4 h-4" />
+              </button>
+            </>
+          ) : (
+            <>
+              <button onClick={toggleTheme}
+                className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl bg-secondary/60 hover:bg-secondary transition-colors text-sm">
+                <span className="text-muted-foreground font-medium">Tema</span>
+                <div className="flex items-center gap-1.5 text-foreground font-medium">
+                  {isDark ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+                  {isDark ? 'Scuro' : 'Chiaro'}
+                </div>
+              </button>
+              <div className="flex items-center gap-3 px-2 py-1">
+                <Avatar className="w-9 h-9 shrink-0">
+                  <AvatarImage src={user?.picture} />
+                  <AvatarFallback className="bg-primary/10 text-primary font-semibold text-sm">
+                    {user?.name?.charAt(0) || 'U'}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold truncate">{user?.name}</p>
+                  <p className="text-xs text-muted-foreground truncate">{user?.pharmacy_name || 'La mia farmacia'}</p>
+                </div>
+                <button type="button" onClick={handleLogout} className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors" title="Esci">
+                  <LogOut className="w-4 h-4" />
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </aside>
 
@@ -234,10 +340,10 @@ export const Layout = ({ children, title }) => {
               onClick={() => window.dispatchEvent(new Event('open-command-palette'))}
               className="hidden sm:flex items-center gap-2 h-9 pl-3 pr-2 rounded-xl border border-border bg-secondary/50 text-muted-foreground text-sm hover:bg-secondary transition-colors mr-1"
               data-testid="command-palette-trigger"
-              title="Cerca / comandi rapidi"
+              title="Vai a una pagina o cerca un cliente, una consegna, un fattorino"
             >
               <Search className="w-4 h-4" />
-              <span>Cerca…</span>
+              <span>Vai a / Cerca</span>
               <kbd className="ml-1 px-1.5 py-0.5 rounded bg-background border border-border text-[10px] font-mono">⌘K</kbd>
             </button>
             {/* Installa l'app: su mobile e tablet, dove il prompt del browser

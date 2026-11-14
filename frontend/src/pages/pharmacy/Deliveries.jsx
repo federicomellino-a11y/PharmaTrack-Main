@@ -9,6 +9,7 @@ import { dataConsegnaPredefinita } from '@/lib/giorniConsegna';
 import BarraConsegne from '../../components/deliveries/BarraConsegne';
 import ListaConsegne from '../../components/deliveries/ListaConsegne';
 import { consegneAperteDelCliente } from '@/lib/consegneAperte';
+import { consegnaInRitardo } from '@/lib/deliveryDisplay';
 import { Layout } from '../../components/Layout';
 import { Dialog } from '../../components/ui/dialog';
 import { Filter } from 'lucide-react';
@@ -50,6 +51,9 @@ export default function DeliveriesPage() {
   const [activeCustomerIndex, setActiveCustomerIndex] = useState(-1);
   const customerInputRef = React.useRef(null);
   const [activeTab, setActiveTab] = useState('active');
+  // Filtro in piu' che arriva dalla Home ("Consegne in ritardo", "Ordini da
+  // assegnare"). Non e' una scheda: si somma ai filtri e si toglie con la x.
+  const [vista, setVista] = useState(null);
   const [filterDriver, setFilterDriver] = useState('all');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -138,6 +142,31 @@ export default function DeliveriesPage() {
     ]);
     setRefreshing(false);
   }, [queryClient]);
+
+  // Arrivo dalla Home: scheda "da incassare" e i due filtri della sezione
+  // "Da gestire ora". Si tolgono dalla querystring solo questi parametri, il
+  // resto (compreso ?delivery=) resta per chi lo legge dopo.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    let cambiato = false;
+    const scheda = params.get('tab');
+    if (scheda === 'pending_confirmation' || scheda === 'archive') {
+      setActiveTab(scheda);
+      params.delete('tab');
+      cambiato = true;
+    }
+    const filtro = params.get('vista');
+    if (filtro === 'ritardo' || filtro === 'da_assegnare') {
+      setVista(filtro);
+      if (filtro === 'da_assegnare') setFilterDriver('unassigned');
+      params.delete('vista');
+      cambiato = true;
+    }
+    if (cambiato) {
+      const resto = params.toString();
+      window.history.replaceState({}, '', `/deliveries${resto ? `?${resto}` : ''}`);
+    }
+  }, []);
 
   // Open new delivery if ?new=true or ?new=1, supporta deep-link da Winfarm
   useEffect(() => {
@@ -379,8 +408,13 @@ export default function DeliveriesPage() {
       (d.notes || '').toLowerCase().includes(cerca);
     const matchDriver = filterDriver === 'all' || d.driver_id === filterDriver ||
       (filterDriver === 'unassigned' && !d.driver_id);
-    return matchTab && matchSearch && matchDriver;
-  }), [safeDeliveries, activeTab, searchTerm, filterDriver]);
+    const matchVista = vista === 'ritardo'
+      ? consegnaInRitardo(d)
+      : vista === 'da_assegnare'
+        ? !d.driver_id && ['da_preparare', 'pending', 'pronta'].includes(d.status)
+        : true;
+    return matchTab && matchSearch && matchDriver && matchVista;
+  }), [safeDeliveries, activeTab, searchTerm, filterDriver, vista]);
   const listIsCapped = safeDeliveries.length >= 500;
 
   // V17: la lista attiva si ordina per priorità reale, poi orario, poi data
@@ -480,6 +514,24 @@ export default function DeliveriesPage() {
           onFattorino={setFilterDriver}
           onScheda={setActiveTab}
         />
+
+        {vista && (
+          <div className="flex items-center gap-2" data-testid="vista-attiva">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+              {vista === 'ritardo' ? 'Solo consegne in ritardo' : 'Solo ordini da assegnare'}
+              <button
+                type="button"
+                onClick={() => { setVista(null); setFilterDriver('all'); }}
+                className="rounded-full p-0.5 hover:bg-primary/20"
+                aria-label="Togli il filtro"
+                data-testid="vista-togli"
+              >
+                <Filter className="h-3 w-3" />
+              </button>
+            </span>
+            <span className="text-xs text-muted-foreground">{sorted.length} risultati</span>
+          </div>
+        )}
 
         <ListaConsegne
           consegne={sorted}

@@ -11,6 +11,9 @@ const PAGES = [
   { path: '/deliveries', nome: 'Consegne', atteso: /Consegne|In attesa/i },
   { path: '/tracking', testId: 'tracking-page', nome: 'Tracking' },
   { path: '/customers', nome: 'Clienti', atteso: /Clienti|Cerca/i },
+  // La mappa clienti e' la sezione nuova: ha un chunk suo con Leaflet dentro,
+  // quindi va guardata almeno una volta dopo ogni deploy.
+  { path: '/mappa', testId: 'mappa-page', nome: 'Mappa clienti' },
   { path: '/drivers', nome: 'Fattorini', atteso: /Fattorin|Aggiungi/i },
   { path: '/archive', nome: 'Archivio', atteso: /Archivio|Nessuna/i },
   // La pagina Impostazioni e' quella che ha rotto con i chunk mancanti:

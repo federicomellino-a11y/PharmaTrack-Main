@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useDriversQuery } from '@/hooks/queries';
 import useFattorini from '@/hooks/useFattorini';
@@ -47,6 +47,20 @@ export default function DriversPage() {
     setShowPassword,
     showPassword,
   } = useFattorini({ drivers, user, updateProfile, queryClient });
+
+ // Arrivo dalla ricerca (/drivers?driver=<id>): si apre il profilo cercato.
+ useEffect(() => {
+  if (loading) return;
+  const params = new URLSearchParams(window.location.search);
+  const id = params.get('driver');
+  if (!id) return;
+  const trovato = drivers.find((fattorino) => fattorino.driver_id === id);
+  if (!trovato) return;
+  apriProfilo(trovato);
+  params.delete('driver');
+  const resto = params.toString();
+  window.history.replaceState({}, '', `/drivers${resto ? `?${resto}` : ''}`);
+ }, [loading, drivers]);
 
  if (loading) {
  return (
