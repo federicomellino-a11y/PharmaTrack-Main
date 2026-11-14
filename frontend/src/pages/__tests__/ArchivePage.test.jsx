@@ -1,14 +1,20 @@
 // @vitest-environment jsdom
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, cleanup, fireEvent, waitFor, act } from '@testing-library/react';
 
 const invalidateQueries = vi.fn();
 const post = vi.fn();
 const del = vi.fn();
 
-vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries }) }));
-vi.mock('@/hooks/queries', () => ({ useArchiveQuery: vi.fn() }));
+vi.mock('@tanstack/react-query', () => ({
+  useQueryClient: () => ({ invalidateQueries }),
+  keepPreviousData: (precedente) => precedente,
+}));
+vi.mock('@/hooks/queries', () => ({
+  useArchiveQuery: vi.fn(),
+  useDriversQuery: () => ({ data: [{ driver_id: 'drv-1', name: 'Luca', is_active: true }] }),
+}));
 vi.mock('@/lib/config', () => ({ API: 'https://api.test/api' }));
 vi.mock('axios', () => ({ default: { post: (...a) => post(...a), delete: (...a) => del(...a) } }));
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
@@ -85,6 +91,28 @@ describe('ArchivePage', () => {
     await waitFor(() => expect(del).toHaveBeenCalledWith(
       'https://api.test/api/deliveries/d2', { withCredentials: true },
     ));
+  });
+
+  it('la ricerca la chiede al server su tutto l\'archivio, non alla pagina', async () => {
+    vi.useFakeTimers();
+    render(<ArchivePage />);
+    fireEvent.change(screen.getByTestId('search-archive'), { target: { value: 'anna' } });
+    // mentre si scrive non parte niente: si aspetta che la mano si fermi
+    expect(useArchiveQuery).toHaveBeenLastCalledWith(1, 20, expect.objectContaining({ q: '' }), expect.anything());
+    act(() => { vi.advanceTimersByTime(400); });
+    expect(useArchiveQuery).toHaveBeenLastCalledWith(1, 20, expect.objectContaining({ q: 'anna' }), expect.anything());
+    vi.useRealTimers();
+  });
+
+  it('mostra quanti documenti ci sono e azzera i filtri accesi', async () => {
+    render(<ArchivePage />);
+    expect(screen.getByTestId('conteggio-archivio').textContent).toContain('3 consegne');
+    expect(screen.queryByTestId('azzera-filtri-archivio')).toBeNull();
+
+    fireEvent.change(screen.getByTestId('search-archive'), { target: { value: 'anna' } });
+    const azzera = await screen.findByTestId('azzera-filtri-archivio');
+    fireEvent.click(azzera);
+    expect(screen.getByTestId('search-archive').value).toBe('');
   });
 
   it('ripristina e avvisa che la consegna torna in lavorazione', async () => {
