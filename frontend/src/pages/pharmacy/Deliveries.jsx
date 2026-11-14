@@ -56,6 +56,9 @@ export default function DeliveriesPage() {
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [prontaDialogOpen, setProntaDialogOpen] = useState(false);
   const [selectedDelivery, setSelectedDelivery] = useState(null);
+  // Riga da mettere in evidenza quando si arriva da un avviso della home
+  // (/deliveries?delivery=<id>): senza, l'avviso apriva l'elenco e basta.
+  const [evidenziaId, setEvidenziaId] = useState(null);
   // La fascia scelta è uno stato suo: derivarla dai valori non permetteva
   // Le fasce sono quelle della farmacia (Impostazioni > Consegne), non piu' una
   // lista uguale per tutti.
@@ -165,6 +168,29 @@ export default function DeliveriesPage() {
     window.addEventListener('pt:new-delivery', open);
     return () => window.removeEventListener('pt:new-delivery', open);
   }, []);
+
+  // Apertura mirata da un avviso della home: porta sulla consegna indicata,
+  // sulla scheda giusta, con la riga evidenziata per qualche secondo.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get('delivery');
+    if (!id || loading) return;
+    const elenco = ensureArray(deliveries);
+    const consegna = elenco.find((d) => d.delivery_id === id);
+    if (!consegna) return;
+    window.history.replaceState({}, '', '/deliveries');
+    setSearchTerm('');
+    setFilterDriver('all');
+    const archiviata = ['delivered', 'cancelled', 'not_delivered'].includes(consegna.status);
+    setActiveTab(archiviata ? 'archive' : 'active');
+    setEvidenziaId(id);
+    const scorri = setTimeout(() => {
+      const riga = document.querySelector(`[data-testid="riga-consegna-${id}"]`);
+      riga?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+    }, 150);
+    const spegni = setTimeout(() => setEvidenziaId(null), 5000);
+    return () => { clearTimeout(scorri); clearTimeout(spegni); };
+  }, [loading, deliveries]);
 
   // Autofocus sul campo cliente quando si apre "Nuova consegna" (meno click al banco)
   useEffect(() => {
@@ -461,6 +487,7 @@ export default function DeliveriesPage() {
           cerca={searchTerm}
           scheda={activeTab}
           listIsCapped={listIsCapped}
+          evidenziaId={evidenziaId}
           fattorini={safeDrivers}
           onNuova={() => { resetForm(); dialogOpenedAtRef.current = Date.now(); setDialogOpen(true); }}
           gestori={{

@@ -18,6 +18,15 @@ import { toast } from 'sonner';
 import 'leaflet/dist/leaflet.css';
 import { geocodeAddress as geocodeWithRateLimit } from '../../lib/geocoding';
 import { ensureArray, ensureObject } from '@/lib/collections';
+import SezioneFattorini from '../../components/tracking/SezioneFattorini';
+import {
+  STATI_PRESENZA,
+  SOGLIA_LIVE_MIN,
+  SOGLIA_RITARDO_MIN,
+  statoPresenza,
+  testoUltimoAggiornamento,
+  testoEta,
+} from '@/lib/trackingPresenze';
 
 // Fix Leaflet default icon
 delete L.Icon.Default.prototype._getIconUrl;
@@ -37,10 +46,18 @@ function haversineKm(lat1, lng1, lat2, lng2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-const driverIcon = new L.DivIcon({
+// Un colore per stato: verde petrolio quando la posizione e' fresca, ambra
+// quando si e' fermata, grigio quando non c'e' nulla da mostrare.
+const COLORI_PRESENZA = {
+  live: '#2DD4BF',
+  in_ritardo: '#F59E0B',
+  non_disponibile: '#A1A1AA',
+};
+
+const iconaDriver = (stato) => new L.DivIcon({
   className: 'custom-driver-marker',
   html: `<div style="
-  background: #2DD4BF;
+  background: ${COLORI_PRESENZA[stato] || COLORI_PRESENZA.live};
   width: 36px;
   height: 36px;
   border-radius: 50%;
@@ -48,7 +65,7 @@ const driverIcon = new L.DivIcon({
   align-items: center;
   justify-content: center;
   border: 3px solid white;
-  box-shadow: 0 0 20px rgba(45,212,191,0.5);
+  box-shadow: 0 0 20px ${COLORI_PRESENZA[stato] || COLORI_PRESENZA.live}80;
 ">
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2">
     <path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/>
@@ -105,21 +122,6 @@ const deliveryIcon = new L.DivIcon({
   iconSize: [28, 28],
   iconAnchor: [14, 14],
 });
-
-function formatLastSeen(value) {
-  if (!value) return 'posizione non ancora ricevuta';
-  const then = new Date(value).getTime();
-  if (Number.isNaN(then)) return '';
-  const mins = Math.max(0, Math.round((Date.now() - then) / 60000));
-  if (mins <= 1) return 'posizione aggiornata ora';
-  if (mins < 60) return `ultimo aggiornamento ${mins} min fa`;
-  return `ultimo aggiornamento ${Math.round(mins / 60)} h fa`;
-}
-
-function etaFromKm(km) {
-  if (km == null) return null;
-  return Math.max(1, Math.round((km * 1.35 / 24) * 60));
-}
 
 function MapUpdater({ center }) {
   const map = useMap();
@@ -242,7 +244,14 @@ export default function TrackingPage() {
       setDrivers((prev) => ensureArray(prev).map((driver) => {
         const liveLocation = safeDriverLocations[driver.driver_id];
         if (liveLocation) {
-          return { ...driver, current_lat: liveLocation.lat, current_lng: liveLocation.lng };
+          // La posizione appena ricevuta dal websocket e' fresca per definizione:
+          // senza aggiornare l'orario finirebbe classificata come ferma.
+          return {
+            ...driver,
+            current_lat: liveLocation.lat,
+            current_lng: liveLocation.lng,
+            last_location_update: liveLocation.last_location_update || new Date().toISOString(),
+          };
         }
         return driver;
       }));
@@ -301,7 +310,17 @@ export default function TrackingPage() {
     return () => clearInterval(timer);
   }, []);
 
-  const activeDrivers = safeDrivers.filter((driver) => driver.is_active && driver.current_lat && driver.current_lng);
+  // Ogni fattorino con il suo stato, deciso dall'orario reale dell'ultima
+  // posizione e non dalla semplice presenza di due coordinate salvate.
+  const adesso = Date.now();
+  const presenze = safeDrivers.map((driver) => ({ driver, ...statoPresenza(driver, adesso) }));
+  const perStato = (stato) => presenze.filter((p) => p.stato === stato).map((p) => p.driver);
+  const liveDrivers = perStato('live');
+  const ritardoDrivers = perStato('in_ritardo');
+  const nonDisponibili = perStato('non_disponibile');
+  // Sulla mappa finisce chi ha coordinate utilizzabili: i "non disponibili" senza
+  // posizione non hanno un punto dove stare.
+  const driversSuMappa = presenze.filter((p) => p.stato !== 'non_disponibile').map((p) => p.driver);
   const activeDeliveries = safeDeliveries.filter((delivery) => ['assigned', 'picked_up', 'in_transit'].includes(delivery.status));
 
   const statusLabels = {
@@ -331,22 +350,35 @@ export default function TrackingPage() {
   return (
     <Layout title="Tracking">
       <div className="space-y-4" data-testid="tracking-page">
-        <Card className={`${activeDrivers.length > 0 ? 'border-emerald-500/30 bg-emerald-500/10' : 'border-amber-500/30 bg-amber-500/10'}`}>
+        <Card className={`${liveDrivers.length > 0 ? 'border-emerald-500/40 bg-emerald-500/10' : 'border-amber-500/40 bg-amber-500/10'}`}>
           <CardContent className="p-4">
             <div className="flex items-start gap-3">
-              <div className={`rounded-2xl p-2 ${activeDrivers.length > 0 ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'}`}>
-                {activeDrivers.length > 0 ? <LocateFixed className="h-5 w-5" /> : <AlertTriangle className="h-5 w-5" />}
+              <div className={`rounded-2xl p-2 ${liveDrivers.length > 0 ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300' : 'bg-amber-500/20 text-amber-700 dark:text-amber-300'}`}>
+                {liveDrivers.length > 0 ? <LocateFixed className="h-5 w-5" /> : <AlertTriangle className="h-5 w-5" />}
               </div>
               <div className="flex-1">
                 <p className="font-semibold text-foreground">
-                  {activeDrivers.length > 0 ? 'Tracking live disponibile' : 'Tracking live da attivare'}
+                  {liveDrivers.length > 0 ? 'Tracking live disponibile' : 'Nessun fattorino live in questo momento'}
                 </p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  {activeDrivers.length > 0
-                    ? `${activeDrivers.length} fattorin${activeDrivers.length === 1 ? 'o è visibile' : 'i sono visibili'} in tempo reale sulla mappa.`
-                    : 'I marker live compaiono solo dopo che il fattorino apre l’app, tocca “Attiva posizione live” e consente la geolocalizzazione del browser.'}
+                  {liveDrivers.length > 0
+                    ? `${liveDrivers.length} fattorin${liveDrivers.length === 1 ? 'o aggiorna' : 'i aggiornano'} la posizione in tempo reale${
+                      ritardoDrivers.length > 0 ? `, ${ritardoDrivers.length} con posizione ferma da oltre ${SOGLIA_RITARDO_MIN} minuti` : ''
+                    }.`
+                    : `I marker verdi compaiono quando il fattorino apre l’app, tocca “Attiva posizione live” e consente la geolocalizzazione. Una posizione ferma da oltre ${SOGLIA_LIVE_MIN} minuti non conta come live.`}
                 </p>
-                {activeDrivers.length === 0 && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-800 dark:text-emerald-300" data-testid="tracking-conteggio-live">
+                    <span className="h-2 w-2 rounded-full bg-emerald-500" />Live: {liveDrivers.length}
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/40 bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-800 dark:text-amber-300" data-testid="tracking-conteggio-in-ritardo">
+                    <span className="h-2 w-2 rounded-full bg-amber-500" />In ritardo: {ritardoDrivers.length}
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-secondary px-2.5 py-1 text-xs font-medium text-muted-foreground" data-testid="tracking-conteggio-non-disponibile">
+                    <span className="h-2 w-2 rounded-full bg-muted-foreground" />Non disponibile: {nonDisponibili.length}
+                  </span>
+                </div>
+                {liveDrivers.length === 0 && (
                   <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
                     <Badge variant="outline">1. Apri app fattorino</Badge>
                     <Badge variant="outline">2. Attiva posizione live</Badge>
@@ -365,18 +397,23 @@ export default function TrackingPage() {
                 <TileLayer attribution='&copy; OpenStreetMap contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                 <MapUpdater center={mapCenter} />
 
-                {activeDrivers.map((driver) => (
-                  <Marker key={driver.driver_id} position={[driver.current_lat, driver.current_lng]} icon={driverIcon}>
+                {driversSuMappa.map((driver) => {
+                  const presenza = statoPresenza(driver, adesso);
+                  return (
+                  <Marker key={driver.driver_id} position={[driver.current_lat, driver.current_lng]} icon={iconaDriver(presenza.stato)}>
                     <Popup>
                       <div className="text-center p-2">
                         <p className="font-bold text-lg">{driver.name}</p>
                         <p className="text-sm text-gray-600">{driver.vehicle_type}</p>
                         <p className="text-xs text-gray-500">{driver.phone}</p>
-                        <p className="text-xs text-gray-400 mt-1">{formatLastSeen(driver.last_location_update)}</p>
+                        <p className={`text-xs font-medium mt-1 ${presenza.stato === 'live' ? 'text-emerald-700' : presenza.stato === 'in_ritardo' ? 'text-amber-700' : 'text-zinc-600'}`}>
+                          {STATI_PRESENZA[presenza.stato].etichetta} · {testoUltimoAggiornamento(driver, adesso)}
+                        </p>
                       </div>
                     </Popup>
                   </Marker>
-                ))}
+                  );
+                })}
 
                 {pharmacyCoords && (
                   <Marker position={[pharmacyCoords.lat, pharmacyCoords.lng]} icon={pharmacyIcon}>
@@ -411,7 +448,7 @@ export default function TrackingPage() {
           <Card className="w-full lg:w-80 flex-shrink-0 bg-card border-border flex flex-col max-h-[40vh] lg:max-h-none overflow-hidden">
             <CardHeader className="pb-3 border-b">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-lg text-white flex items-center gap-2">
+                <CardTitle className="text-lg text-foreground flex items-center gap-2">
                   <Truck className="w-5 h-5 text-teal-400" />
                   Mappa operativa
                 </CardTitle>
@@ -422,97 +459,85 @@ export default function TrackingPage() {
             </CardHeader>
 
             <ScrollArea className="flex-1">
-              <div className="p-3">
-                <div className="mb-4">
-                  <h3 className="text-sm font-semibold text-zinc-400 mb-2 flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-teal-400 animate-pulse"></div>
-                    Fattorini online ({activeDrivers.length})
-                  </h3>
-                  {activeDrivers.length === 0 ? (
-                    <p className="text-xs text-zinc-500 py-2">Nessuna posizione live ricevuta. I fattorini devono attivare la geolocalizzazione dalla loro dashboard.</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {activeDrivers.map((driver) => {
-                        const driverDeliveries = activeDeliveries.filter((delivery) => delivery.driver_id === driver.driver_id);
-                        return (
-                          <button
-                            key={driver.driver_id}
-                            onClick={() => handleCenterOnDriver(driver)}
-                            className={`w-full p-3 rounded-lg text-left transition-colors ${
-                              selectedDriver?.driver_id === driver.driver_id
-                                ? 'bg-teal-500/20 border border-teal-500/50'
-                                : 'border border-transparent hover:border-teal-500/40 hover:bg-teal-500/10'
-                            }`}
-                          >
-                            <div className="flex items-center gap-2 mb-1">
-                              <div className="w-8 h-8 rounded-full bg-teal-500/20 flex items-center justify-center">
-                                <Truck className="w-4 h-4 text-teal-400" />
-                              </div>
-                              <div>
-                                <p className="font-medium text-white text-sm">{driver.name}</p>
-                                <p className="text-xs text-zinc-500">{driver.vehicle_type}</p>
-                                <p className="text-[11px] text-zinc-600">{formatLastSeen(driver.last_location_update)}</p>
-                              </div>
-                            </div>
-                            {driverDeliveries.length > 0 && (
-                              <div className="mt-2 pl-10">
-                                <p className="text-xs text-teal-400">
-                                  {driverDeliveries.length} consegn{driverDeliveries.length === 1 ? 'a' : 'e'} attiv{driverDeliveries.length === 1 ? 'a' : 'e'}
-                                </p>
-                              </div>
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
+              <div className="p-3 space-y-4">
+                <SezioneFattorini
+                  stato="live"
+                  fattorini={liveDrivers}
+                  consegneAttive={activeDeliveries}
+                  selezionato={selectedDriver}
+                  onCentra={handleCenterOnDriver}
+                  adesso={adesso}
+                />
+                <SezioneFattorini
+                  stato="in_ritardo"
+                  fattorini={ritardoDrivers}
+                  consegneAttive={activeDeliveries}
+                  selezionato={selectedDriver}
+                  onCentra={handleCenterOnDriver}
+                  adesso={adesso}
+                />
+                <SezioneFattorini
+                  stato="non_disponibile"
+                  fattorini={nonDisponibili}
+                  consegneAttive={activeDeliveries}
+                  selezionato={selectedDriver}
+                  onCentra={handleCenterOnDriver}
+                  adesso={adesso}
+                />
 
                 <div>
-                  <h3 className="text-sm font-semibold text-zinc-400 mb-2 flex items-center gap-2">
+                  <h3 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
                     <Package className="w-4 h-4" />
                     Consegne in corso ({activeDeliveries.length})
                   </h3>
                   {activeDeliveries.length === 0 ? (
-                    <p className="text-xs text-zinc-500 py-2">Nessuna consegna attiva</p>
+                    <p className="text-xs text-muted-foreground py-2">Nessuna consegna attiva</p>
                   ) : (
                     <div className="space-y-2">
                       {activeDeliveries.slice(0, 10).map((delivery) => {
                         const driver = safeDrivers.find((item) => item.driver_id === delivery.driver_id);
                         const delivCoords = safeDeliveryCoords[delivery.delivery_id];
+                        const presenza = driver ? statoPresenza(driver, adesso) : null;
                         let distanceKm = null;
                         if (driver?.current_lat && driver?.current_lng && delivCoords) {
                           distanceKm = haversineKm(driver.current_lat, driver.current_lng, delivCoords.lat, delivCoords.lng);
                         }
                         return (
-                          <div key={delivery.delivery_id} className="p-3 rounded-lg/50">
-                            <div className="flex items-start justify-between mb-1">
-                              <p className="font-medium text-white text-sm">{delivery.customer_name}</p>
-                              <Badge className={`status-${delivery.status} text-xs`}>
+                          <div key={delivery.delivery_id} className="p-3 rounded-lg border border-border bg-secondary/40">
+                            <div className="flex items-start justify-between gap-2 mb-1">
+                              <p className="font-medium text-foreground text-sm truncate">{delivery.customer_name}</p>
+                              <Badge className={`status-${delivery.status} text-xs shrink-0`}>
                                 {statusLabels[delivery.status]}
                               </Badge>
                             </div>
-                            <p className="text-xs text-zinc-400 flex items-center gap-1 mb-1">
-                              <MapPin className="w-3 h-3" />
-                              {delivery.customer_address.substring(0, 25)}...
+                            <p className="text-xs text-muted-foreground flex items-center gap-1 mb-1">
+                              <MapPin className="w-3 h-3 shrink-0" />
+                              <span className="truncate">{(delivery.customer_address || '').slice(0, 30)}</span>
                             </p>
-                            <div className="flex items-center justify-between">
+                            <div className="flex items-center justify-between gap-2">
                               {driver && (
-                                <p className="text-xs text-teal-400 flex items-center gap-1">
-                                  <Truck className="w-3 h-3" />
-                                  {driver.name}
+                                <p className="text-xs text-primary flex items-center gap-1 min-w-0">
+                                  <Truck className="w-3 h-3 shrink-0" />
+                                  <span className="truncate">{driver.name}</span>
+                                  {presenza?.stato === 'in_ritardo' && (
+                                    <span className="text-amber-700 dark:text-amber-300 shrink-0">· posizione ferma</span>
+                                  )}
                                 </p>
                               )}
                               {distanceKm !== null && (
-                                <p className="text-xs text-amber-400 font-semibold">
-                                  {distanceKm < 1 ? `${Math.round(distanceKm * 1000)}m` : `${distanceKm.toFixed(1)}km`}
-                                  {' · ≈ '}{etaFromKm(distanceKm)} min
+                                <p className="text-xs text-amber-700 dark:text-amber-300 font-semibold shrink-0">
+                                  {distanceKm < 1 ? `${Math.round(distanceKm * 1000)} m` : `${distanceKm.toFixed(1)} km`}
+                                  {' · '}{testoEta(distanceKm)}
                                 </p>
                               )}
                             </div>
                           </div>
                         );
                       })}
+                      <p className="text-[11px] text-muted-foreground">
+                        La distanza e il tempo sono una stima in linea d'aria sulla posizione del fattorino,
+                        non il percorso stradale.
+                      </p>
                     </div>
                   )}
                 </div>
@@ -520,19 +545,23 @@ export default function TrackingPage() {
             </ScrollArea>
 
             <div className="p-3 border-t">
-              <p className="text-xs text-zinc-500 mb-2">Legenda</p>
-              <div className="flex flex-wrap gap-3 text-xs">
+              <p className="text-xs font-medium text-foreground mb-2">Legenda</p>
+              <div className="flex flex-wrap gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
                 <div className="flex items-center gap-1">
-                  <div className="w-3 h-3 rounded-full bg-amber-400"></div>
-                  <span className="text-zinc-400">Farmacia</span>
+                  <div className="w-3 h-3 rounded-full bg-emerald-400 border border-white/60"></div>
+                  <span>Fattorino live</span>
                 </div>
                 <div className="flex items-center gap-1">
-                  <div className="w-3 h-3 rounded-full bg-teal-400"></div>
-                  <span className="text-zinc-400">Fattorino</span>
+                  <div className="w-3 h-3 rounded-full bg-amber-400 border border-white/60"></div>
+                  <span>Posizione ferma</span>
                 </div>
                 <div className="flex items-center gap-1">
-                  <div className="w-3 h-3 rounded-full bg-rose-500"></div>
-                  <span className="text-zinc-400">Consegna</span>
+                  <div className="w-3 h-3 rounded-full bg-amber-600 border border-white/60"></div>
+                  <span>Farmacia</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 rounded-full bg-rose-500 border border-white/60"></div>
+                  <span>Consegna</span>
                 </div>
               </div>
             </div>

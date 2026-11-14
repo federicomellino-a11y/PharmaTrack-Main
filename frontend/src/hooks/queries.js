@@ -51,10 +51,13 @@ export const useShiftDetailQuery = (shiftId, options = {}) =>
     ...options,
   });
 
-export const useArchiveQuery = (page = 1, limit = 20, options = {}) =>
+// Archivio: pagina, limite e filtri formano la chiave. `filtri` resta un
+// oggetto semplice, quindi react-query lo confronta per valore e non rilegge
+// gli stessi documenti a ogni render.
+export const useArchiveQuery = (page = 1, limit = 20, filtri = {}, options = {}) =>
   useQuery({
-    queryKey: chiavi.archivio(page, limit),
-    queryFn: letture.archivio(page, limit),
+    queryKey: chiavi.archivio(page, limit, filtri),
+    queryFn: letture.archivio(page, limit, filtri),
     ...options,
   });
 

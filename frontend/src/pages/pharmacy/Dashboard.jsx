@@ -418,7 +418,7 @@ export default function PharmacyDashboard() {
               {urgentDeliveries.slice(0, 5).map(({ delivery, reason }) => (
                 <Link
                   key={delivery.delivery_id}
-                  to="/deliveries"
+                  to={`/deliveries?delivery=${delivery.delivery_id}`}
                   data-testid={`urgent-${delivery.delivery_id}`}
                   className="flex items-center gap-3 rounded-xl p-2.5 transition-colors hover:bg-secondary/60"
                 >

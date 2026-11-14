@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { enqueueRequest, getPendingCount, isNetworkError, flushOfflineQueue } from '../offlineQueue';
+import { enqueueRequest, getPendingCount, isNetworkError, flushOfflineQueue, getPendingOperations, pendingOperationsForDelivery } from '../offlineQueue';
 
 describe('offlineQueue', () => {
   beforeEach(() => {
@@ -23,6 +23,18 @@ describe('offlineQueue', () => {
     enqueueRequest({ method: 'put', url: '/b' });
     const raw = JSON.parse(localStorage.getItem('pt_offline_queue_v1'));
     expect(raw.map((x) => x.url)).toEqual(['/a', '/b']);
+  });
+
+  it('sa dire quali operazioni riguardano una consegna, per mostrarle in scheda', () => {
+    enqueueRequest({ method: 'put', url: '/driver/deliveries/abc/status', data: { status: 'delivered' }, label: 'Consegna consegnata' });
+    enqueueRequest({ method: 'put', url: '/driver/deliveries/xyz/status', data: { status: 'not_delivered' }, label: 'Consegna non riuscita' });
+
+    expect(getPendingOperations()).toHaveLength(2);
+    const mie = pendingOperationsForDelivery('abc');
+    expect(mie).toHaveLength(1);
+    expect(mie[0].label).toBe('Consegna consegnata');
+    expect(pendingOperationsForDelivery('inesistente')).toHaveLength(0);
+    expect(pendingOperationsForDelivery(null)).toHaveLength(0);
   });
 
   it('distingue un errore di rete da un errore del server', () => {

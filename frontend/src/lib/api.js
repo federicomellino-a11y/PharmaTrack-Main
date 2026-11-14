@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { API } from './config';
 import { ensureArray } from './collections';
+import { queryArchivio } from './archivioFiltri';
 
 /**
  * Unico punto in cui le pagine leggono dal server.
@@ -26,7 +27,9 @@ export const chiavi = {
   numeriUtili: ['useful-numbers'],
   shifts: ['shifts'],
   turno: (shiftId) => ['shift', shiftId],
-  archivio: (page, limit) => ['archive', page, limit],
+  // I filtri entrano nella chiave: cambiando periodo o fattorino la pagina
+  // chiede al server un'altra fetta di archivio invece di riusare la prima.
+  archivio: (page, limit, filtri) => ['archive', page, limit, filtri ?? {}],
   conversazioni: ['conversations'],
   conversazione: (driverId) => ['messages', driverId],
   winfarm: ['winfarm-status'],
@@ -60,7 +63,7 @@ export const letture = {
   numeriUtili: () => getLista('/useful-numbers'),
   shifts: () => getLista('/shifts'),
   turno: (shiftId) => () => get(`/shifts/${shiftId}`),
-  archivio: (page, limit) => () => get(`/archive?page=${page}&limit=${limit}`),
+  archivio: (page, limit, filtri) => () => get(`/archive?${queryArchivio({ page, limit, filtri })}`),
   conversazioni: () => getLista('/messages/conversations'),
   conversazione: (driverId) => () => getLista(`/messages/${driverId}`),
   winfarm: () => get('/integrations/winfarm/status'),

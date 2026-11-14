@@ -43,7 +43,7 @@ import {
    i fattorini per risolvere il nome, la funzione che dice se e' in ritardo e i
    gesti (conferma incasso, contesta, consegnata, annulla, ripristina, condividi).
 */
-export default function DeliveryRow({ d, drivers, inRitardo, handlers }) {
+export default function DeliveryRow({ d, drivers, inRitardo, evidenziata = false, handlers }) {
   const {
     handleConfirmPayment,
     handleDisputePayment,
@@ -76,6 +76,7 @@ export default function DeliveryRow({ d, drivers, inRitardo, handlers }) {
                   transition-all hover:shadow-md ${haDettagli ? 'cursor-pointer' : ''}
                   ${d.priority === 'urgent' ? 'border-l-4 border-l-destructive' : ''}
                   ${d.priority === 'high' ? 'border-l-4 border-l-amber-400' : ''}
+                  ${evidenziata ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : ''}
                 `}>
                   <CardContent className="p-4">
                     <div className="flex flex-col sm:flex-row sm:items-start gap-3">

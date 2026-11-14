@@ -20,6 +20,15 @@ const writeQueue = (items) => {
 
 export const getPendingCount = () => readQueue().length;
 
+/** Le operazioni in attesa, per mostrarle all'utente e non solo contarle. */
+export const getPendingOperations = () => readQueue();
+
+/** Solo quelle che riguardano una consegna: la coda e' condivisa dal telefono. */
+export const pendingOperationsForDelivery = (deliveryId) => {
+  if (!deliveryId) return [];
+  return readQueue().filter((item) => String(item.url || '').includes(String(deliveryId)));
+};
+
 export const isNetworkError = (error) => !error?.response;
 
 export function enqueueRequest({ method, url, data, label }) {

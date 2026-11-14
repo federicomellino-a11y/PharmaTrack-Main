@@ -1,15 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { useQueryClient } from '@tanstack/react-query';
-import { useArchiveQuery } from '@/hooks/queries';
+import { useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import { useArchiveQuery, useDriversQuery } from '@/hooks/queries';
 import { API } from '@/lib/config';
 import { Layout } from '../../components/Layout';
 import { Card, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
+import FiltriArchivio from '../../components/archivio/FiltriArchivio';
+import { FILTRI_VUOTI, azzeraFiltri } from '@/lib/archivioFiltri';
 import { Badge } from '../../components/ui/badge';
 import {
-  Search, Package, MapPin, Phone, Calendar,
+  Package, MapPin, Phone, Calendar,
   CheckCircle2, XCircle, ChevronLeft, ChevronRight,
   RotateCcw, Trash2, Ban
 } from 'lucide-react';
@@ -25,12 +27,19 @@ import { formatDateTimeFull } from '@/lib/format';
 import { etichettaStato } from '@/lib/deliveryDisplay';
 export default function ArchivePage() {
   const queryClient = useQueryClient();
-  const [searchTerm, setSearchTerm] = useState('');
+  // La ricerca e i filtri li applica il backend su TUTTO l'archivio: la stringa
+  // che si sta scrivendo resta in locale, quella che parte e' quella ferma da
+  // un attimo (altrimenti una richiesta per ogni tasto).
+  const [cerca, setCerca] = useState('');
+  const [filtri, setFiltri] = useState(FILTRI_VUOTI);
   const [page, setPage] = useState(1);
-  const { data: archiveData, isLoading: loading } = useArchiveQuery(page, 20);
+  const { data: drivers } = useDriversQuery();
+  const { data: archiveData, isLoading: loading, isFetching } = useArchiveQuery(
+    page, 20, filtri, { placeholderData: keepPreviousData },
+  );
   const deliveries = ensureArray(archiveData?.deliveries);
   const totalPages = archiveData?.pages || 1;
-  const fetchArchive = () => queryClient.invalidateQueries({ queryKey: ['archive'] });
+  const totale = archiveData?.total ?? deliveries.length;
 
   // Un'azione sull'archivio tocca anche consegne, KPI, turni e clienti:
   // se non si invalidano tutte, la home resta con i numeri di prima.
@@ -69,17 +78,27 @@ export default function ArchivePage() {
   };
 
   useEffect(() => {
+    const timer = setTimeout(() => {
+      setFiltri((precedenti) => (precedenti.q === cerca ? precedenti : { ...precedenti, q: cerca }));
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [cerca]);
+
+  // Cambiare filtro riporta alla prima pagina: restare alla terza dopo aver
+  // ristretto la ricerca mostrerebbe una pagina vuota senza motivo.
+  useEffect(() => {
     setPage(1);
-  }, [searchTerm]);
+  }, [filtri]);
 
+  const cambiaFiltro = (chiave, valore) => setFiltri((precedenti) => ({ ...precedenti, [chiave]: valore }));
 
-  const safeDeliveries = ensureArray(deliveries);
+  const azzeraTutto = () => {
+    setCerca('');
+    setFiltri(azzeraFiltri());
+  };
 
-  const filteredDeliveries = safeDeliveries.filter(d =>
-    (d.customer_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (d.customer_address || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    d.notes?.toLowerCase()?.includes(searchTerm.toLowerCase())
-  );
+  const filtriAccesi = Object.entries(filtri).some(([chiave, valore]) =>
+    chiave === 'q' ? Boolean(valore) : Boolean(valore) && valore !== 'tutti' && valore !== 'sempre');
 
   if (loading) {
     return (
@@ -102,30 +121,30 @@ export default function ArchivePage() {
           </div>
         </div>
 
-        <div className="relative max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Cerca nell'archivio..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-            data-testid="search-archive"
-          />
-        </div>
+        <FiltriArchivio
+          cerca={cerca}
+          filtri={filtri}
+          fattorini={ensureArray(drivers)}
+          totale={totale}
+          inAggiornamento={isFetching && !loading}
+          onCerca={setCerca}
+          onFiltro={cambiaFiltro}
+          onAzzera={azzeraTutto}
+        />
 
-        {filteredDeliveries.length === 0 ? (
+        {deliveries.length === 0 ? (
           <Card>
             <CardContent className="py-12 text-center">
               <Package className="w-12 h-12 text-muted-foreground/40 mx-auto mb-4" />
               <p className="text-muted-foreground">
-                {searchTerm ? 'Nessuna consegna trovata' : 'Archivio vuoto'}
+                {filtriAccesi ? 'Nessuna consegna con questi filtri' : 'Archivio vuoto'}
               </p>
             </CardContent>
           </Card>
         ) : (
           <>
             <div className="space-y-3">
-              {filteredDeliveries.map((delivery, index) => (
+              {deliveries.map((delivery, index) => (
                 <Card
                   key={delivery.delivery_id}
                   className={`animate-slide-up stagger-${(index % 5) + 1}`}
