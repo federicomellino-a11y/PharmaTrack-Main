@@ -35,13 +35,24 @@ const gestori = {
   apriAssegna: vi.fn(),
 };
 
-const disegna = () => render(
-  <DeliveryRow d={consegna} drivers={[]} inRitardo={() => false} handlers={gestori} />
+const disegna = (extra = {}) => render(
+  <DeliveryRow d={consegna} drivers={[]} inRitardo={() => false} handlers={gestori} {...extra} />
 );
 
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 
 describe('riga della consegna', () => {
+  it('si evidenzia quando si arriva da un avviso della home', () => {
+    const { container } = disegna({ evidenziata: true });
+    expect(container.querySelector('[data-testid="riga-consegna-d1"]')).toBeTruthy();
+    expect(screen.getByTestId('riga-consegna-d1').className).toMatch(/ring-2/);
+  });
+
+  it('senza evidenziazione resta normale', () => {
+    disegna();
+    expect(screen.getByTestId('riga-consegna-d1').className).not.toMatch(/ring-2/);
+  });
+
   it('i dettagli restano chiusi finche non si tocca la riga', () => {
     disegna();
     expect(screen.queryByTestId('dettagli-d1')).toBeNull();

@@ -7,14 +7,14 @@ import { prossimaAzione } from '@/lib/deliveryActions';
 import { ETICHETTE_FATTORINO } from '@/lib/deliveryDisplay';
 import { ensureArray } from '@/lib/collections';
 import { API } from '@/lib/config';
-import { requestWithOfflineQueue } from '@/lib/offlineQueue';
-import { queuePhoto, flushQueuedPhotos } from '@/lib/offlinePhotos';
+import { requestWithOfflineQueue, pendingOperationsForDelivery } from '@/lib/offlineQueue';
+import { queuePhoto, flushQueuedPhotos, listQueuedPhotos } from '@/lib/offlinePhotos';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import { Card, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
-import { ArrowLeft, MapPin, Phone, Package, Navigation, CheckCircle2, Play, MessageSquare, LogOut, Banknote, CreditCard, Calculator, Camera, Loader2, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, MapPin, Phone, Package, Navigation, CheckCircle2, Play, MessageSquare, LogOut, Banknote, CreditCard, Calculator, Camera, Loader2, AlertTriangle, CloudOff } from 'lucide-react';
 import { toast } from 'sonner';
 import { confirmAction } from '../../components/ConfirmDialog';
 import 'leaflet/dist/leaflet.css';
@@ -42,6 +42,22 @@ export default function DriverDeliveryDetail() {
   const [photoUrl, setPhotoUrl] = useState(null);
   const [photoUploading, setPhotoUploading] = useState(false);
   const [coordinates, setCoordinates] = useState(null);
+  // Cosa e' rimasto sul telefono: operazioni in coda e foto non ancora caricate.
+  const [daSincronizzare, setDaSincronizzare] = useState({ operazioni: [], foto: 0 });
+
+  const aggiornaCoda = async () => {
+    const operazioni = pendingOperationsForDelivery(deliveryId);
+    let foto = 0;
+    try {
+      const tutte = await listQueuedPhotos();
+      foto = tutte.filter((item) => item.deliveryId === deliveryId).length;
+    } catch {
+      foto = 0;
+    }
+    setDaSincronizzare({ operazioni, foto });
+  };
+
+  useEffect(() => { aggiornaCoda(); }, [deliveryId]);
 
   useEffect(() => {
     fetchDelivery();
@@ -135,6 +151,7 @@ export default function DriverDeliveryDetail() {
 
       if (result.queued) {
         toast.success('Sei offline: aggiornamento salvato, sincronizzo appena torna la rete');
+        aggiornaCoda();
       } else {
         toast.success(statusMessages[newStatus]);
       }
@@ -167,6 +184,7 @@ export default function DriverDeliveryDetail() {
         try {
           await queuePhoto(file, deliveryId);
           setPhotoUrl('queued');
+          aggiornaCoda();
           toast.success('Foto salvata sul telefono: si carica appena torna la rete');
         } catch {
           toast.error('Rete assente e memoria non disponibile: riprova con connessione');
@@ -261,6 +279,41 @@ export default function DriverDeliveryDetail() {
               </div>
             </div>
 
+            {/* Cosa e' rimasto sul telefono: prima non si vedeva da nessuna parte */}
+            {(daSincronizzare.operazioni.length > 0 || daSincronizzare.foto > 0) && (
+              <div
+                className="mb-4 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3"
+                data-testid="operazioni-non-sincronizzate"
+              >
+                <p className="flex items-center gap-2 text-sm font-semibold text-amber-700 dark:text-amber-300">
+                  <CloudOff className="w-4 h-4" />
+                  Non ancora sincronizzato ({daSincronizzare.operazioni.length + daSincronizzare.foto})
+                </p>
+                <ul className="mt-2 space-y-1 text-sm text-amber-800 dark:text-amber-200">
+                  {daSincronizzare.operazioni.map((operazione) => (
+                    <li key={operazione.id} className="flex items-start gap-2">
+                      <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
+                      <span className="flex-1">{operazione.label}</span>
+                      <span className="text-xs opacity-80">
+                        {new Date(operazione.created_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </li>
+                  ))}
+                  {daSincronizzare.foto > 0 && (
+                    <li className="flex items-start gap-2">
+                      <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
+                      <span className="flex-1">
+                        {daSincronizzare.foto === 1 ? '1 foto di consegna' : `${daSincronizzare.foto} foto di consegna`}
+                      </span>
+                    </li>
+                  )}
+                </ul>
+                <p className="mt-2 text-xs text-amber-800/80 dark:text-amber-200/80">
+                  Partono da sole appena il telefono torna in rete.
+                </p>
+              </div>
+            )}
+
             {/* Info */}
             <div className="space-y-4 mb-6">
               <div className="flex items-start gap-3 p-3 rounded-lg bg-zinc-800/50">
@@ -298,12 +351,6 @@ export default function DriverDeliveryDetail() {
                   <p className="text-white">{delivery.notes || 'Nessuna nota'}</p>
                 </div>
               </div>
-
-              {delivery.notes && (
-                <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
-                  <p className="text-sm text-amber-400">Note: {delivery.notes}</p>
-                </div>
-              )}
 
               {/* Payment Info */}
               {delivery.amount && (

@@ -14,6 +14,7 @@ export default function ListaConsegne({
   cerca = '',
   scheda = 'active',
   listIsCapped = false,
+  evidenziaId = null,
   fattorini = [],
   gestori = {},
   onNuova,
@@ -47,6 +48,7 @@ export default function ListaConsegne({
           d={d}
           drivers={fattorini}
           inRitardo={consegnaInRitardo}
+          evidenziata={evidenziaId === d.delivery_id}
           handlers={gestori}
         />
       ))}
