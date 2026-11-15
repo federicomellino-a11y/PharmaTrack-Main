@@ -1,6 +1,7 @@
 import hmac
 import uuid
 import logging
+import re
 from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, HTTPException, Depends, Request, Response
 
@@ -58,6 +59,82 @@ def credenziali_admin_giuste(email: str, password: str) -> bool:
     return email_ok and password_ok
 
 
+def _audit_detail_sicuro(value):
+    """Rimuove dati sensibili dai dettagli di audit prima di restituirli al super admin."""
+    if value is None:
+        return None
+    if isinstance(value, dict):
+        pulito = {}
+        for chiave, val in value.items():
+            key = str(chiave)
+            if key.lower() in {"password", "password_hash", "session_token", "token", "secret", "authorization", "cookie"}:
+                continue
+            pulito[key] = _audit_detail_sicuro(val)
+        return pulito
+    if isinstance(value, list):
+        return [_audit_detail_sicuro(v) for v in value]
+    if isinstance(value, str):
+        return value[:2000]
+    return value
+
+
+def _filtro_attivita(
+    role: Optional[str] = None,
+    actor: Optional[str] = None,
+    entity: Optional[str] = None,
+    action: Optional[str] = None,
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None,
+    q: Optional[str] = None,
+) -> dict:
+    query = {}
+
+    if role and role != "all":
+        query["actor_role"] = role
+
+    if actor and actor.strip():
+        valore = actor.strip()
+        query["$or"] = [
+            {"actor": {"$regex": re.escape(valore), "$options": "i"}},
+            {"actor_id": {"$regex": re.escape(valore), "$options": "i"}},
+        ]
+
+    if entity and entity != "all":
+        query["entity"] = entity
+
+    if action and action != "all":
+        query["action"] = action
+
+    if from_date:
+        if "created_at" in query:
+            query["created_at"]["$gte"] = from_date
+        else:
+            query["created_at"] = {"$gte": from_date}
+
+    if to_date:
+        if "created_at" in query:
+            query["created_at"]["$lte"] = to_date
+        else:
+            query["created_at"] = {"$lte": to_date}
+
+    if q and q.strip():
+        testo = q.strip()
+        filtro_testo = {
+            "$or": [
+                {"entity": {"$regex": re.escape(testo), "$options": "i"}},
+                {"action": {"$regex": re.escape(testo), "$options": "i"}},
+                {"actor": {"$regex": re.escape(testo), "$options": "i"}},
+                {"detail": {"$regex": re.escape(testo), "$options": "i"}},
+            ]
+        }
+        if query.get("$or"):
+            query["$and"] = [query["$or"], filtro_testo["$or"][0]]
+        else:
+            query.update(filtro_testo)
+
+    return query
+
+
 @router.post("/admin/login")
 @limiter.limit(LOGIN_RATE_LIMIT)
 async def admin_login(request: Request, data: AdminLoginLoose, response: Response):
@@ -93,6 +170,7 @@ async def _crea_sessione_admin(response: Response) -> dict:
     })
     response.set_cookie(key="admin_session_token", value=session_token, httponly=True, secure=True, samesite="none", path="/", max_age=7*24*60*60)
     return {"email": ADMIN_EMAIL, "name": ADMIN_NAME}
+
 
 class AllarmeAdmin(BaseModel):
     """Messaggio di allarme dagli automatismi (testo semplice, limitato)."""
@@ -208,6 +286,7 @@ async def admin_email_status(admin: dict = Depends(get_current_admin)):
 async def admin_me(admin: dict = Depends(get_current_admin)):
     return admin
 
+
 @router.post("/admin/logout")
 async def admin_logout(request: Request, response: Response):
     session_token = request.cookies.get("admin_session_token")
@@ -215,6 +294,7 @@ async def admin_logout(request: Request, response: Response):
         await db.admin_sessions.delete_many({"session_token": session_token})
     clear_cookie_variants(response, "admin_session_token")
     return {"message": "Logged out"}
+
 
 @router.get("/admin/overview")
 async def admin_overview(admin: dict = Depends(get_current_admin)):
@@ -231,6 +311,87 @@ async def admin_overview(admin: dict = Depends(get_current_admin)):
         "latest_users": latest_users,
     }
 
+
+@router.get("/admin/activity")
+async def admin_activity(
+    request: Request,
+    page: int = 1,
+    limit: int = 25,
+    role: str | None = None,
+    actor: str | None = None,
+    entity: str | None = None,
+    action: str | None = None,
+    from_date: str | None = None,
+    to_date: str | None = None,
+    q: str | None = None,
+    admin: dict = Depends(get_current_admin),
+):
+    """Lista globale delle azioni eseguite nel sistema, visibile solo al super admin."""
+    page = max(1, page)
+    limit = max(1, min(200, limit))
+
+    filtro = _filtro_attivita(
+        role=role,
+        actor=actor,
+        entity=entity,
+        action=action,
+        from_date=from_date,
+        to_date=to_date,
+        q=q,
+    )
+
+    cursore = db.audit_log.find(filtro, {"_id": 0}).sort("created_at", -1)
+    totale = await db.audit_log.count_documents(filtro)
+    elementi = await cursore.skip((page - 1) * limit).limit(limit).to_list(length=limit)
+
+    items = []
+    for item in elementi:
+        items.append({
+            "audit_id": item.get("audit_id"),
+            "actor": item.get("actor"),
+            "actor_id": item.get("actor_id"),
+            "actor_role": item.get("actor_role"),
+            "entity": item.get("entity"),
+            "entity_id": item.get("entity_id"),
+            "action": item.get("action"),
+            "detail": _audit_detail_sicuro(item.get("detail")),
+            "created_at": item.get("created_at"),
+            "ip": item.get("ip"),
+        })
+
+    await db.audit_log.insert_one({
+        "audit_id": f"aud_{datetime.now(timezone.utc).timestamp():.0f}",
+        "entity": "admin_activity",
+        "entity_id": "activity_log",
+        "action": "read",
+        "actor": admin.get("email"),
+        "actor_role": "super_admin",
+        "detail": {
+            "page": page,
+            "limit": limit,
+            "filtro": {
+                "role": role,
+                "actor": actor,
+                "entity": entity,
+                "action": action,
+                "from_date": from_date,
+                "to_date": to_date,
+                "q": q,
+            },
+            "ip": request.client.host if request.client else None,
+        },
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+
+    return {
+        "items": items,
+        "page": page,
+        "limit": limit,
+        "total": totale,
+        "pages": max(1, (totale + limit - 1) // limit),
+    }
+
+
 @router.get("/admin/users")
 async def admin_users(admin: dict = Depends(get_current_admin)):
     users = await db.users.find({}, {"_id": 0, "password_hash": 0}).sort("created_at", -1).to_list(500)
@@ -245,6 +406,7 @@ async def admin_users(admin: dict = Depends(get_current_admin)):
         }
         enriched_users.append(item)
     return enriched_users
+
 
 @router.get("/admin/database/stats")
 async def admin_database_stats(admin: dict = Depends(get_current_admin)):
@@ -265,6 +427,7 @@ async def admin_database_stats(admin: dict = Depends(get_current_admin)):
             "admin": await db.admin_sessions.count_documents({}),
         },
     }
+
 
 @router.get("/admin/users/{user_id}/details")
 async def admin_user_details(user_id: str, admin: dict = Depends(get_current_admin)):
@@ -318,6 +481,7 @@ async def admin_user_details(user_id: str, admin: dict = Depends(get_current_adm
         "recent_notifications": recent_notifications,
     }
 
+
 @router.put("/admin/users/{user_id}/status")
 async def admin_update_user_status(user_id: str, data: AdminUserStatusUpdate, admin: dict = Depends(get_current_admin)):
     result = await db.users.update_one({"user_id": user_id}, {"$set": {"is_active": data.is_active}})
@@ -333,8 +497,20 @@ async def admin_update_user_status(user_id: str, data: AdminUserStatusUpdate, ad
         for driver_id in driver_ids:
             await richiudi_canali_revocati("driver", driver_id)
 
+    await db.audit_log.insert_one({
+        "audit_id": f"aud_{datetime.now(timezone.utc).timestamp():.0f}",
+        "entity": "user",
+        "entity_id": user_id,
+        "action": "status_changed",
+        "actor": admin.get("email"),
+        "actor_role": "super_admin",
+        "detail": {"is_active": data.is_active},
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+
     user = await db.users.find_one({"user_id": user_id}, {"_id": 0, "password_hash": 0})
     return user
+
 
 class AssegnaPro(BaseModel):
     """Funzioni Pro decise dall'amministratore: accese (con o senza scadenza), spente o automatiche."""
@@ -355,6 +531,18 @@ async def admin_assegna_pro(user_id: str, data: AssegnaPro, admin: dict = Depend
         raise HTTPException(status_code=404, detail="Utente non trovato")
     user = await db.users.find_one({"user_id": user_id}, {"_id": 0, "password_hash": 0})
     user["piano_stato"] = stato_piano(user)
+
+    await db.audit_log.insert_one({
+        "audit_id": f"aud_{datetime.now(timezone.utc).timestamp():.0f}",
+        "entity": "user",
+        "entity_id": user_id,
+        "action": "pro_changed",
+        "actor": admin.get("email"),
+        "actor_role": "super_admin",
+        "detail": {"stato": data.stato, "mesi": data.mesi, "scadenza": data.scadenza},
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+
     return user
 
 
@@ -433,6 +621,7 @@ async def admin_database_schema(admin: dict = Depends(get_current_admin)):
         },
     }
 
+
 @router.post("/admin/database/cleanup-sessions")
 async def admin_cleanup_sessions(admin: dict = Depends(get_current_admin)):
     summary = {}
@@ -468,11 +657,23 @@ async def admin_cleanup_sessions(admin: dict = Depends(get_current_admin)):
             "deleted": deleted,
         }
 
+    await db.audit_log.insert_one({
+        "audit_id": f"aud_{datetime.now(timezone.utc).timestamp():.0f}",
+        "entity": "admin",
+        "entity_id": "sessions",
+        "action": "cleanup_sessions",
+        "actor": admin.get("email"),
+        "actor_role": "super_admin",
+        "detail": summary,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+
     return {
         "message": "Pulizia sessioni completata",
         "summary": summary,
         "generated_at": datetime.now(timezone.utc).isoformat(),
     }
+
 
 @router.delete("/admin/users/{user_id}")
 async def admin_delete_user(user_id: str, admin: dict = Depends(get_current_admin)):
@@ -485,5 +686,17 @@ async def admin_delete_user(user_id: str, admin: dict = Depends(get_current_admi
         "Account PharmaTrack eliminato",
         f"Ciao {user.get('name') or 'utente'},\n\nil tuo account PharmaTrack è stato eliminato da un amministratore.\nSe pensi sia stato un errore, contatta il supporto.",
     )
+
+    await db.audit_log.insert_one({
+        "audit_id": f"aud_{datetime.now(timezone.utc).timestamp():.0f}",
+        "entity": "user",
+        "entity_id": user_id,
+        "action": "deleted",
+        "actor": admin.get("email"),
+        "actor_role": "super_admin",
+        "detail": {"email": user["email"], "name": user.get("name")},
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+
     await delete_pharmacy_account_data(user_id)
     return {"message": "Utente eliminato"}
