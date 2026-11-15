@@ -124,10 +124,9 @@ def _filtro_attivita(
                 {"entity": {"$regex": re.escape(testo), "$options": "i"}},
                 {"action": {"$regex": re.escape(testo), "$options": "i"}},
                 {"actor": {"$regex": re.escape(testo), "$options": "i"}},
-                {"detail": {"$regex": re.escape(testo), "$options": "i"}},
             ]
         }
-        if query.get("$or"):
+        if "$or" in query:
             query["$and"] = [query["$or"], filtro_testo["$or"][0]]
         else:
             query.update(filtro_testo)
