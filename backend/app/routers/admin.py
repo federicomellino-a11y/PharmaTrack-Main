@@ -285,7 +285,6 @@ async def admin_email_status(admin: dict = Depends(get_current_admin)):
 async def admin_me(admin: dict = Depends(get_current_admin)):
     return admin
 
-
 @router.post("/admin/logout")
 async def admin_logout(request: Request, response: Response):
     session_token = request.cookies.get("admin_session_token")
@@ -293,7 +292,6 @@ async def admin_logout(request: Request, response: Response):
         await db.admin_sessions.delete_many({"session_token": session_token})
     clear_cookie_variants(response, "admin_session_token")
     return {"message": "Logged out"}
-
 
 @router.get("/admin/overview")
 async def admin_overview(admin: dict = Depends(get_current_admin)):
@@ -309,7 +307,6 @@ async def admin_overview(admin: dict = Depends(get_current_admin)):
         },
         "latest_users": latest_users,
     }
-
 
 @router.get("/admin/activity")
 async def admin_activity(
@@ -496,17 +493,6 @@ async def admin_update_user_status(user_id: str, data: AdminUserStatusUpdate, ad
         for driver_id in driver_ids:
             await richiudi_canali_revocati("driver", driver_id)
 
-    await db.audit_log.insert_one({
-        "audit_id": f"aud_{datetime.now(timezone.utc).timestamp():.0f}",
-        "entity": "user",
-        "entity_id": user_id,
-        "action": "status_changed",
-        "actor": admin.get("email"),
-        "actor_role": "super_admin",
-        "detail": {"is_active": data.is_active},
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    })
-
     user = await db.users.find_one({"user_id": user_id}, {"_id": 0, "password_hash": 0})
     return user
 
@@ -530,18 +516,6 @@ async def admin_assegna_pro(user_id: str, data: AssegnaPro, admin: dict = Depend
         raise HTTPException(status_code=404, detail="Utente non trovato")
     user = await db.users.find_one({"user_id": user_id}, {"_id": 0, "password_hash": 0})
     user["piano_stato"] = stato_piano(user)
-
-    await db.audit_log.insert_one({
-        "audit_id": f"aud_{datetime.now(timezone.utc).timestamp():.0f}",
-        "entity": "user",
-        "entity_id": user_id,
-        "action": "pro_changed",
-        "actor": admin.get("email"),
-        "actor_role": "super_admin",
-        "detail": {"stato": data.stato, "mesi": data.mesi, "scadenza": data.scadenza},
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    })
-
     return user
 
 
@@ -656,17 +630,6 @@ async def admin_cleanup_sessions(admin: dict = Depends(get_current_admin)):
             "deleted": deleted,
         }
 
-    await db.audit_log.insert_one({
-        "audit_id": f"aud_{datetime.now(timezone.utc).timestamp():.0f}",
-        "entity": "admin",
-        "entity_id": "sessions",
-        "action": "cleanup_sessions",
-        "actor": admin.get("email"),
-        "actor_role": "super_admin",
-        "detail": summary,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    })
-
     return {
         "message": "Pulizia sessioni completata",
         "summary": summary,
@@ -685,17 +648,5 @@ async def admin_delete_user(user_id: str, admin: dict = Depends(get_current_admi
         "Account PharmaTrack eliminato",
         f"Ciao {user.get('name') or 'utente'},\n\nil tuo account PharmaTrack è stato eliminato da un amministratore.\nSe pensi sia stato un errore, contatta il supporto.",
     )
-
-    await db.audit_log.insert_one({
-        "audit_id": f"aud_{datetime.now(timezone.utc).timestamp():.0f}",
-        "entity": "user",
-        "entity_id": user_id,
-        "action": "deleted",
-        "actor": admin.get("email"),
-        "actor_role": "super_admin",
-        "detail": {"email": user["email"], "name": user.get("name")},
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    })
-
     await delete_pharmacy_account_data(user_id)
     return {"message": "Utente eliminato"}
