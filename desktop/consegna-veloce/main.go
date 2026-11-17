@@ -29,34 +29,34 @@ import (
 	"unsafe"
 )
 
-const versione = 8
+const versione = 9
 
 //go:embed assets/icona.ico
 var risorsaIcona embed.FS
 
 const (
-	idPrendi    = 1
-	idModulo    = 2
-	idTasto     = 3
-	idAvvio     = 4
-	idLog       = 5
-	idAggiorna  = 6
-	idEsci      = 9
+	idPrendi          = 1
+	idModulo          = 2
+	idTasto           = 3
+	idAvvio           = 4
+	idLog             = 5
+	idAggiorna        = 6
+	idEsci            = 9
 	intervalloBattito = 5 * time.Minute
 )
 
 var (
-	finestra      uintptr
-	icona         uintptr
+	finestra       uintptr
+	icona          uintptr
 	configurazione *Configurazione
-	cfg           *Configurazione // alias usato da api.go
-	messaggioTray = uint32(wmApp + 1)
-	procWndProc   = syscall.NewCallback(finestraMessaggi)
-	registrato    bool
-	tastoCorrente string
-	statoAvvio    bool
-	fileLog       *os.File
-	tastoScelto   int
+	cfg            *Configurazione // alias usato da api.go
+	messaggioTray  = uint32(wmApp + 1)
+	procWndProc    = syscall.NewCallback(finestraMessaggi)
+	registrato     bool
+	tastoCorrente  string
+	statoAvvio     bool
+	fileLog        *os.File
+	tastoScelto    int
 )
 
 // combinazioni provate in ordine: la prima che Windows concede resta quella.
@@ -186,38 +186,40 @@ func mostraMenu() {
 	var posizione point
 	procGetCursorPos.Call(uintptr(unsafe.Pointer(&posizione)))
 	procSetForegroundWindow.Call(finestra)
-	procTrackPopupMenu.Call(menu, tpmLeftAlign|tpmRightButton|tpmReturnCmd,
+	scelto, _, _ := procTrackPopupMenu.Call(menu, tpmLeftAlign|tpmRightButton|tpmReturnCmd,
 		uintptr(posizione.X), uintptr(posizione.Y), 0, finestra, 0)
 	procPostMessage.Call(finestra, wmNull, 0, 0)
+	scriviLog("menu: chiuso con scelta %d", scelto)
 }
 
 // --- la vendita ---
 
 func prendiVendita() {
 	if configurazione == nil {
-		notifica("Consegna veloce", "Manca la configurazione: riscarica il programma da Integrazioni.", true)
+		avvisoVisibile("Consegna veloce", "Manca la configurazione: riscarica il programma da Integrazioni.")
 		return
 	}
-	scriviLog("vendita: copio la selezione")
+	scriviLog("vendita: copio la selezione (finestra %d)", finestra)
 	notifica("Consegna veloce", "Leggo la vendita…", false)
 	copiaSelezione()
 	time.Sleep(450 * time.Millisecond)
 	testoVendita := leggiAppunti()
+	scriviLog("vendita: appunti %d caratteri", len(testoVendita))
 	if len(strings.TrimSpace(testoVendita)) < 8 {
 		scriviLog("vendita: appunti vuoti")
-		notifica("Nessuna vendita selezionata", "In Winfarm seleziona le righe della vendita e riprova.", true)
+		avvisoVisibile("Nessuna vendita selezionata", "In Winfarm seleziona le righe della vendita e riprova.")
 		return
 	}
 	letto, stato, motivo := leggiVendita(testoVendita)
 	if motivo != "" {
 		scriviLog("parse %d: %s", stato, motivo)
-		notifica("Consegna veloce", motivo, true)
+		avvisoVisibile("Consegna veloce", motivo)
 		return
 	}
 	if !letto.Utilizzabile {
 		scriviLog("parse: vendita non riconosciuta")
-		notifica("Vendita non riconosciuta",
-			"Non ho letto cliente e totale. Seleziona la vendita intera, dalla riga del cliente al totale.", true)
+		avvisoVisibile("Vendita non riconosciuta",
+			"Non ho letto cliente e totale. Seleziona la vendita intera, dalla riga del cliente al totale.")
 		return
 	}
 	cliente := testo(letto.Campi, "cliente")
@@ -232,20 +234,20 @@ func prendiVendita() {
 		scriviLog("consegna creata per %s", cliente)
 		notifica("Consegna creata", cliente+" · apri PharmaTrack per pagamento e indirizzo", false)
 	case 409:
-		notifica("Già importata", "Questa vendita è già una consegna in PharmaTrack.", true)
+		avvisoVisibile("Già importata", "Questa vendita è già una consegna in PharmaTrack.")
 	case 401:
-		notifica("Chiave revocata",
-			"Questo PC non è più collegato. Scarica di nuovo il programma da Integrazioni.", true)
+		avvisoVisibile("Chiave revocata",
+			"Questo PC non è più collegato. Scarica di nuovo il programma da Integrazioni.")
 	case 402:
-		notifica("Piano Professional scaduto", "Le integrazioni sono chiuse: riattiva il piano per usarle.", true)
+		avvisoVisibile("Piano Professional scaduto", "Le integrazioni sono chiuse: riattiva il piano per usarle.")
 	case 422:
 		scriviLog("consegna: cliente da inserire")
 		apriModulo(cliente, letto.Campi)
-		notifica("Serve l'indirizzo", "Ho aperto il modulo: scegli il cliente o aggiungilo con l'indirizzo.", true)
+		avvisoVisibile("Serve l'indirizzo", "Ho aperto il modulo: scegli il cliente o aggiungilo con l'indirizzo.")
 	default:
 		dettaglio := testo(risposta, "detail")
 		scriviLog("consegna: stato %d %s", statoConsegna, dettaglio)
-		notifica("Consegna non creata", fmt.Sprintf("%s (%d)", dettaglio, statoConsegna), true)
+		avvisoVisibile("Consegna non creata", fmt.Sprintf("%s (%d)", dettaglio, statoConsegna))
 	}
 }
 
@@ -337,7 +339,9 @@ func finestraMessaggi(hwnd, messaggio, wparam, lparam uintptr) uintptr {
 		}
 		return 0
 	case wmCommand:
-		switch wparam & 0xffff {
+		comando := wparam & 0xffff
+		scriviLog("menu: comando %d", comando)
+		switch comando {
 		case idPrendi:
 			go prendiVendita()
 		case idModulo:
@@ -350,7 +354,11 @@ func finestraMessaggi(hwnd, messaggio, wparam, lparam uintptr) uintptr {
 		case idAggiorna:
 			go controllaAggiornamento(true)
 		case idLog:
-			apriUrl("file:///" + strings.ReplaceAll(percorsoLog(), "\\", "/"))
+			if !apriPercorso(percorsoLog()) {
+				apriCartella(percorsoLog())
+				avvisoVisibile("Registro",
+					"Non riesco ad aprire il file del registro.\n\nIl registro di Consegna veloce e' qui:\n"+percorsoLog())
+			}
 		case idEsci:
 			procDestroyWindow.Call(hwnd)
 		}
@@ -399,10 +407,13 @@ func creaFinestra() bool {
 		scriviLog("RegisterClassEx fallita")
 		return false
 	}
-	hwndMessage := ^uintptr(2) // HWND_MESSAGE: finestra che non si vede
+	// Finestra normale ma mai mostrata (stile 0, nessun WS_VISIBLE).
+	// Prima era una finestra "message only": il menu si apriva ma
+	// SetForegroundWindow su di lei non ha effetto, quindi TrackPopupMenu
+	// chiudeva la tendina senza mandare il comando scelto.
 	finestra, _, _ = procCreateWindowEx.Call(0,
 		uintptr(unsafe.Pointer(wc.LpszClassName)), 0, 0, 0, 0, 0, 0,
-		hwndMessage, 0, istanza, 0)
+		0, 0, istanza, 0)
 	if finestra == 0 {
 		scriviLog("CreateWindowEx fallita")
 		return false
@@ -495,8 +506,13 @@ func selfTest() int {
 	}
 	if !creaFinestra() {
 		problemi = append(problemi, "finestra di messaggi non creata")
-	}
-	if finestra != 0 {
+	} else {
+		// Una finestra "message only" non puo' passare in primo piano, e senza
+		// primo piano TrackPopupMenu chiude il menu senza mandare il comando:
+		// il pulsante smetteva di rispondere. Deve essere una finestra normale.
+		if padre, _, _ := procGetParent.Call(finestra); padre != 0 {
+			problemi = append(problemi, "finestra agganciata a HWND_MESSAGE: il menu non risponderebbe")
+		}
 		procDestroyWindow.Call(finestra)
 	}
 	esito := "ok"
@@ -546,6 +562,9 @@ func main() {
 	cfg = caricata
 	statoAvvio = avvioAutomaticoAttivo()
 	scriviLog("farmacia %s su %s", configurazione.Farmacia, configurazione.BaseURL)
+	if percorso, erroreExec := os.Executable(); erroreExec == nil {
+		scriviLog("eseguibile: %s", percorso)
+	}
 	if !creaFinestra() {
 		mostraMessaggio("Consegna veloce", "Non sono riuscito ad aprire la finestra di Windows. Vedi il registro nel menu dell'icona.")
 		return
