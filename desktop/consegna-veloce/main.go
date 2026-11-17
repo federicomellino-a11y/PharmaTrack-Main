@@ -29,7 +29,7 @@ import (
 	"unsafe"
 )
 
-const versione = 7
+const versione = 8
 
 //go:embed assets/icona.ico
 var risorsaIcona embed.FS
@@ -61,6 +61,14 @@ var (
 
 // combinazioni provate in ordine: la prima che Windows concede resta quella.
 var combinazioni = []string{"Ctrl+Shift+C", "Ctrl+Shift+D", "Ctrl+Alt+C", "Win+C", "Alt+F9"}
+
+func percorsoPerLog() string {
+	eseguibile, errore := os.Executable()
+	if errore != nil {
+		return "percorso sconosciuto"
+	}
+	return eseguibile
+}
 
 func percorsoEseguibile() (string, error) {
 	return os.Executable()
@@ -465,6 +473,26 @@ func selfTest() int {
 	if dati, err := risorsaIcona.ReadFile("assets/icona.ico"); err != nil || len(dati) < 100 {
 		problemi = append(problemi, "icona non incorporata")
 	}
+	// L'icona vicino all'orologio e' il modo in cui il programma esiste: se
+	// l'API che la aggiunge non si trova, la versione precedente moriva in
+	// silenzio al primo doppio clic. Qui si controlla che si risolva davvero.
+	if apiIconaOrologio() == nil {
+		problemi = append(problemi, "Shell_NotifyIconW non risolta (icona impossibile)")
+	}
+	for _, controllo := range []struct {
+		nome string
+		proc *syscall.LazyProc
+	}{
+		{"RegisterHotKey", procRegisterHotKey},
+		{"SendInput", procSendInput},
+		{"OpenClipboard", procOpenClipboard},
+		{"CreatePopupMenu", procCreatePopupMenu},
+		{"TrackPopupMenu", procTrackPopupMenu},
+	} {
+		if errore := controllo.proc.Find(); errore != nil {
+			problemi = append(problemi, controllo.nome+" non trovata")
+		}
+	}
 	if !creaFinestra() {
 		problemi = append(problemi, "finestra di messaggi non creata")
 	}
@@ -495,7 +523,16 @@ func main() {
 		os.Exit(selfTest())
 	}
 	apriLog()
-	scriviLog("avvio versione %d", versione)
+	scriviLog("avvio versione %d (%s)", versione, percorsoPerLog())
+	// Se qualcosa va storto qui dentro, il programma non deve sparire in
+	// silenzio: l'errore finisce nel registro e in una finestra.
+	defer func() {
+		if guasto := recover(); guasto != nil {
+			scriviLog("errore grave: %v", guasto)
+			mostraMessaggio("Consegna veloce",
+				fmt.Sprintf("Il programma si e' fermato all'avvio.\n\nDettaglio: %v\n\nIl registro completo e' in:\n%s", guasto, percorsoLog()))
+		}
+	}()
 	if !istanzaSingola() {
 		return
 	}
@@ -514,7 +551,11 @@ func main() {
 		return
 	}
 	icona = caricaIcona(iconaSuDisco())
-	aggiungiIcona(finestra, icona, "Consegna veloce — "+primoNome())
+	if !aggiungiIcona(finestra, icona, "Consegna veloce — "+primoNome()) {
+		mostraMessaggio("Consegna veloce",
+			"Non sono riuscito a mettere l'icona vicino all'orologio, quindi il programma non puo' restare attivo.\n\nProva a chiudere e riaprire il programma. Se succede ancora, manda a PharmaTrack il file:\n"+percorsoLog())
+		return
+	}
 	tasto := configurazione.Tasto
 	if tasto == "" {
 		tasto = combinazioni[0]

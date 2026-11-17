@@ -27,7 +27,6 @@ var (
 	procOpenClipboard       = user32.NewProc("OpenClipboard")
 	procCloseClipboard      = user32.NewProc("CloseClipboard")
 	procGetClipboardData    = user32.NewProc("GetClipboardData")
-	procShellNotifyIcon     = user32.NewProc("Shell_NotifyIconW")
 	procCreatePopupMenu     = user32.NewProc("CreatePopupMenu")
 	procAppendMenu          = user32.NewProc("AppendMenuW")
 	procTrackPopupMenu      = user32.NewProc("TrackPopupMenu")
@@ -55,6 +54,26 @@ var (
 	procRegDeleteValue = advapi32.NewProc("RegDeleteValueW")
 	procRegCloseKey    = advapi32.NewProc("RegCloseKey")
 )
+
+// Shell_NotifyIconW vive in shell32.dll: cercata in user32 la prima chiamata
+// andava in panico e, senza console, il programma moriva senza dire niente.
+// Qui la maniglia si risolve una volta sola, provando le due librerie: se in
+// futuro cambia, non torna il silenzio.
+var procShellNotifyIcon *syscall.LazyProc
+
+func apiIconaOrologio() *syscall.LazyProc {
+	if procShellNotifyIcon != nil {
+		return procShellNotifyIcon
+	}
+	for _, libreria := range []*syscall.LazyDLL{shell32, user32} {
+		candidata := libreria.NewProc("Shell_NotifyIconW")
+		if errore := candidata.Find(); errore == nil {
+			procShellNotifyIcon = candidata
+			return procShellNotifyIcon
+		}
+	}
+	return nil
+}
 
 const (
 	wmDestroy      = 0x0002
@@ -231,7 +250,7 @@ func caricaIcona(percorso string) uintptr {
 	return maniglia
 }
 
-func aggiungiIcona(finestra uintptr, icona uintptr, suggerimento string) {
+func aggiungiIcona(finestra uintptr, icona uintptr, suggerimento string) bool {
 	var dati notifyIconData
 	dati.CbSize = uint32(unsafe.Sizeof(dati))
 	dati.HWnd = finestra
@@ -240,7 +259,18 @@ func aggiungiIcona(finestra uintptr, icona uintptr, suggerimento string) {
 	dati.CallbackMessage = messaggioTray
 	dati.HIcon = icona
 	copiaUtf16(dati.SzTip[:], suggerimento)
-	procShellNotifyIcon.Call(nimAdd, uintptr(unsafe.Pointer(&dati)))
+	api := apiIconaOrologio()
+	if api == nil {
+		scriviLog("Shell_NotifyIconW non trovata: icona non aggiunta")
+		return false
+	}
+	esito, _, erroreChiamata := api.Call(nimAdd, uintptr(unsafe.Pointer(&dati)))
+	if esito == 0 {
+		scriviLog("Shell_NotifyIcon(NIM_ADD) rifiutata: %v", erroreChiamata)
+		return false
+	}
+	scriviLog("icona aggiunta vicino all'orologio")
+	return true
 }
 
 func notifica(titolo, testoNotifica string, avviso bool) {
@@ -256,7 +286,9 @@ func notifica(titolo, testoNotifica string, avviso bool) {
 	}
 	copiaUtf16(dati.SzInfoTitle[:], titolo)
 	copiaUtf16(dati.SzInfo[:], testoNotifica)
-	procShellNotifyIcon.Call(nimModify, uintptr(unsafe.Pointer(&dati)))
+	if api := apiIconaOrologio(); api != nil {
+		api.Call(nimModify, uintptr(unsafe.Pointer(&dati)))
+	}
 }
 
 func mostraMessaggio(titolo, testoMessaggio string) {
