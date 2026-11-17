@@ -38,6 +38,7 @@ var (
 	procPostQuitMessage     = user32.NewProc("PostQuitMessage")
 	procDestroyWindow       = user32.NewProc("DestroyWindow")
 	procPostMessage         = user32.NewProc("PostMessageW")
+	procGetParent           = user32.NewProc("GetParent")
 
 	procGetModuleHandle = kernel32.NewProc("GetModuleHandleW")
 	procCreateMutex     = kernel32.NewProc("CreateMutexW")
@@ -50,9 +51,9 @@ var (
 	procRegCreateKeyEx  = advapi32.NewProc("RegCreateKeyExW")
 	procRegOpenKeyEx    = advapi32.NewProc("RegOpenKeyExW")
 	procRegQueryValueEx = advapi32.NewProc("RegQueryValueExW")
-	procRegSetValueEx  = advapi32.NewProc("RegSetValueExW")
-	procRegDeleteValue = advapi32.NewProc("RegDeleteValueW")
-	procRegCloseKey    = advapi32.NewProc("RegCloseKey")
+	procRegSetValueEx   = advapi32.NewProc("RegSetValueExW")
+	procRegDeleteValue  = advapi32.NewProc("RegDeleteValueW")
+	procRegCloseKey     = advapi32.NewProc("RegCloseKey")
 )
 
 // Shell_NotifyIconW vive in shell32.dll: cercata in user32 la prima chiamata
@@ -76,40 +77,40 @@ func apiIconaOrologio() *syscall.LazyProc {
 }
 
 const (
-	wmDestroy      = 0x0002
-	wmCommand      = 0x0111
-	wmApp          = 0x8000
-	wmHotKey       = 0x0312
-	wmLButtonUp    = 0x0202
-	wmLButtonDbl   = 0x0203
-	wmRButtonUp    = 0x0205
-	wmNull         = 0x0000
-	cfUnicodeText  = 13
-	keyUpFlag      = 0x0002
-	vkControl      = 0x11
-	vkC            = 0x43
-	nimAdd         = 0x00000000
-	nimModify      = 0x00000001
-	nimDelete      = 0x00000002
-	nifMessage     = 0x00000001
-	nifIcon        = 0x00000002
-	nifTip         = 0x00000004
-	nifInfo        = 0x00000010
-	niifInfo       = 0x00000001
-	niifWarning    = 0x00000002
-	imageIcon      = 1
-	lrLoadFromFile = 0x000010
-	mfString       = 0x00000000
-	mfSeparator    = 0x00000800
-	mfChecked      = 0x00000008
-	tpmLeftAlign   = 0x0000
-	tpmRightButton = 0x0002
-	tpmReturnCmd   = 0x0100
-	swHide         = 0
-	hkeyCurrentUser = 0x80000001
-	keySetValue     = 0x0002
-	keyQueryValue   = 0x0001
-	regSz           = 1
+	wmDestroy          = 0x0002
+	wmCommand          = 0x0111
+	wmApp              = 0x8000
+	wmHotKey           = 0x0312
+	wmLButtonUp        = 0x0202
+	wmLButtonDbl       = 0x0203
+	wmRButtonUp        = 0x0205
+	wmNull             = 0x0000
+	cfUnicodeText      = 13
+	keyUpFlag          = 0x0002
+	vkControl          = 0x11
+	vkC                = 0x43
+	nimAdd             = 0x00000000
+	nimModify          = 0x00000001
+	nimDelete          = 0x00000002
+	nifMessage         = 0x00000001
+	nifIcon            = 0x00000002
+	nifTip             = 0x00000004
+	nifInfo            = 0x00000010
+	niifInfo           = 0x00000001
+	niifWarning        = 0x00000002
+	imageIcon          = 1
+	lrLoadFromFile     = 0x000010
+	mfString           = 0x00000000
+	mfSeparator        = 0x00000800
+	mfChecked          = 0x00000008
+	tpmLeftAlign       = 0x0000
+	tpmRightButton     = 0x0002
+	tpmReturnCmd       = 0x0100
+	swHide             = 0
+	hkeyCurrentUser    = 0x80000001
+	keySetValue        = 0x0002
+	keyQueryValue      = 0x0001
+	regSz              = 1
 	errorAlreadyExists = 183
 	nullPointer        = 0
 )
@@ -209,11 +210,29 @@ func inviaTasto(vk uint16, flags uint32) {
 // copiaSelezione manda Ctrl+C a Winfarm: quello che è selezionato finisce negli
 // appunti e da lì lo leggiamo. È lo stesso gesto del vecchio bridge Alt+C, ma
 // senza installare AutoHotkey.
+// La copia si manda in un colpo solo: quattro SendInput separati arrivano al
+// programma di vendita con tempi diversi e a volte la C resta attaccata al
+// Ctrl, quindi la selezione non finisce negli appunti e sembra che il
+// programma non legga niente.
 func copiaSelezione() {
-	inviaTasto(vkControl, 0)
-	inviaTasto(vkC, 0)
-	inviaTasto(vkC, keyUpFlag)
-	inviaTasto(vkControl, keyUpFlag)
+	var eventi [4]inputStruct
+	for i, evento := range []struct {
+		vk    uint16
+		flags uint32
+	}{
+		{vkControl, 0},
+		{vkC, 0},
+		{vkC, keyUpFlag},
+		{vkControl, keyUpFlag},
+	} {
+		eventi[i].Type = 1
+		eventi[i].Ki.Vk = evento.vk
+		eventi[i].Ki.Flags = evento.flags
+	}
+	inviate, _, _ := procSendInput.Call(4, uintptr(unsafe.Pointer(&eventi[0])), unsafe.Sizeof(eventi[0]))
+	if inviate != 4 {
+		scriviLog("copia: SendInput ha preso %d eventi su 4", inviate)
+	}
 }
 
 func leggiAppunti() string {
@@ -273,6 +292,14 @@ func aggiungiIcona(finestra uintptr, icona uintptr, suggerimento string) bool {
 	return true
 }
 
+// Un problema va visto sempre: i fumetti di Windows si perdono con
+// l'Assistenza concentrazione o con le notifiche spente per il programma, e al
+// banco "non e' successo niente" e' peggio di una finestra in piu'.
+func avvisoVisibile(titolo, testoAvviso string) {
+	notifica(titolo, testoAvviso, true)
+	mostraMessaggio(titolo, testoAvviso)
+}
+
 func notifica(titolo, testoNotifica string, avviso bool) {
 	var dati notifyIconData
 	dati.CbSize = uint32(unsafe.Sizeof(dati))
@@ -287,7 +314,10 @@ func notifica(titolo, testoNotifica string, avviso bool) {
 	copiaUtf16(dati.SzInfoTitle[:], titolo)
 	copiaUtf16(dati.SzInfo[:], testoNotifica)
 	if api := apiIconaOrologio(); api != nil {
-		api.Call(nimModify, uintptr(unsafe.Pointer(&dati)))
+		esito, _, _ := api.Call(nimModify, uintptr(unsafe.Pointer(&dati)))
+		if esito == 0 {
+			scriviLog("fumetto non mostrato da Windows: %s", titolo)
+		}
 	}
 }
 
@@ -295,6 +325,29 @@ func mostraMessaggio(titolo, testoMessaggio string) {
 	procMessageBox.Call(0,
 		uintptr(unsafe.Pointer(puntatoreUtf16(testoMessaggio))),
 		uintptr(unsafe.Pointer(puntatoreUtf16(titolo))), 0x40)
+}
+
+// "file:///C:/..." non e' un file: ShellExecute lo rifiuta e il menu sembra
+// morto. Qui si apre il percorso vero.
+func apriPercorso(percorso string) bool {
+	esito, _, _ := procShellExecute.Call(0,
+		uintptr(unsafe.Pointer(puntatoreUtf16("open"))),
+		uintptr(unsafe.Pointer(puntatoreUtf16(percorso))),
+		0, 0, 1)
+	if esito <= 32 {
+		scriviLog("apertura di '%s' rifiutata (codice %d)", percorso, esito)
+		return false
+	}
+	return true
+}
+
+// Mostra il file dentro la sua cartella: ultima strada quando il programma
+// predefinito non risponde.
+func apriCartella(percorso string) {
+	procShellExecute.Call(0,
+		uintptr(unsafe.Pointer(puntatoreUtf16("explorer.exe"))),
+		uintptr(unsafe.Pointer(puntatoreUtf16("/select,"+percorso))),
+		0, 0, 1)
 }
 
 func apriUrl(url string) {
