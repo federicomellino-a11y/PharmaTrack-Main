@@ -5,13 +5,13 @@
 # e i tool di sviluppo. I pacchetti di supporto (starlette, anyio, limits,
 # cryptography, ...) arrivano come dipendenze indirette: non vanno pinnati qui.
 
-fastapi==0.162.2
+fastapi==0.162.7
 starlette==1.10.0
 uvicorn==0.25.0
 websockets==13.1
 pydantic==2.12.5
 email-validator==2.3.0
-python-multipart==0.0.33
+python-multipart==0.0.34
 python-dotenv==1.2.4
 
 motor==3.7.1
